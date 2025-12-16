@@ -115,7 +115,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    chatTransition.value = withTiming(activeTab === 'chat' ? 1 : 0, { duration: 250 });
+    chatTransition.value = withTiming(activeTab === 'chat' ? 1 : 0, { duration: 280 });
   }, [activeTab, chatTransition]);
 
   const homeAnimatedStyle = useAnimatedStyle(() => ({
@@ -131,7 +131,10 @@ export default function App() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
-      <Animated.View style={[styles.screenLayer, homeAnimatedStyle]} pointerEvents={activeTab === 'chat' ? 'none' : 'auto'}>
+      <Animated.View
+        style={[styles.screenLayer, homeAnimatedStyle]}
+        pointerEvents={activeTab === 'chat' ? 'none' : 'auto'}
+      >
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.deviceCutout} />
 
@@ -227,7 +230,10 @@ export default function App() {
         </ScrollView>
       </Animated.View>
 
-      <Animated.View style={[styles.screenLayer, styles.chatLayer, chatAnimatedStyle]} pointerEvents={activeTab === 'chat' ? 'auto' : 'none'}>
+      <Animated.View
+        style={[styles.screenLayer, styles.chatLayer, chatAnimatedStyle]}
+        pointerEvents={activeTab === 'chat' ? 'auto' : 'none'}
+      >
         <View style={styles.chatContainer}>
           <View style={styles.chatHeader}>
             <Text style={styles.chatTitle}>Support Chat</Text>
@@ -316,6 +322,13 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     fontSize: 13,
     marginLeft: 8,
+  },
+  statusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#22c55e',
+    marginRight: 6,
   },
   scrollContent: {
     paddingBottom: 120,
