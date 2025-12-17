@@ -21,6 +21,7 @@
     "@solana/wallet-adapter-base": "^0.9.27",
     "@solana/wallet-adapter-react": "^0.15.39",
     "@solana/web3.js": "^1.98.4",
+    "@supabase/supabase-js": "^2.88.0",
     "@walletconnect/react-native-compat": "^2.23.1",
     "axios": "^1.13.2",
     "date-and-time": "^4.1.2",
