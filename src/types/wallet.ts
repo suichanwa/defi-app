@@ -3,4 +3,5 @@ export type EncryptedWalletKey = {
   encryptedJson: string;
   createdAt: string;
   updatedAt: string;
+  backupCompleted?: boolean;
 };

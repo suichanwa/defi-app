@@ -8,6 +8,7 @@ import ConnectScreen from '../components/secureChat/ConnectScreen';
 import type { ChatMessage, ChatThread, ServerInfo } from '../types/secureChat';
 import * as date from 'date-and-time';
 import * as Location from 'expo-location';
+import { useTheme } from '../theme/ThemeProvider';
 
 const initialChats: ChatThread[] = [
   {
@@ -53,6 +54,7 @@ const initialMessages: Record<string, ChatMessage[]> = {
 };
 
 export default function SecureChatScreen() {
+  const { colors } = useTheme();
   const [secureTab, setSecureTab] = useState<'chats' | 'connect'>('chats');
   const [chatView, setChatView] = useState<'list' | 'thread'>('list');
   const [chats, setChats] = useState<ChatThread[]>(initialChats);
@@ -244,7 +246,13 @@ export default function SecureChatScreen() {
   };
 
   return (
-    <View style={[styles.container, isCompact && styles.containerCompact]}>
+    <View
+      style={[
+        styles.container,
+        isCompact && styles.containerCompact,
+        { backgroundColor: colors.background },
+      ]}
+    >
       <ChatHeader
         isCompact={isCompact}
         timeLabel={timeLabel}

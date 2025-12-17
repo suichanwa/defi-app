@@ -8,11 +8,14 @@ import SecureChatScreen from './src/screens/SecureChatScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import { appShellStyles as styles } from './src/styles/AppShellStyles';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ThemeProvider, useTheme } from './src/theme/ThemeProvider';
+import { WalletSessionProvider } from './src/context/WalletSessionProvider';
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState<'wallet' | 'secureChat' | 'profile'>('wallet');
   const secureTransition = useSharedValue(0);
   const insets = useSafeAreaInsets();
+  const { colors, resolved } = useTheme();
 
   useEffect(() => {
     secureTransition.value = withTiming(activeTab === 'secureChat' ? 1 : 0, { duration: 280 });
@@ -41,13 +44,15 @@ function AppContent() {
           paddingBottom: insets.bottom,
           paddingLeft: insets.left,
           paddingRight: insets.right,
+          backgroundColor: colors.background,
         },
       ]}
     >
-      <StatusBar style="dark" />
+      <StatusBar style={resolved === 'dark' ? 'light' : 'dark'} />
       <Animated.View
         style={[
           styles.screenLayer,
+          { backgroundColor: colors.background },
           walletAnimatedStyle,
           isWeb && { pointerEvents: walletPointerEvents },
         ]}
@@ -60,6 +65,7 @@ function AppContent() {
         style={[
           styles.screenLayer,
           styles.chatLayer,
+          { backgroundColor: colors.background },
           secureChatAnimatedStyle,
           isWeb && { pointerEvents: chatPointerEvents },
         ]}
@@ -68,38 +74,47 @@ function AppContent() {
         <SecureChatScreen />
       </Animated.View>
 
-      <View style={styles.bottomNav}>
+      <View style={[styles.bottomNav, { backgroundColor: colors.nav }]}>
         <TouchableOpacity
-          style={[styles.navItem, activeTab === 'wallet' && styles.navItemActive]}
+          style={[
+            styles.navItem,
+            activeTab === 'wallet' && { backgroundColor: `${colors.accent}22` },
+          ]}
           onPress={() => setActiveTab('wallet')}
           activeOpacity={0.8}
         >
           <MaterialCommunityIcons
             name="wallet-outline"
             size={26}
-            color={activeTab === 'wallet' ? '#4f46e5' : '#111827'}
+            color={activeTab === 'wallet' ? colors.accent : colors.text}
           />
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.navItem, activeTab === 'secureChat' && styles.navItemActive]}
+          style={[
+            styles.navItem,
+            activeTab === 'secureChat' && { backgroundColor: `${colors.accent}22` },
+          ]}
           onPress={() => setActiveTab('secureChat')}
           activeOpacity={0.8}
         >
           <MaterialCommunityIcons
             name="message-lock-outline"
             size={26}
-            color={activeTab === 'secureChat' ? '#4f46e5' : '#111827'}
+            color={activeTab === 'secureChat' ? colors.accent : colors.text}
           />
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.navItem, activeTab === 'profile' && styles.navItemActive]}
+          style={[
+            styles.navItem,
+            activeTab === 'profile' && { backgroundColor: `${colors.accent}22` },
+          ]}
           onPress={() => setActiveTab('profile')}
           activeOpacity={0.8}
         >
           <Ionicons
             name="person-circle-outline"
             size={28}
-            color={activeTab === 'profile' ? '#4f46e5' : '#111827'}
+            color={activeTab === 'profile' ? colors.accent : colors.text}
           />
         </TouchableOpacity>
       </View>
@@ -110,7 +125,11 @@ function AppContent() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AppContent />
+      <ThemeProvider>
+        <WalletSessionProvider>
+          <AppContent />
+        </WalletSessionProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

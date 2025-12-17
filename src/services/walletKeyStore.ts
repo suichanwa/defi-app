@@ -1,8 +1,11 @@
 import { Wallet } from 'ethers';
 import type { EncryptedWalletKey } from '../types/wallet';
-import { getJson, setJson } from './storage';
+import { getJson, removeKey, setJson } from './storage';
+import { deleteSecureItem, getSecureItem, setSecureItem } from './secureStore';
 
-const WALLET_KEY = 'wallet.encryptedKey.v1';
+const METADATA_KEY = 'wallet.metadata.v1';
+const SECURE_KEY = 'wallet.encrypted.v1';
+const LEGACY_KEY = 'wallet.encryptedKey.v1';
 
 export class WalletKeyNotFoundError extends Error {
   constructor() {
@@ -26,11 +29,31 @@ export class WalletReencryptError extends Error {
 }
 
 export async function loadEncryptedWalletKey(): Promise<EncryptedWalletKey | null> {
-  return getJson<EncryptedWalletKey>(WALLET_KEY);
+  const [meta, secureJson, legacy] = await Promise.all([
+    getJson<Omit<EncryptedWalletKey, 'encryptedJson'> | null>(METADATA_KEY),
+    getSecureItem(SECURE_KEY),
+    getJson<EncryptedWalletKey | null>(LEGACY_KEY),
+  ]);
+
+  if (legacy && !secureJson) {
+    await setSecureItem(SECURE_KEY, legacy.encryptedJson);
+    await setJson(METADATA_KEY, {
+      id: legacy.id,
+      createdAt: legacy.createdAt,
+      updatedAt: legacy.updatedAt,
+      backupCompleted: legacy.backupCompleted,
+    });
+    await removeKey(LEGACY_KEY);
+    return legacy;
+  }
+
+  if (!meta || !secureJson) return null;
+  return { ...meta, encryptedJson: secureJson };
 }
 
 export async function saveEncryptedWalletKey(record: EncryptedWalletKey): Promise<void> {
-  await setJson(WALLET_KEY, record);
+  const { encryptedJson, ...meta } = record;
+  await Promise.all([setJson(METADATA_KEY, meta), setSecureItem(SECURE_KEY, encryptedJson)]);
 }
 
 export async function encryptWalletKey(privateKey: string, password: string): Promise<EncryptedWalletKey> {
@@ -42,6 +65,7 @@ export async function encryptWalletKey(privateKey: string, password: string): Pr
     encryptedJson,
     createdAt: timestamp,
     updatedAt: timestamp,
+    backupCompleted: false,
   };
 }
 
@@ -59,6 +83,7 @@ export async function createInitialWalletKey(password: string): Promise<Encrypte
     encryptedJson,
     createdAt: timestamp,
     updatedAt: timestamp,
+    backupCompleted: false,
   };
   await saveEncryptedWalletKey(record);
   return record;
@@ -83,6 +108,7 @@ export async function changeWalletPassword(currentPassword: string, newPassword:
     id: existing.id ?? updated.id,
     createdAt: existing.createdAt ?? updated.createdAt,
     updatedAt: new Date().toISOString(),
+    backupCompleted: existing.backupCompleted,
   };
 
   await saveEncryptedWalletKey(next);
@@ -94,4 +120,15 @@ export async function changeWalletPassword(currentPassword: string, newPassword:
   }
 
   return next;
+}
+
+export async function markBackupCompleted(): Promise<void> {
+  const existing = await loadEncryptedWalletKey();
+  if (!existing) return;
+  const next = { ...existing, backupCompleted: true, updatedAt: new Date().toISOString() };
+  await saveEncryptedWalletKey(next);
+}
+
+export async function clearWallet(): Promise<void> {
+  await Promise.all([removeKey(METADATA_KEY), removeKey(LEGACY_KEY), deleteSecureItem(SECURE_KEY)]);
 }

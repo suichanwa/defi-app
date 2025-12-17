@@ -17,8 +17,14 @@ import {
   type AuthSession,
 } from '../services/auth';
 import { getAnonymousId } from '../services/identity';
-import { fetchRewardsActivity, fetchRewardsSummary } from '../services/rewardsRemote';
+import {
+  fetchRewardsActivity,
+  fetchRewardsSummary,
+  insertRewardsActivity,
+  upsertRewardsSummary,
+} from '../services/rewardsRemote';
 import { isSupabaseConfigured } from '../services/supabaseClient';
+import { fetchRemoteProfile, upsertRemoteProfile } from '../services/profileRemote';
 import {
   changeWalletPassword,
   createInitialWalletKey,
@@ -27,6 +33,7 @@ import {
   WalletPasswordError,
   WalletReencryptError,
 } from '../services/walletKeyStore';
+import { useTheme } from '../theme/ThemeProvider';
 
 type ProfileView = 'home' | 'personalization' | 'security' | 'rewards' | 'auth';
 
@@ -89,25 +96,46 @@ export default function ProfileScreen() {
   const [rewardsSummary, setRewardsSummary] = useState<RewardsSummary | null>(null);
   const [rewardsActivity, setRewardsActivity] = useState<RewardActivity[]>([]);
   const [rewardsSource, setRewardsSource] = useState<'local' | 'supabase'>('local');
+  const [profileSource, setProfileSource] = useState<'local' | 'supabase'>('local');
+  const [effectiveUserId, setEffectiveUserId] = useState<string | null>(null);
+  const { preference: themePrefCtx, setPreference: setThemePrefCtx, colors } = useTheme();
+  const cardStyle = useMemo(
+    () => [styles.card, { backgroundColor: colors.card, borderColor: colors.border }],
+    [colors],
+  );
+  const scrollStyle = useMemo(() => [styles.scrollContent, { backgroundColor: colors.background }], [colors]);
 
   useEffect(() => {
     let isMounted = true;
     const loadAll = async () => {
       const [settings, key] = await Promise.all([loadProfileSettings(), loadEncryptedWalletKey()]);
-      const anonymousId = await getAnonymousId();
+      const currentSession = await getAuthSession();
+      const userId = currentSession?.user?.id ?? (await getAnonymousId());
+      setEffectiveUserId(userId);
+      const useSupabaseRewards = Boolean(isSupabaseConfigured && currentSession?.user?.id);
       const [remoteSummary, remoteActivity] = await Promise.all([
-        fetchRewardsSummary(anonymousId),
-        fetchRewardsActivity(anonymousId),
+        useSupabaseRewards ? fetchRewardsSummary(userId) : Promise.resolve(null),
+        useSupabaseRewards ? fetchRewardsActivity(userId) : Promise.resolve(null),
       ]);
       const [localSummary, localActivity] = await Promise.all([loadRewardsSummary(), loadRewardsActivity()]);
+      const remoteProfile =
+        isSupabaseConfigured && currentSession?.user?.id
+          ? await fetchRemoteProfile(currentSession.user.id)
+          : null;
       if (!isMounted) return;
-      setAlias(settings.alias ?? '');
-      setAvatarType(settings.avatarType ?? 'identicon');
-      const nextSeed = settings.avatarSeed ?? key?.id ?? makeSeed();
+      const mergedProfile = remoteProfile ?? settings;
+      setProfileSource(remoteProfile ? 'supabase' : 'local');
+      setAlias(mergedProfile.alias ?? '');
+      setAvatarType(mergedProfile.avatarType ?? 'identicon');
+      const nextSeed = mergedProfile.avatarSeed ?? key?.id ?? makeSeed();
       setAvatarSeed(nextSeed);
-      setThemePreference(settings.themePreference ?? 'system');
-      if (!settings.avatarSeed) {
-        await saveProfileSettings({ ...settings, avatarSeed: nextSeed });
+      const mergedTheme = mergedProfile.themePreference ?? 'system';
+      setThemePreference(mergedTheme);
+      if (mergedTheme !== themePrefCtx) {
+        await setThemePrefCtx(mergedTheme);
+      }
+      if (!mergedProfile.avatarSeed) {
+        await saveProfileSettings({ ...mergedProfile, avatarSeed: nextSeed });
       }
       setWalletKey(key);
       if (isSupabaseConfigured && remoteSummary) {
@@ -167,6 +195,16 @@ export default function ProfileScreen() {
       avatarSeed: avatarType === 'identicon' ? identiconSeed : undefined,
       themePreference,
     });
+    if (isSupabaseConfigured && session?.user?.id) {
+      await upsertRemoteProfile(session.user.id, saved);
+      setProfileSource('supabase');
+      if (rewardsSource === 'supabase' && rewardsSummary) {
+        await upsertRewardsSummary(session.user.id, rewardsSummary);
+      }
+      if (rewardsSource === 'supabase' && rewardsActivity.length > 0) {
+        await insertRewardsActivity(session.user.id, rewardsActivity);
+      }
+    }
     setAlias(saved.alias);
     setProfileMessage('Profile preferences saved.');
   };
@@ -362,9 +400,9 @@ export default function ProfileScreen() {
 
   if (view === 'personalization') {
     return (
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={scrollStyle} showsVerticalScrollIndicator={false}>
         {renderHeader('Personalization')}
-        <View style={styles.card}>
+        <View style={cardStyle}>
           <Text style={styles.cardTitle}>Display alias</Text>
           <TextInput
             value={alias}
@@ -377,7 +415,7 @@ export default function ProfileScreen() {
           <Text style={styles.hint}>Optional. 3-24 characters using letters, numbers, spaces, _ and -.</Text>
         </View>
 
-        <View style={styles.card}>
+        <View style={cardStyle}>
           <Text style={styles.cardTitle}>Avatar</Text>
           <View style={styles.avatarRow}>
             <View style={styles.avatarPreview}>
@@ -417,14 +455,17 @@ export default function ProfileScreen() {
           <Text style={styles.hint}>Identicon is derived from your local wallet id.</Text>
         </View>
 
-        <View style={styles.card}>
+        <View style={cardStyle}>
           <Text style={styles.cardTitle}>Theme preference</Text>
           <View style={styles.optionRow}>
             {(['system', 'light', 'dark'] as ThemePreference[]).map((option) => (
               <TouchableOpacity
                 key={option}
                 style={[styles.optionButton, themePreference === option && styles.optionButtonActive]}
-                onPress={() => setThemePreference(option)}
+                onPress={async () => {
+                  setThemePreference(option);
+                  await setThemePrefCtx(option);
+                }}
                 activeOpacity={0.8}
               >
                 <Text style={themePreference === option ? styles.optionTextActive : styles.optionText}>
@@ -448,9 +489,9 @@ export default function ProfileScreen() {
 
   if (view === 'auth') {
     return (
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={scrollStyle} showsVerticalScrollIndicator={false}>
         {renderHeader('Account access')}
-        <View style={styles.card}>
+        <View style={cardStyle}>
           <View style={styles.cardRow}>
             <Text style={styles.cardTitle}>Supabase auth</Text>
             <Ionicons name="lock-closed-outline" size={20} color="#4f46e5" />
@@ -542,9 +583,9 @@ export default function ProfileScreen() {
 
   if (view === 'security') {
     return (
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={scrollStyle} showsVerticalScrollIndicator={false}>
         {renderHeader('Security')}
-        <View style={styles.card}>
+        <View style={cardStyle}>
           <View style={styles.cardRow}>
             <Text style={styles.cardTitle}>Wallet key status</Text>
             <MaterialCommunityIcons name="shield-lock-outline" size={20} color="#4f46e5" />
@@ -561,7 +602,7 @@ export default function ProfileScreen() {
         </View>
 
         {!walletKey ? (
-          <View style={styles.card}>
+          <View style={cardStyle}>
             <Text style={styles.cardTitle}>Create local wallet key</Text>
             <Text style={styles.cardSubtitle}>Set a password to encrypt a new local key.</Text>
             <TextInput
@@ -585,7 +626,7 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={styles.card}>
+          <View style={cardStyle}>
             <Text style={styles.cardTitle}>Change wallet password</Text>
             <TextInput
               value={currentPassword}
@@ -625,18 +666,19 @@ export default function ProfileScreen() {
 
   if (view === 'rewards') {
     return (
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={scrollStyle} showsVerticalScrollIndicator={false}>
         {renderHeader('RewardsHub')}
-        <View style={styles.card}>
+        <View style={cardStyle}>
           <Text style={styles.cardTitle}>Rewards balance</Text>
           <Text style={styles.pointsValue}>{rewardsSummary?.points ?? 0} pts</Text>
           <Text style={styles.metaText}>Tier: {rewardsSummary?.tier ?? 'bronze'}</Text>
           <Text style={styles.metaText}>
             Source: {rewardsSource === 'supabase' ? 'Supabase' : 'Local mock data'}
+            {effectiveUserId ? ` · User: ${effectiveUserId.slice(0, 8)}` : ''}
           </Text>
         </View>
 
-        <View style={styles.card}>
+        <View style={cardStyle}>
           <Text style={styles.cardTitle}>How points are earned</Text>
           {rules.map((rule) => (
             <Text key={rule} style={styles.listItem}>
@@ -645,7 +687,7 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        <View style={styles.card}>
+        <View style={cardStyle}>
           <Text style={styles.cardTitle}>Recent activity</Text>
           {rewardsActivity.length === 0 ? (
             <Text style={styles.cardSubtitle}>No activity yet.</Text>
@@ -667,26 +709,28 @@ export default function ProfileScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={scrollStyle} showsVerticalScrollIndicator={false}>
       <View style={styles.titleBlock}>
         <Text style={styles.headerTitle}>Profile</Text>
         <Text style={styles.cardSubtitle}>Manage how your account feels and stays secure.</Text>
       </View>
 
-      <TouchableOpacity style={styles.card} onPress={() => setView('personalization')} activeOpacity={0.85}>
+      <TouchableOpacity style={cardStyle} onPress={() => setView('personalization')} activeOpacity={0.85}>
         <View style={styles.cardRow}>
           <View style={styles.cardIcon}>
             <Ionicons name="color-palette-outline" size={22} color="#4f46e5" />
           </View>
           <View style={styles.cardBody}>
             <Text style={styles.cardTitle}>Personalization</Text>
-            <Text style={styles.cardSubtitle}>Alias, avatar, and theme preferences.</Text>
+            <Text style={styles.cardSubtitle}>
+              Alias, avatar, and theme preferences. Source: {profileSource === 'supabase' ? 'Supabase' : 'Local'}.
+            </Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
         </View>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.card} onPress={() => setView('auth')} activeOpacity={0.85}>
+      <TouchableOpacity style={cardStyle} onPress={() => setView('auth')} activeOpacity={0.85}>
         <View style={styles.cardRow}>
           <View style={styles.cardIcon}>
             <Ionicons name="log-in-outline" size={22} color="#4f46e5" />
@@ -699,7 +743,7 @@ export default function ProfileScreen() {
         </View>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.card} onPress={() => setView('security')} activeOpacity={0.85}>
+      <TouchableOpacity style={cardStyle} onPress={() => setView('security')} activeOpacity={0.85}>
         <View style={styles.cardRow}>
           <View style={styles.cardIcon}>
             <MaterialCommunityIcons name="shield-lock-outline" size={22} color="#4f46e5" />
@@ -712,7 +756,7 @@ export default function ProfileScreen() {
         </View>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.card} onPress={() => setView('rewards')} activeOpacity={0.85}>
+      <TouchableOpacity style={cardStyle} onPress={() => setView('rewards')} activeOpacity={0.85}>
         <View style={styles.cardRow}>
           <View style={styles.cardIcon}>
             <Ionicons name="gift-outline" size={22} color="#4f46e5" />

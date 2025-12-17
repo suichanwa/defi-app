@@ -52,3 +52,27 @@ export async function fetchRewardsActivity(userId: string): Promise<RewardActivi
     timestamp: item.timestamp,
   }));
 }
+
+export async function upsertRewardsSummary(userId: string, summary: RewardsSummary): Promise<void> {
+  if (!supabase) return;
+  const payload = {
+    user_id: userId,
+    points: summary.points,
+    tier: summary.tier,
+    updated_at: summary.updatedAt,
+  };
+  await supabase.from('rewards_summary').upsert(payload);
+}
+
+export async function insertRewardsActivity(userId: string, activity: RewardActivity[]): Promise<void> {
+  if (!supabase || activity.length === 0) return;
+  const rows = activity.map((item) => ({
+    id: item.id,
+    user_id: userId,
+    title: item.title,
+    description: item.description,
+    points_delta: item.pointsDelta,
+    timestamp: item.timestamp,
+  }));
+  await supabase.from('rewards_activity').upsert(rows);
+}
