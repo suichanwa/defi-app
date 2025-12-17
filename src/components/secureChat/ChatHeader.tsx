@@ -8,17 +8,19 @@ type Props = {
 };
 
 export default function ChatHeader({ isCompact, timeLabel, locationLabel }: Props) {
+  const hasMeta = Boolean(timeLabel || locationLabel);
+
   return (
     <View style={[styles.container, isCompact && styles.containerCompact]}>
       <View style={styles.titleBlock}>
         <Text style={styles.title}>Secure Chat</Text>
         <Text style={styles.subtitle}>Components mirrored from repo/secureChat</Text>
-        {(timeLabel || locationLabel) && (
+        {hasMeta ? (
           <View style={styles.metaRow}>
-            {timeLabel && <Text style={styles.metaText}>Local time: {timeLabel}</Text>}
-            {locationLabel && <Text style={styles.metaHint}>{locationLabel}</Text>}
+            {timeLabel ? <Text style={styles.metaText}>Local time: {timeLabel}</Text> : null}
+            {locationLabel ? <Text style={styles.metaHint}>{locationLabel}</Text> : null}
           </View>
-        )}
+        ) : null}
       </View>
     </View>
   );

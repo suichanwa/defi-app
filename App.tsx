@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { TouchableOpacity, View } from 'react-native';
+import { Platform, TouchableOpacity, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import WalletScreen from './src/screens/WalletScreen';
@@ -27,20 +27,33 @@ export default function App() {
     transform: [{ translateX: 12 * (1 - secureTransition.value) }],
   }));
 
+  const isWeb = Platform.OS === 'web';
+  const walletPointerEvents = activeTab === 'secureChat' ? 'none' : 'auto';
+  const chatPointerEvents = activeTab === 'secureChat' ? 'auto' : 'none';
+
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.safeArea}>
         <StatusBar style="dark" />
         <Animated.View
-          style={[styles.screenLayer, walletAnimatedStyle]}
-          pointerEvents={activeTab === 'secureChat' ? 'none' : 'auto'}
+          style={[
+            styles.screenLayer,
+            walletAnimatedStyle,
+            isWeb && { pointerEvents: walletPointerEvents },
+          ]}
+          pointerEvents={isWeb ? undefined : walletPointerEvents}
         >
           {activeTab === 'profile' ? <ProfileScreen /> : <WalletScreen />}
         </Animated.View>
 
         <Animated.View
-          style={[styles.screenLayer, styles.chatLayer, secureChatAnimatedStyle]}
-          pointerEvents={activeTab === 'secureChat' ? 'auto' : 'none'}
+          style={[
+            styles.screenLayer,
+            styles.chatLayer,
+            secureChatAnimatedStyle,
+            isWeb && { pointerEvents: chatPointerEvents },
+          ]}
+          pointerEvents={isWeb ? undefined : chatPointerEvents}
         >
           <SecureChatScreen />
         </Animated.View>

@@ -7,6 +7,9 @@ import type { EncryptedWalletKey } from '../types/wallet';
 import type { RewardActivity, RewardsSummary } from '../types/rewards';
 import { loadProfileSettings, saveProfileSettings } from '../services/profileStore';
 import { loadRewardsActivity, loadRewardsSummary } from '../services/rewardsStore';
+import { getAnonymousId } from '../services/identity';
+import { fetchRewardsActivity, fetchRewardsSummary } from '../services/rewardsRemote';
+import { isSupabaseConfigured } from '../services/supabaseClient';
 import {
   changeWalletPassword,
   createInitialWalletKey,
@@ -67,16 +70,18 @@ export default function ProfileScreen() {
   const [securityError, setSecurityError] = useState<string | null>(null);
   const [rewardsSummary, setRewardsSummary] = useState<RewardsSummary | null>(null);
   const [rewardsActivity, setRewardsActivity] = useState<RewardActivity[]>([]);
+  const [rewardsSource, setRewardsSource] = useState<'local' | 'supabase'>('local');
 
   useEffect(() => {
     let isMounted = true;
     const loadAll = async () => {
-      const [settings, key, summary, activity] = await Promise.all([
-        loadProfileSettings(),
-        loadEncryptedWalletKey(),
-        loadRewardsSummary(),
-        loadRewardsActivity(),
+      const [settings, key] = await Promise.all([loadProfileSettings(), loadEncryptedWalletKey()]);
+      const anonymousId = await getAnonymousId();
+      const [remoteSummary, remoteActivity] = await Promise.all([
+        fetchRewardsSummary(anonymousId),
+        fetchRewardsActivity(anonymousId),
       ]);
+      const [localSummary, localActivity] = await Promise.all([loadRewardsSummary(), loadRewardsActivity()]);
       if (!isMounted) return;
       setAlias(settings.alias ?? '');
       setAvatarType(settings.avatarType ?? 'identicon');
@@ -87,8 +92,19 @@ export default function ProfileScreen() {
         await saveProfileSettings({ ...settings, avatarSeed: nextSeed });
       }
       setWalletKey(key);
-      setRewardsSummary(summary);
-      setRewardsActivity(activity);
+      if (isSupabaseConfigured && remoteSummary) {
+        setRewardsSummary(remoteSummary);
+        setRewardsSource('supabase');
+      } else {
+        setRewardsSummary(localSummary);
+        setRewardsSource('local');
+      }
+
+      if (isSupabaseConfigured && remoteActivity) {
+        setRewardsActivity(remoteActivity);
+      } else {
+        setRewardsActivity(localActivity);
+      }
     };
     loadAll();
     return () => {
@@ -392,6 +408,9 @@ export default function ProfileScreen() {
           <Text style={styles.cardTitle}>Rewards balance</Text>
           <Text style={styles.pointsValue}>{rewardsSummary?.points ?? 0} pts</Text>
           <Text style={styles.metaText}>Tier: {rewardsSummary?.tier ?? 'bronze'}</Text>
+          <Text style={styles.metaText}>
+            Source: {rewardsSource === 'supabase' ? 'Supabase' : 'Local mock data'}
+          </Text>
         </View>
 
         <View style={styles.card}>
