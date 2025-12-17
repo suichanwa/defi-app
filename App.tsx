@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView, TouchableOpacity, View } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import WalletScreen from './src/screens/WalletScreen';
 import SecureChatScreen from './src/screens/SecureChatScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import { appShellStyles as styles } from './src/styles/AppShellStyles';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'wallet' | 'secureChat' | 'profile'>('wallet');

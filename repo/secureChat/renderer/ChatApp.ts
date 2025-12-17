@@ -511,9 +511,8 @@ export class ChatApp implements Component {
       return;
     }
 
-    if (!res.ok) {
-      const msg = this.mapConnectError(res.reason);
-      // Use the error modal
+    if (typeof res === 'object' && res !== null && 'ok' in res) {
+      const msg = this.mapConnectError((res as any).reason);
       this.errorModal.show(msg);
       throw new Error(msg);
     }

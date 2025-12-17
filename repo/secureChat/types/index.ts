@@ -86,7 +86,10 @@ export interface ElectronAPI {
   };
   transport: {
     startServer: (port?: number) => Promise<{ port: number; address: string }>;
-    connect: (address: string, port: number) => Promise<boolean>;
+    connect: (
+      address: string,
+      port: number,
+    ) => Promise<boolean | { ok: boolean; reason?: string }>;
     send: (chatId: string, data: unknown) => Promise<boolean>;
     disconnect: (chatId: string) => Promise<void>;
     onMessage: (callback: (chatId: string, data: unknown) => void) => void;

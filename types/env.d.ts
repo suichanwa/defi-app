@@ -1,3 +1,5 @@
+/// <reference types="nativewind/types" />
+
 declare module '@env' {
   export const ANTHROPIC_API_KEY: string;
   export const WALLETCONNECT_PROJECT_ID: string;
