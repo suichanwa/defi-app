@@ -1,4 +1,17 @@
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
+
+const cardShadow = Platform.select({
+  web: {
+    boxShadow: '0px 4px 10px rgba(17, 24, 39, 0.08)',
+  },
+  default: {
+    shadowColor: '#111827',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+});
 
 export const appShellStyles = StyleSheet.create({
   safeArea: {
@@ -26,10 +39,7 @@ export const appShellStyles = StyleSheet.create({
     paddingVertical: 12,
     flexDirection: 'row',
     justifyContent: 'space-around',
-    shadowColor: '#111827',
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
+    ...(cardShadow ?? {}),
   },
   navItem: {
     padding: 6,

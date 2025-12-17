@@ -1,4 +1,17 @@
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
+
+const cardShadow = Platform.select({
+  web: {
+    boxShadow: '0px 4px 12px rgba(17, 24, 39, 0.16)',
+  },
+  default: {
+    shadowColor: '#111827',
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+});
 
 export const walletStyles = StyleSheet.create({
   errorText: {
@@ -55,10 +68,7 @@ export const walletStyles = StyleSheet.create({
     backgroundColor: '#4f46e5',
     borderRadius: 18,
     padding: 18,
-    shadowColor: '#111827',
-    shadowOpacity: 0.16,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
+    ...(cardShadow ?? {}),
   },
   walletHeader: {
     flexDirection: 'row',

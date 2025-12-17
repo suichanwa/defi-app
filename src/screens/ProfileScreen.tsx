@@ -28,7 +28,7 @@ import {
   WalletReencryptError,
 } from '../services/walletKeyStore';
 
-type ProfileView = 'home' | 'personalization' | 'security' | 'rewards';
+type ProfileView = 'home' | 'personalization' | 'security' | 'rewards' | 'auth';
 
 const ALIAS_MIN = 3;
 const ALIAS_MAX = 24;
@@ -446,13 +446,13 @@ export default function ProfileScreen() {
     );
   }
 
-  if (view === 'security') {
+  if (view === 'auth') {
     return (
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {renderHeader('Security')}
+        {renderHeader('Account access')}
         <View style={styles.card}>
           <View style={styles.cardRow}>
-            <Text style={styles.cardTitle}>Account access</Text>
+            <Text style={styles.cardTitle}>Supabase auth</Text>
             <Ionicons name="lock-closed-outline" size={20} color="#4f46e5" />
           </View>
           {!isSupabaseConfigured ? (
@@ -536,6 +536,14 @@ export default function ProfileScreen() {
           {authError && <Text style={styles.errorText}>{authError}</Text>}
           {authMessage && <Text style={styles.successText}>{authMessage}</Text>}
         </View>
+      </ScrollView>
+    );
+  }
+
+  if (view === 'security') {
+    return (
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {renderHeader('Security')}
         <View style={styles.card}>
           <View style={styles.cardRow}>
             <Text style={styles.cardTitle}>Wallet key status</Text>
@@ -673,6 +681,19 @@ export default function ProfileScreen() {
           <View style={styles.cardBody}>
             <Text style={styles.cardTitle}>Personalization</Text>
             <Text style={styles.cardSubtitle}>Alias, avatar, and theme preferences.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+        </View>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.card} onPress={() => setView('auth')} activeOpacity={0.85}>
+        <View style={styles.cardRow}>
+          <View style={styles.cardIcon}>
+            <Ionicons name="log-in-outline" size={22} color="#4f46e5" />
+          </View>
+          <View style={styles.cardBody}>
+            <Text style={styles.cardTitle}>Account access</Text>
+            <Text style={styles.cardSubtitle}>Create an account, sign in, and update password.</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
         </View>
