@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, useWindowDimensions } from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import ChatHeader from '../components/secureChat/ChatHeader';
 import ChatTabs from '../components/secureChat/ChatTabs';
 import ChatListScreen from '../components/secureChat/ChatListScreen';
@@ -244,7 +244,7 @@ export default function SecureChatScreen() {
   };
 
   return (
-    <View className={isCompact ? 'flex-1 bg-white px-4 pt-5' : 'flex-1 bg-white px-5 pt-6'}>
+    <View style={[styles.container, isCompact && styles.containerCompact]}>
       <ChatHeader
         isCompact={isCompact}
         onConnectPress={() => handleTabChange('connect')}
@@ -267,7 +267,7 @@ export default function SecureChatScreen() {
           onStartServer={handleStartServer}
         />
       ) : chatView === 'thread' ? (
-        <View className="mt-4 flex-1">
+        <View style={styles.threadWrapper}>
           <ChatThreadScreen
             chat={selectedChat}
             messages={selectedMessages}
@@ -289,3 +289,21 @@ export default function SecureChatScreen() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 112,
+  },
+  containerCompact: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+  },
+  threadWrapper: {
+    marginTop: 16,
+    flex: 1,
+  },
+});

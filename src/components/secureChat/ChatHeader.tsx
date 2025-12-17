@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 type Props = {
@@ -10,39 +10,120 @@ type Props = {
   locationLabel?: string;
 };
 
-export default function ChatHeader({ isCompact, onConnectPress, onHostPress, timeLabel, locationLabel }: Props) {
+export default function ChatHeader({
+  isCompact,
+  onConnectPress,
+  onHostPress,
+  timeLabel,
+  locationLabel,
+}: Props) {
   return (
-    <View className={`${isCompact ? 'flex-col' : 'flex-row items-center justify-between'}`}>
-      <View>
-        <Text className="text-2xl font-bold text-slate-900">Secure Chat</Text>
-        <Text className="mt-1 text-slate-500">Components mirrored from repo/secureChat</Text>
+    <View style={[styles.container, isCompact && styles.containerCompact]}>
+      <View style={styles.titleBlock}>
+        <Text style={styles.title}>Secure Chat</Text>
+        <Text style={styles.subtitle}>Components mirrored from repo/secureChat</Text>
         {(timeLabel || locationLabel) && (
-          <View className="mt-2 flex-row flex-wrap">
-            {timeLabel && <Text className="mr-2 text-xs text-slate-500">Local time: {timeLabel}</Text>}
-            {locationLabel && <Text className="text-xs text-slate-400">{locationLabel}</Text>}
+          <View style={styles.metaRow}>
+            {timeLabel && <Text style={styles.metaText}>Local time: {timeLabel}</Text>}
+            {locationLabel && <Text style={styles.metaHint}>{locationLabel}</Text>}
           </View>
         )}
       </View>
-      <View className={isCompact ? 'mt-3 w-full' : 'flex-row items-center'}>
+      <View style={[styles.actions, isCompact && styles.actionsCompact]}>
         <TouchableOpacity
-          className={`flex-row items-center justify-center rounded-xl bg-slate-200 px-4 py-3 ${isCompact ? 'w-full' : ''}`}
+          style={[styles.button, styles.secondaryButton, isCompact && styles.fullWidth]}
           onPress={onConnectPress}
           activeOpacity={0.9}
         >
           <MaterialCommunityIcons name="lan-connect" color="#111827" size={18} />
-          <Text className="ml-2 font-semibold text-slate-900">Connect</Text>
+          <Text style={styles.secondaryButtonText}>Connect</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          className={`flex-row items-center justify-center rounded-xl bg-indigo-600 px-4 py-3 ${
-            isCompact ? 'mt-2 w-full' : 'ml-3'
-          }`}
+          style={[styles.button, styles.primaryButton, isCompact ? styles.fullWidth : styles.primaryButtonSpacing]}
           onPress={onHostPress}
           activeOpacity={0.9}
         >
           <MaterialCommunityIcons name="rocket-launch" color="#ffffff" size={18} />
-          <Text className="ml-2 font-semibold text-white">Host server</Text>
+          <Text style={styles.primaryButtonText}>Host server</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  containerCompact: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
+  titleBlock: {
+    flexShrink: 1,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  subtitle: {
+    marginTop: 4,
+    color: '#64748b',
+  },
+  metaRow: {
+    marginTop: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  metaText: {
+    marginRight: 12,
+    fontSize: 12,
+    color: '#64748b',
+  },
+  metaHint: {
+    fontSize: 12,
+    color: '#94a3b8',
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionsCompact: {
+    width: '100%',
+    marginTop: 12,
+  },
+  button: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  secondaryButton: {
+    backgroundColor: '#e2e8f0',
+  },
+  secondaryButtonText: {
+    marginLeft: 8,
+    fontWeight: '600',
+    color: '#0f172a',
+  },
+  primaryButton: {
+    backgroundColor: '#4f46e5',
+  },
+  primaryButtonText: {
+    marginLeft: 8,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  primaryButtonSpacing: {
+    marginLeft: 12,
+  },
+  fullWidth: {
+    width: '100%',
+    marginTop: 8,
+  },
+});

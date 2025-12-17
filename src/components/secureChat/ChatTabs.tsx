@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 type TabKey = 'chats' | 'connect';
@@ -11,37 +11,52 @@ type Props = {
 
 export default function ChatTabs({ activeTab, onTabChange }: Props) {
   return (
-    <View className="mt-4 flex-row flex-wrap">
+    <View style={styles.container}>
       <TouchableOpacity
-        className={`mr-2 mb-2 flex-row items-center rounded-xl px-4 py-2 ${
-          activeTab === 'chats' ? 'bg-indigo-600' : 'bg-slate-200'
-        }`}
+        style={[styles.tab, activeTab === 'chats' ? styles.tabActive : styles.tabInactive]}
         onPress={() => onTabChange('chats')}
       >
-        <MaterialCommunityIcons
-          name="message-outline"
-          size={18}
-          color={activeTab === 'chats' ? '#ffffff' : '#111827'}
-        />
-        <Text className={`ml-2 font-semibold ${activeTab === 'chats' ? 'text-white' : 'text-slate-900'}`}>
-          Chats
-        </Text>
+        <MaterialCommunityIcons name="message-outline" size={18} color={activeTab === 'chats' ? '#ffffff' : '#111827'} />
+        <Text style={[styles.tabText, activeTab === 'chats' && styles.tabTextActive]}>Chats</Text>
       </TouchableOpacity>
       <TouchableOpacity
-        className={`mb-2 flex-row items-center rounded-xl px-4 py-2 ${
-          activeTab === 'connect' ? 'bg-indigo-600' : 'bg-slate-200'
-        }`}
+        style={[styles.tab, activeTab === 'connect' ? styles.tabActive : styles.tabInactive]}
         onPress={() => onTabChange('connect')}
       >
-        <MaterialCommunityIcons
-          name="access-point"
-          size={18}
-          color={activeTab === 'connect' ? '#ffffff' : '#111827'}
-        />
-        <Text className={`ml-2 font-semibold ${activeTab === 'connect' ? 'text-white' : 'text-slate-900'}`}>
-          Connect
-        </Text>
+        <MaterialCommunityIcons name="access-point" size={18} color={activeTab === 'connect' ? '#ffffff' : '#111827'} />
+        <Text style={[styles.tabText, activeTab === 'connect' && styles.tabTextActive]}>Connect</Text>
       </TouchableOpacity>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 16,
+  },
+  tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  tabActive: {
+    backgroundColor: '#4f46e5',
+  },
+  tabInactive: {
+    backgroundColor: '#e2e8f0',
+  },
+  tabText: {
+    marginLeft: 8,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  tabTextActive: {
+    color: '#ffffff',
+  },
+});

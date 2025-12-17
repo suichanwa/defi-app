@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import PulseBadge from '../PulseBadge';
 import type { ServerInfo } from '../../types/secureChat';
@@ -28,48 +28,44 @@ export default function ConnectScreen({
   onStartServer,
 }: Props) {
   return (
-    <ScrollView className="mt-4" contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
-      <View className="mb-4 rounded-2xl border border-slate-200 bg-white p-4">
-        <View className="flex-row items-center justify-between">
-          <Text className="text-xl font-semibold text-slate-900">Connect to a peer</Text>
+    <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>Connect to a peer</Text>
           <MaterialCommunityIcons name="shield-lock-outline" size={22} color="#4f46e5" />
         </View>
-        <Text className="mt-1 text-slate-500">Mirror of secureChat ConnectionForm in React Native</Text>
+        <Text style={styles.cardSubtitle}>Mirror of secureChat ConnectionForm in React Native</Text>
         <TextInput
           placeholder="192.168.1.20:8080"
           placeholderTextColor="#9ca3af"
-          className="mt-3 rounded-xl border border-slate-200 px-3 py-2 text-slate-900"
+          style={styles.input}
           value={connectAddress}
           onChangeText={onConnectAddressChange}
           autoCapitalize="none"
         />
-        <Text className="mt-2 text-xs text-slate-500">Peer address (IP:Port or hostname)</Text>
+        <Text style={styles.hint}>Peer address (IP:Port or hostname)</Text>
         <TextInput
           placeholder="Chat name (optional)"
           placeholderTextColor="#9ca3af"
-          className="mt-3 rounded-xl border border-slate-200 px-3 py-2 text-slate-900"
+          style={styles.input}
           value={connectName}
           onChangeText={onConnectNameChange}
         />
-        <TouchableOpacity
-          className="mt-3 flex-row items-center justify-center rounded-xl bg-indigo-600 px-4 py-3"
-          onPress={onConnectPress}
-          activeOpacity={0.9}
-        >
+        <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={onConnectPress} activeOpacity={0.9}>
           <MaterialCommunityIcons name="access-point-network" size={18} color="#ffffff" />
-          <Text className="ml-2 font-semibold text-white">Connect securely</Text>
+          <Text style={styles.primaryButtonText}>Connect securely</Text>
         </TouchableOpacity>
       </View>
 
-      <View className="mb-4 rounded-2xl border border-slate-200 bg-white p-4">
-        <View className="flex-row items-center justify-between">
-          <Text className="text-xl font-semibold text-slate-900">Host a server</Text>
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>Host a server</Text>
           <MaterialCommunityIcons name="server" size={22} color="#111827" />
         </View>
-        <Text className="mt-1 text-slate-500">Adapted from secureChat InfoPanel</Text>
-        <View className="mt-3 flex-row items-center">
+        <Text style={styles.cardSubtitle}>Adapted from secureChat InfoPanel</Text>
+        <View style={styles.statusRow}>
           <PulseBadge size={10} color={serverInfo ? '#22c55e' : '#f97316'} />
-          <Text className="ml-2 text-sm font-semibold text-slate-800">
+          <Text style={styles.statusText}>
             {serverInfo
               ? serverInfo.status === 'running'
                 ? `Running on ${serverInfo.address}:${serverInfo.port}`
@@ -77,14 +73,12 @@ export default function ConnectScreen({
               : 'Server offline'}
           </Text>
         </View>
-        <Text className="mt-2 text-xs text-slate-500">Share this address with peers once running.</Text>
-        <Text className="mt-2 rounded-xl bg-indigo-50 px-3 py-2 text-sm font-semibold text-slate-900">
+        <Text style={styles.hint}>Share this address with peers once running.</Text>
+        <Text style={styles.addressPill}>
           {serverInfo ? `${serverInfo.address}:${serverInfo.port}` : 'Not started yet'}
         </Text>
         <TouchableOpacity
-          className={`mt-3 flex-row items-center justify-center rounded-xl px-4 py-3 ${
-            serverInfo?.status === 'running' ? 'bg-indigo-300' : 'bg-indigo-600'
-          }`}
+          style={[styles.button, serverInfo?.status === 'running' ? styles.disabledButton : styles.primaryButton]}
           onPress={onStartServer}
           activeOpacity={serverInfo?.status === 'running' ? 1 : 0.9}
         >
@@ -93,27 +87,127 @@ export default function ConnectScreen({
             size={18}
             color="#ffffff"
           />
-          <Text className="ml-2 font-semibold text-white">
+          <Text style={styles.primaryButtonText}>
             {serverInfo?.status === 'running' ? 'Server running' : 'Start server'}
           </Text>
         </TouchableOpacity>
       </View>
 
-      <View className="rounded-2xl border border-slate-200 bg-white p-4">
-        <Text className="text-xl font-semibold text-slate-900">Connection activity</Text>
-        <Text className="mt-1 text-slate-500">Recent events from transport / clipboard helpers</Text>
-        <ScrollView className="mt-2" style={{ maxHeight: 112 }} showsVerticalScrollIndicator={false}>
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Connection activity</Text>
+        <Text style={styles.cardSubtitle}>Recent events from transport / clipboard helpers</Text>
+        <ScrollView style={styles.logList} showsVerticalScrollIndicator={false}>
           {connectionLog.map((line, idx) => (
-            <Text key={`${line}-${idx}`} className="mb-1 text-sm text-slate-800">
+            <Text key={`${line}-${idx}`} style={styles.logLine}>
               - {line}
             </Text>
           ))}
         </ScrollView>
-        <Text className="mt-2 text-xs text-slate-500">Public key preview (from secureChat crypto API):</Text>
-        <Text className="mt-2 rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-900">
-          {devicePublicKey}
-        </Text>
+        <Text style={styles.hint}>Public key preview (from secureChat crypto API):</Text>
+        <Text style={styles.keyPreview}>{devicePublicKey}</Text>
       </View>
     </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  scrollContent: {
+    paddingTop: 16,
+    paddingBottom: 120,
+  },
+  card: {
+    marginBottom: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
+    padding: 16,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  cardTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#0f172a',
+  },
+  cardSubtitle: {
+    marginTop: 4,
+    color: '#64748b',
+  },
+  input: {
+    marginTop: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#0f172a',
+  },
+  hint: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#64748b',
+  },
+  button: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    paddingVertical: 12,
+  },
+  primaryButton: {
+    backgroundColor: '#4f46e5',
+  },
+  primaryButtonText: {
+    marginLeft: 8,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  disabledButton: {
+    backgroundColor: '#a5b4fc',
+  },
+  statusRow: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusText: {
+    marginLeft: 8,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  addressPill: {
+    marginTop: 8,
+    borderRadius: 12,
+    backgroundColor: '#eef2ff',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0f172a',
+  },
+  logList: {
+    marginTop: 8,
+    maxHeight: 112,
+  },
+  logLine: {
+    marginBottom: 4,
+    fontSize: 13,
+    color: '#1f2937',
+  },
+  keyPreview: {
+    marginTop: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 12,
+    color: '#0f172a',
+  },
+});

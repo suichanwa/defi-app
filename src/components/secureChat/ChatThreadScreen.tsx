@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import PulseBadge from '../PulseBadge';
 import type { ChatMessage, ChatThread, ServerInfo } from '../../types/secureChat';
@@ -25,10 +25,10 @@ export default function ChatThreadScreen({
 }: Props) {
   if (!chat) {
     return (
-      <View className="flex-1 items-center justify-center rounded-2xl border border-slate-200 bg-white p-6">
+      <View style={styles.emptyState}>
         <MaterialCommunityIcons name="message-text-lock-outline" size={48} color="#9ca3af" />
-        <Text className="mt-4 text-xl font-semibold text-slate-900">No chat selected</Text>
-        <Text className="mt-2 text-center text-slate-500">Choose a chat or start a secure connection.</Text>
+        <Text style={styles.emptyTitle}>No chat selected</Text>
+        <Text style={styles.emptySubtitle}>Choose a chat or start a secure connection.</Text>
       </View>
     );
   }
@@ -40,67 +40,205 @@ export default function ChatThreadScreen({
     : 'Server offline';
 
   return (
-    <View className="flex-1 rounded-2xl border border-slate-200 bg-white p-4">
-      <View className="flex-row items-start justify-between">
-        <View className="flex-1 pr-3">
-          <View className="flex-row items-center">
-            <TouchableOpacity onPress={onBack} className="mr-2 rounded-full bg-slate-100 p-2">
+    <View style={styles.container}>
+      <View style={styles.headerRow}>
+        <View style={styles.headerMain}>
+          <View style={styles.headerTitleRow}>
+            <TouchableOpacity onPress={onBack} style={styles.backButton}>
               <MaterialCommunityIcons name="arrow-left" size={18} color="#111827" />
             </TouchableOpacity>
             <View>
-              <Text className="text-xl font-semibold text-slate-900">{chat.name}</Text>
-              <Text className="text-slate-500">
+              <Text style={styles.title}>{chat.name}</Text>
+              <Text style={styles.subtitle}>
                 {chat.peerAddress ? `Peer: ${chat.peerAddress}` : 'Local secure store'}
               </Text>
             </View>
           </View>
         </View>
-        <View className="flex-row items-center">
+        <View style={styles.statusRow}>
           <PulseBadge size={10} color={serverInfo ? '#22c55e' : '#f97316'} />
-          <Text className="ml-2 text-xs font-semibold text-slate-800">{serverStatus}</Text>
+          <Text style={styles.statusText}>{serverStatus}</Text>
         </View>
       </View>
 
       <ScrollView
-        className="mt-4 flex-1"
-        contentContainerStyle={{ paddingBottom: 12 }}
+        style={styles.messageList}
+        contentContainerStyle={styles.messageContent}
         showsVerticalScrollIndicator={false}
       >
-        {messages.map((msg) => (
-          <View
-            key={msg.id}
-            style={{ maxWidth: '85%' }}
-            className={`mb-3 rounded-xl px-4 py-3 ${
-              msg.type === 'system'
-                ? 'self-center bg-sky-100'
-                : msg.outgoing
-                ? 'self-end bg-indigo-600'
-                : 'self-start bg-indigo-100'
-            }`}
-          >
-            <Text className={`font-semibold ${msg.outgoing ? 'text-white' : 'text-slate-900'}`}>{msg.author}</Text>
-            <Text className={`mt-1 ${msg.outgoing ? 'text-white' : 'text-slate-900'}`}>{msg.content}</Text>
-            <Text className={`mt-2 text-xs ${msg.outgoing ? 'text-indigo-100' : 'text-slate-500'}`}>
-              {msg.timestamp}
-            </Text>
-          </View>
-        ))}
+        {messages.map((msg) => {
+          const bubbleStyle = [
+            styles.messageBubble,
+            msg.type === 'system'
+              ? styles.messageSystem
+              : msg.outgoing
+              ? styles.messageOutgoing
+              : styles.messageIncoming,
+          ];
+          const textStyle = msg.outgoing ? styles.messageTextOutgoing : styles.messageText;
+          const timeStyle = msg.outgoing ? styles.messageTimeOutgoing : styles.messageTime;
+          return (
+            <View key={msg.id} style={bubbleStyle}>
+              <Text style={textStyle}>{msg.author}</Text>
+              <Text style={[textStyle, styles.messageBody]}>{msg.content}</Text>
+              <Text style={timeStyle}>{msg.timestamp}</Text>
+            </View>
+          );
+        })}
       </ScrollView>
 
-      <View className="flex-row items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+      <View style={styles.inputBar}>
         <TextInput
           placeholder="Type a secure message..."
           placeholderTextColor="#9ca3af"
-          className="flex-1 text-slate-900"
+          style={styles.input}
           value={draft}
           onChangeText={onDraftChange}
           onSubmitEditing={onSend}
           returnKeyType="send"
         />
-        <TouchableOpacity onPress={onSend} className="rounded-full bg-indigo-600 p-2">
+        <TouchableOpacity onPress={onSend} style={styles.sendButton}>
           <MaterialCommunityIcons name="send" size={18} color="#ffffff" />
         </TouchableOpacity>
       </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
+    padding: 24,
+  },
+  emptyTitle: {
+    marginTop: 16,
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#0f172a',
+  },
+  emptySubtitle: {
+    marginTop: 8,
+    textAlign: 'center',
+    color: '#64748b',
+  },
+  container: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
+    padding: 16,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  headerMain: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backButton: {
+    marginRight: 8,
+    padding: 8,
+    borderRadius: 16,
+    backgroundColor: '#e2e8f0',
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#0f172a',
+  },
+  subtitle: {
+    marginTop: 4,
+    color: '#64748b',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusText: {
+    marginLeft: 6,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  messageList: {
+    marginTop: 16,
+    flex: 1,
+  },
+  messageContent: {
+    paddingBottom: 12,
+  },
+  messageBubble: {
+    marginBottom: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    maxWidth: '85%',
+  },
+  messageIncoming: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#e0e7ff',
+  },
+  messageOutgoing: {
+    alignSelf: 'flex-end',
+    backgroundColor: '#4f46e5',
+  },
+  messageSystem: {
+    alignSelf: 'center',
+    backgroundColor: '#bae6fd',
+  },
+  messageText: {
+    fontWeight: '600',
+    color: '#0f172a',
+  },
+  messageTextOutgoing: {
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  messageBody: {
+    marginTop: 4,
+    fontWeight: '400',
+  },
+  messageTime: {
+    marginTop: 8,
+    fontSize: 11,
+    color: '#64748b',
+  },
+  messageTimeOutgoing: {
+    marginTop: 8,
+    fontSize: 11,
+    color: '#c7d2fe',
+  },
+  inputBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  input: {
+    flex: 1,
+    color: '#0f172a',
+  },
+  sendButton: {
+    marginLeft: 8,
+    padding: 10,
+    borderRadius: 16,
+    backgroundColor: '#4f46e5',
+  },
+});
