@@ -7,6 +7,15 @@ import type { EncryptedWalletKey } from '../types/wallet';
 import type { RewardActivity, RewardsSummary } from '../types/rewards';
 import { loadProfileSettings, saveProfileSettings } from '../services/profileStore';
 import { loadRewardsActivity, loadRewardsSummary } from '../services/rewardsStore';
+import {
+  getAuthSession,
+  onAuthStateChange,
+  signInWithEmail,
+  signOut,
+  signUpWithEmail,
+  updateAccountPassword,
+  type AuthSession,
+} from '../services/auth';
 import { getAnonymousId } from '../services/identity';
 import { fetchRewardsActivity, fetchRewardsSummary } from '../services/rewardsRemote';
 import { isSupabaseConfigured } from '../services/supabaseClient';
@@ -25,6 +34,7 @@ const ALIAS_MIN = 3;
 const ALIAS_MAX = 24;
 const PASSWORD_MIN = 8;
 const ALIAS_REGEX = /^[a-zA-Z0-9 _-]+$/;
+const EMAIL_REGEX = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 const makeSeed = () => `seed_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 
@@ -68,6 +78,14 @@ export default function ProfileScreen() {
   const [setupConfirm, setSetupConfirm] = useState('');
   const [securityMessage, setSecurityMessage] = useState<string | null>(null);
   const [securityError, setSecurityError] = useState<string | null>(null);
+  const [session, setSession] = useState<AuthSession>(null);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [accountPassword, setAccountPassword] = useState('');
+  const [accountConfirm, setAccountConfirm] = useState('');
+  const [authMessage, setAuthMessage] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
   const [rewardsSummary, setRewardsSummary] = useState<RewardsSummary | null>(null);
   const [rewardsActivity, setRewardsActivity] = useState<RewardActivity[]>([]);
   const [rewardsSource, setRewardsSource] = useState<'local' | 'supabase'>('local');
@@ -112,6 +130,22 @@ export default function ProfileScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    getAuthSession().then((current) => {
+      if (active) {
+        setSession(current);
+      }
+    });
+    const subscription = onAuthStateChange((next) => {
+      setSession(next);
+    });
+    return () => {
+      active = false;
+      subscription?.unsubscribe();
+    };
+  }, []);
+
   const identiconSeed = walletKey?.id ?? avatarSeed;
   const identicon = useMemo(() => buildIdenticon(identiconSeed || 'seed'), [identiconSeed]);
 
@@ -142,6 +176,101 @@ export default function ProfileScreen() {
       return `Password must be at least ${PASSWORD_MIN} characters.`;
     }
     return null;
+  };
+
+  const handleSignUp = async () => {
+    setAuthMessage(null);
+    setAuthError(null);
+    const email = authEmail.trim();
+    if (!EMAIL_REGEX.test(email)) {
+      setAuthError('Enter a valid email address.');
+      return;
+    }
+    const policyError = validateNewPassword(authPassword);
+    if (policyError) {
+      setAuthError(policyError);
+      return;
+    }
+    setAuthLoading(true);
+    try {
+      const result = await signUpWithEmail(email, authPassword);
+      if (result.session) {
+        setAuthMessage('Account created. You are signed in.');
+      } else {
+        setAuthMessage('Account created. Check your email to confirm.');
+      }
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Unable to create account.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleSignIn = async () => {
+    setAuthMessage(null);
+    setAuthError(null);
+    const email = authEmail.trim();
+    if (!EMAIL_REGEX.test(email)) {
+      setAuthError('Enter a valid email address.');
+      return;
+    }
+    const policyError = validateNewPassword(authPassword);
+    if (policyError) {
+      setAuthError(policyError);
+      return;
+    }
+    setAuthLoading(true);
+    try {
+      await signInWithEmail(email, authPassword);
+      setAuthMessage('Signed in.');
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Unable to sign in.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    setAuthMessage(null);
+    setAuthError(null);
+    setAuthLoading(true);
+    try {
+      await signOut();
+      setAuthMessage('Signed out.');
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Unable to sign out.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleUpdateAccountPassword = async () => {
+    setAuthMessage(null);
+    setAuthError(null);
+    if (!session) {
+      setAuthError('Sign in to update your account password.');
+      return;
+    }
+    const policyError = validateNewPassword(accountPassword);
+    if (policyError) {
+      setAuthError(policyError);
+      return;
+    }
+    if (accountPassword !== accountConfirm) {
+      setAuthError('Password entries do not match.');
+      return;
+    }
+    setAuthLoading(true);
+    try {
+      await updateAccountPassword(accountPassword);
+      setAccountPassword('');
+      setAccountConfirm('');
+      setAuthMessage('Account password updated.');
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Unable to update password.');
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   const handleChangePassword = async () => {
@@ -321,6 +450,92 @@ export default function ProfileScreen() {
     return (
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {renderHeader('Security')}
+        <View style={styles.card}>
+          <View style={styles.cardRow}>
+            <Text style={styles.cardTitle}>Account access</Text>
+            <Ionicons name="lock-closed-outline" size={20} color="#4f46e5" />
+          </View>
+          {!isSupabaseConfigured ? (
+            <Text style={styles.cardSubtitle}>Supabase auth is not configured.</Text>
+          ) : session ? (
+            <>
+              <Text style={styles.cardSubtitle}>Signed in as {session.user.email ?? 'Unknown email'}.</Text>
+              <TouchableOpacity
+                style={[styles.secondaryButton, authLoading && styles.buttonDisabled]}
+                onPress={handleSignOut}
+                activeOpacity={0.9}
+                disabled={authLoading}
+              >
+                <Text style={styles.secondaryButtonText}>Sign out</Text>
+              </TouchableOpacity>
+              <View style={styles.divider} />
+              <Text style={styles.cardTitle}>Update account password</Text>
+              <TextInput
+                value={accountPassword}
+                onChangeText={setAccountPassword}
+                placeholder="New account password"
+                placeholderTextColor="#94a3b8"
+                style={styles.input}
+                secureTextEntry
+              />
+              <TextInput
+                value={accountConfirm}
+                onChangeText={setAccountConfirm}
+                placeholder="Confirm new password"
+                placeholderTextColor="#94a3b8"
+                style={styles.input}
+                secureTextEntry
+              />
+              <TouchableOpacity
+                style={[styles.primaryButton, authLoading && styles.buttonDisabled]}
+                onPress={handleUpdateAccountPassword}
+                activeOpacity={0.9}
+                disabled={authLoading}
+              >
+                <Text style={styles.primaryButtonText}>Update account password</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={styles.cardSubtitle}>Create an account or sign in.</Text>
+              <TextInput
+                value={authEmail}
+                onChangeText={setAuthEmail}
+                placeholder="Email"
+                placeholderTextColor="#94a3b8"
+                style={styles.input}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+              <TextInput
+                value={authPassword}
+                onChangeText={setAuthPassword}
+                placeholder="Password"
+                placeholderTextColor="#94a3b8"
+                style={styles.input}
+                secureTextEntry
+              />
+              <TouchableOpacity
+                style={[styles.primaryButton, authLoading && styles.buttonDisabled]}
+                onPress={handleSignUp}
+                activeOpacity={0.9}
+                disabled={authLoading}
+              >
+                <Text style={styles.primaryButtonText}>Create account</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.secondaryButton, authLoading && styles.buttonDisabled]}
+                onPress={handleSignIn}
+                activeOpacity={0.9}
+                disabled={authLoading}
+              >
+                <Text style={styles.secondaryButtonText}>Sign in</Text>
+              </TouchableOpacity>
+            </>
+          )}
+          {authError && <Text style={styles.errorText}>{authError}</Text>}
+          {authMessage && <Text style={styles.successText}>{authMessage}</Text>}
+        </View>
         <View style={styles.card}>
           <View style={styles.cardRow}>
             <Text style={styles.cardTitle}>Wallet key status</Text>

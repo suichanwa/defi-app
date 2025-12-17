@@ -141,6 +141,25 @@ export const profileStyles = StyleSheet.create({
     fontWeight: '600',
     color: '#ffffff',
   },
+  secondaryButton: {
+    marginTop: 10,
+    borderRadius: 12,
+    backgroundColor: '#e2e8f0',
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  secondaryButtonText: {
+    fontWeight: '600',
+    color: '#0f172a',
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#e2e8f0',
+    marginVertical: 16,
+  },
   errorText: {
     color: '#dc2626',
     marginBottom: 8,
