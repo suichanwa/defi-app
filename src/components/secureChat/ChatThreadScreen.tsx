@@ -1,5 +1,15 @@
-import React from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useRef } from 'react';
+import {
+  KeyboardAvoidingView,
+  PanResponder,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import PulseBadge from '../PulseBadge';
 import type { ChatMessage, ChatThread, ServerInfo } from '../../types/secureChat';
@@ -23,13 +33,33 @@ export default function ChatThreadScreen({
   onDraftChange,
   onSend,
 }: Props) {
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) => {
+        const isHorizontal = Math.abs(gesture.dx) > Math.abs(gesture.dy);
+        return isHorizontal && gesture.dx < -12;
+      },
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dx < -60 && gesture.vx < -0.3) {
+          onBack();
+        }
+      },
+    }),
+  ).current;
+
   if (!chat) {
     return (
-      <View style={styles.emptyState}>
-        <MaterialCommunityIcons name="message-text-lock-outline" size={48} color="#9ca3af" />
-        <Text style={styles.emptyTitle}>No chat selected</Text>
-        <Text style={styles.emptySubtitle}>Choose a chat or start a secure connection.</Text>
-      </View>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoid}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={80}
+      >
+        <View style={styles.emptyState}>
+          <MaterialCommunityIcons name="message-text-lock-outline" size={48} color="#9ca3af" />
+          <Text style={styles.emptyTitle}>No chat selected</Text>
+          <Text style={styles.emptySubtitle}>Choose a chat or start a secure connection.</Text>
+        </View>
+      </KeyboardAvoidingView>
     );
   }
 
@@ -40,72 +70,81 @@ export default function ChatThreadScreen({
     : 'Server offline';
 
   return (
-    <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <View style={styles.headerMain}>
-          <View style={styles.headerTitleRow}>
-            <TouchableOpacity onPress={onBack} style={styles.backButton}>
-              <MaterialCommunityIcons name="arrow-left" size={18} color="#111827" />
-            </TouchableOpacity>
-            <View>
-              <Text style={styles.title}>{chat.name}</Text>
-              <Text style={styles.subtitle}>
-                {chat.peerAddress ? `Peer: ${chat.peerAddress}` : 'Local secure store'}
-              </Text>
+    <KeyboardAvoidingView
+      style={styles.keyboardAvoid}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={80}
+    >
+      <View style={styles.container} {...panResponder.panHandlers}>
+        <View style={styles.headerRow}>
+          <View style={styles.headerMain}>
+            <View style={styles.headerTitleRow}>
+              <TouchableOpacity onPress={onBack} style={styles.backButton}>
+                <MaterialCommunityIcons name="arrow-left" size={18} color="#111827" />
+              </TouchableOpacity>
+              <View>
+                <Text style={styles.title}>{chat.name}</Text>
+                <Text style={styles.subtitle}>
+                  {chat.peerAddress ? `Peer: ${chat.peerAddress}` : 'Local secure store'}
+                </Text>
+              </View>
             </View>
           </View>
+          <View style={styles.statusRow}>
+            <PulseBadge size={10} color={serverInfo ? '#22c55e' : '#f97316'} />
+            <Text style={styles.statusText}>{serverStatus}</Text>
+          </View>
         </View>
-        <View style={styles.statusRow}>
-          <PulseBadge size={10} color={serverInfo ? '#22c55e' : '#f97316'} />
-          <Text style={styles.statusText}>{serverStatus}</Text>
+
+        <ScrollView
+          style={styles.messageList}
+          contentContainerStyle={styles.messageContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {messages.map((msg) => {
+            const bubbleStyle = [
+              styles.messageBubble,
+              msg.type === 'system'
+                ? styles.messageSystem
+                : msg.outgoing
+                ? styles.messageOutgoing
+                : styles.messageIncoming,
+            ];
+            const textStyle = msg.outgoing ? styles.messageTextOutgoing : styles.messageText;
+            const timeStyle = msg.outgoing ? styles.messageTimeOutgoing : styles.messageTime;
+            return (
+              <View key={msg.id} style={bubbleStyle}>
+                <Text style={textStyle}>{msg.author}</Text>
+                <Text style={[textStyle, styles.messageBody]}>{msg.content}</Text>
+                <Text style={timeStyle}>{msg.timestamp}</Text>
+              </View>
+            );
+          })}
+        </ScrollView>
+
+        <View style={styles.inputBar}>
+          <TextInput
+            placeholder="Type a secure message..."
+            placeholderTextColor="#9ca3af"
+            style={styles.input}
+            value={draft}
+            onChangeText={onDraftChange}
+            onSubmitEditing={onSend}
+            returnKeyType="send"
+          />
+          <TouchableOpacity onPress={onSend} style={styles.sendButton}>
+            <MaterialCommunityIcons name="send" size={18} color="#ffffff" />
+          </TouchableOpacity>
         </View>
       </View>
-
-      <ScrollView
-        style={styles.messageList}
-        contentContainerStyle={styles.messageContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {messages.map((msg) => {
-          const bubbleStyle = [
-            styles.messageBubble,
-            msg.type === 'system'
-              ? styles.messageSystem
-              : msg.outgoing
-              ? styles.messageOutgoing
-              : styles.messageIncoming,
-          ];
-          const textStyle = msg.outgoing ? styles.messageTextOutgoing : styles.messageText;
-          const timeStyle = msg.outgoing ? styles.messageTimeOutgoing : styles.messageTime;
-          return (
-            <View key={msg.id} style={bubbleStyle}>
-              <Text style={textStyle}>{msg.author}</Text>
-              <Text style={[textStyle, styles.messageBody]}>{msg.content}</Text>
-              <Text style={timeStyle}>{msg.timestamp}</Text>
-            </View>
-          );
-        })}
-      </ScrollView>
-
-      <View style={styles.inputBar}>
-        <TextInput
-          placeholder="Type a secure message..."
-          placeholderTextColor="#9ca3af"
-          style={styles.input}
-          value={draft}
-          onChangeText={onDraftChange}
-          onSubmitEditing={onSend}
-          returnKeyType="send"
-        />
-        <TouchableOpacity onPress={onSend} style={styles.sendButton}>
-          <MaterialCommunityIcons name="send" size={18} color="#ffffff" />
-        </TouchableOpacity>
-      </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoid: {
+    flex: 1,
+  },
   emptyState: {
     flex: 1,
     alignItems: 'center',

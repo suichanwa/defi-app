@@ -247,8 +247,6 @@ export default function SecureChatScreen() {
     <View style={[styles.container, isCompact && styles.containerCompact]}>
       <ChatHeader
         isCompact={isCompact}
-        onConnectPress={() => handleTabChange('connect')}
-        onHostPress={handleStartServer}
         timeLabel={timeLabel}
         locationLabel={locationLabel}
       />
@@ -283,7 +281,7 @@ export default function SecureChatScreen() {
           chats={chats}
           selectedChatId={selectedChatId}
           onSelectChat={handleSelectChat}
-          onConnectPress={() => handleTabChange('connect')}
+          onOpenSelected={handleSelectChat}
         />
       )}
     </View>

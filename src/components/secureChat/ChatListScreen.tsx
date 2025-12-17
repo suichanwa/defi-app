@@ -1,6 +1,5 @@
-import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import React, { useRef } from 'react';
+import { PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import PulseBadge from '../PulseBadge';
 import type { ChatThread } from '../../types/secureChat';
 
@@ -8,21 +7,31 @@ type Props = {
   chats: ChatThread[];
   selectedChatId: string;
   onSelectChat: (chatId: string) => void;
-  onConnectPress: () => void;
+  onOpenSelected: (chatId: string) => void;
 };
 
-export default function ChatListScreen({ chats, selectedChatId, onSelectChat, onConnectPress }: Props) {
+export default function ChatListScreen({ chats, selectedChatId, onSelectChat, onOpenSelected }: Props) {
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) => {
+        const isHorizontal = Math.abs(gesture.dx) > Math.abs(gesture.dy);
+        return isHorizontal && gesture.dx < -12;
+      },
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dx < -60 && selectedChatId) {
+          onOpenSelected(selectedChatId);
+        }
+      },
+    }),
+  ).current;
+
   return (
-    <View style={styles.container}>
+    <View style={styles.container} {...panResponder.panHandlers}>
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.title}>Chats</Text>
           <Text style={styles.subtitle}>Borrowed from secureChat flow</Text>
         </View>
-        <TouchableOpacity style={styles.connectButton} onPress={onConnectPress} activeOpacity={0.9}>
-          <MaterialCommunityIcons name="access-point" color="#111827" size={18} />
-          <Text style={styles.connectButtonText}>Connect</Text>
-        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
@@ -74,19 +83,6 @@ const styles = StyleSheet.create({
   subtitle: {
     marginTop: 4,
     color: '#64748b',
-  },
-  connectButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: '#e2e8f0',
-  },
-  connectButtonText: {
-    marginLeft: 8,
-    fontWeight: '600',
-    color: '#0f172a',
   },
   listContent: {
     paddingTop: 16,
