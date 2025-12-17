@@ -3,5 +3,7 @@ declare module '@env' {
   export const WALLETCONNECT_PROJECT_ID: string;
   export const ETHEREUM_RPC_URL: string;
   export const SOLANA_RPC_URL: string;
+  export const SUPABASE_URL: string;
+  export const SUPABASE_ANON_KEY: string;
   export const NODE_ENV: string;
 }
