@@ -1,5 +1,5 @@
 import type { RewardActivity, RewardsSummary } from '../types/rewards';
-import { getJson, setJson } from './storage';
+import { getJson, removeKey, setJson } from './storage';
 
 const SUMMARY_KEY = 'rewards.summary.v1';
 const ACTIVITY_KEY = 'rewards.activity.v1';
@@ -60,4 +60,8 @@ export async function saveRewardsSummary(next: RewardsSummary): Promise<void> {
 
 export async function saveRewardsActivity(next: RewardActivity[]): Promise<void> {
   await setJson(ACTIVITY_KEY, next);
+}
+
+export async function clearRewardsCache(): Promise<void> {
+  await Promise.all([removeKey(SUMMARY_KEY), removeKey(ACTIVITY_KEY)]);
 }

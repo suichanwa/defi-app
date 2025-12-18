@@ -1,5 +1,5 @@
 import type { ProfileSettings, ThemePreference } from '../types/profile';
-import { getJson, setJson } from './storage';
+import { getJson, removeKey, setJson } from './storage';
 
 const PROFILE_KEY = 'profile.settings.v1';
 
@@ -29,6 +29,10 @@ export async function saveProfileSettings(
   };
   await setJson(PROFILE_KEY, saved);
   return saved;
+}
+
+export async function clearProfileSettings(): Promise<void> {
+  await removeKey(PROFILE_KEY);
 }
 
 export function normalizeThemePreference(value?: string): ThemePreference {

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated as RNAnimated, ScrollView, Share, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { formatEther, isAddress, parseEther } from 'ethers';
+import { ethers } from 'ethers';
 import PulseBadge from '../components/PulseBadge';
 import { walletStyles as styles } from '../styles/WalletStyles';
 import { useTheme } from '../theme/ThemeProvider';
@@ -334,7 +334,7 @@ export default function WalletScreen() {
       setFlowError('Unlock your wallet first.');
       return;
     }
-    if (!isAddress(sendTo.trim())) {
+    if (!ethers.utils.isAddress(sendTo.trim())) {
       setFlowError('Enter a valid recipient address.');
       return;
     }
@@ -345,7 +345,7 @@ export default function WalletScreen() {
     setIsSubmitting(true);
     try {
       const provider = getProvider();
-      const value = parseEther(sendAmount);
+      const value = ethers.utils.parseEther(sendAmount);
       const gasLimit = await provider.estimateGas({ to: sendTo.trim(), value, from: address });
       const feeData = await provider.getFeeData();
       const feePerGas = feeData.maxFeePerGas ?? feeData.gasPrice;
@@ -353,8 +353,8 @@ export default function WalletScreen() {
         setFlowError('Unable to estimate network fee.');
         return;
       }
-      const fee = gasLimit * feePerGas;
-      setSendFeeEth(formatEther(fee));
+      const fee = gasLimit.mul(feePerGas);
+      setSendFeeEth(ethers.utils.formatEther(fee));
       setSendStep('confirm');
     } catch {
       setFlowError('Unable to estimate fees. Check the address and amount.');
@@ -373,7 +373,7 @@ export default function WalletScreen() {
     setSendStep('pending');
     try {
       const provider = getProvider();
-      const value = parseEther(sendAmount);
+      const value = ethers.utils.parseEther(sendAmount);
       const feeData = await provider.getFeeData();
       const tx = {
         to: sendTo.trim(),

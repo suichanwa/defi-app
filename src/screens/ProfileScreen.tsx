@@ -1,12 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { profileStyles as styles } from '../styles/ProfileStyles';
 import type { AvatarType, ThemePreference } from '../types/profile';
 import type { EncryptedWalletKey } from '../types/wallet';
 import type { RewardActivity, RewardsSummary } from '../types/rewards';
-import { loadProfileSettings, saveProfileSettings } from '../services/profileStore';
-import { loadRewardsActivity, loadRewardsSummary } from '../services/rewardsStore';
+import { clearProfileSettings, loadProfileSettings, saveProfileSettings } from '../services/profileStore';
+import { clearRewardsCache, loadRewardsActivity, loadRewardsSummary } from '../services/rewardsStore';
 import {
   getAuthSession,
   onAuthStateChange,
@@ -27,6 +25,7 @@ import { isSupabaseConfigured } from '../services/supabaseClient';
 import { fetchRemoteProfile, upsertRemoteProfile } from '../services/profileRemote';
 import {
   changeWalletPassword,
+  clearWallet,
   createInitialWalletKey,
   loadEncryptedWalletKey,
   WalletKeyNotFoundError,
@@ -34,8 +33,14 @@ import {
   WalletReencryptError,
 } from '../services/walletKeyStore';
 import { useTheme } from '../theme/ThemeProvider';
+import AuthTab from '../components/profile/AuthTab';
+import DeveloperTab from '../components/profile/DeveloperTab';
+import PersonalizationTab from '../components/profile/PersonalizationTab';
+import ProfileHomeTab from '../components/profile/ProfileHomeTab';
+import RewardsTab from '../components/profile/RewardsTab';
+import SecurityTab from '../components/profile/SecurityTab';
 
-type ProfileView = 'home' | 'personalization' | 'security' | 'rewards' | 'auth';
+type ProfileView = 'home' | 'personalization' | 'security' | 'rewards' | 'auth' | 'developer';
 
 const ALIAS_MIN = 3;
 const ALIAS_MAX = 24;
@@ -93,6 +98,9 @@ export default function ProfileScreen() {
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
+  const [developerMessage, setDeveloperMessage] = useState<string | null>(null);
+  const [developerError, setDeveloperError] = useState<string | null>(null);
+  const [developerLoading, setDeveloperLoading] = useState(false);
   const [rewardsSummary, setRewardsSummary] = useState<RewardsSummary | null>(null);
   const [rewardsActivity, setRewardsActivity] = useState<RewardActivity[]>([]);
   const [rewardsSource, setRewardsSource] = useState<'local' | 'supabase'>('local');
@@ -105,54 +113,54 @@ export default function ProfileScreen() {
   );
   const scrollStyle = useMemo(() => [styles.scrollContent, { backgroundColor: colors.background }], [colors]);
 
+  const loadAll = async (isActive: () => boolean) => {
+    const [settings, key] = await Promise.all([loadProfileSettings(), loadEncryptedWalletKey()]);
+    const currentSession = await getAuthSession();
+    const userId = currentSession?.user?.id ?? (await getAnonymousId());
+    if (!isActive()) return;
+    setEffectiveUserId(userId);
+    const useSupabaseRewards = Boolean(isSupabaseConfigured && currentSession?.user?.id);
+    const [remoteSummary, remoteActivity] = await Promise.all([
+      useSupabaseRewards ? fetchRewardsSummary(userId) : Promise.resolve(null),
+      useSupabaseRewards ? fetchRewardsActivity(userId) : Promise.resolve(null),
+    ]);
+    const [localSummary, localActivity] = await Promise.all([loadRewardsSummary(), loadRewardsActivity()]);
+    const remoteProfile =
+      isSupabaseConfigured && currentSession?.user?.id ? await fetchRemoteProfile(currentSession.user.id) : null;
+    if (!isActive()) return;
+    const mergedProfile = remoteProfile ?? settings;
+    setProfileSource(remoteProfile ? 'supabase' : 'local');
+    setAlias(mergedProfile.alias ?? '');
+    setAvatarType(mergedProfile.avatarType ?? 'identicon');
+    const nextSeed = mergedProfile.avatarSeed ?? key?.id ?? makeSeed();
+    setAvatarSeed(nextSeed);
+    const mergedTheme = mergedProfile.themePreference ?? 'system';
+    setThemePreference(mergedTheme);
+    if (mergedTheme !== themePrefCtx) {
+      await setThemePrefCtx(mergedTheme);
+    }
+    if (!mergedProfile.avatarSeed) {
+      await saveProfileSettings({ ...mergedProfile, avatarSeed: nextSeed });
+    }
+    setWalletKey(key);
+    if (isSupabaseConfigured && remoteSummary) {
+      setRewardsSummary(remoteSummary);
+      setRewardsSource('supabase');
+    } else {
+      setRewardsSummary(localSummary);
+      setRewardsSource('local');
+    }
+
+    if (isSupabaseConfigured && remoteActivity) {
+      setRewardsActivity(remoteActivity);
+    } else {
+      setRewardsActivity(localActivity);
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
-    const loadAll = async () => {
-      const [settings, key] = await Promise.all([loadProfileSettings(), loadEncryptedWalletKey()]);
-      const currentSession = await getAuthSession();
-      const userId = currentSession?.user?.id ?? (await getAnonymousId());
-      setEffectiveUserId(userId);
-      const useSupabaseRewards = Boolean(isSupabaseConfigured && currentSession?.user?.id);
-      const [remoteSummary, remoteActivity] = await Promise.all([
-        useSupabaseRewards ? fetchRewardsSummary(userId) : Promise.resolve(null),
-        useSupabaseRewards ? fetchRewardsActivity(userId) : Promise.resolve(null),
-      ]);
-      const [localSummary, localActivity] = await Promise.all([loadRewardsSummary(), loadRewardsActivity()]);
-      const remoteProfile =
-        isSupabaseConfigured && currentSession?.user?.id
-          ? await fetchRemoteProfile(currentSession.user.id)
-          : null;
-      if (!isMounted) return;
-      const mergedProfile = remoteProfile ?? settings;
-      setProfileSource(remoteProfile ? 'supabase' : 'local');
-      setAlias(mergedProfile.alias ?? '');
-      setAvatarType(mergedProfile.avatarType ?? 'identicon');
-      const nextSeed = mergedProfile.avatarSeed ?? key?.id ?? makeSeed();
-      setAvatarSeed(nextSeed);
-      const mergedTheme = mergedProfile.themePreference ?? 'system';
-      setThemePreference(mergedTheme);
-      if (mergedTheme !== themePrefCtx) {
-        await setThemePrefCtx(mergedTheme);
-      }
-      if (!mergedProfile.avatarSeed) {
-        await saveProfileSettings({ ...mergedProfile, avatarSeed: nextSeed });
-      }
-      setWalletKey(key);
-      if (isSupabaseConfigured && remoteSummary) {
-        setRewardsSummary(remoteSummary);
-        setRewardsSource('supabase');
-      } else {
-        setRewardsSummary(localSummary);
-        setRewardsSource('local');
-      }
-
-      if (isSupabaseConfigured && remoteActivity) {
-        setRewardsActivity(remoteActivity);
-      } else {
-        setRewardsActivity(localActivity);
-      }
-    };
-    loadAll();
+    loadAll(() => isMounted);
     return () => {
       isMounted = false;
     };
@@ -383,391 +391,221 @@ export default function ProfileScreen() {
     setSecurityMessage('Encrypted wallet key created.');
   };
 
+  const handleRefreshData = async () => {
+    setDeveloperMessage(null);
+    setDeveloperError(null);
+    setDeveloperLoading(true);
+    try {
+      await loadAll(() => true);
+      setDeveloperMessage('Profile data reloaded.');
+    } catch {
+      setDeveloperError('Unable to reload profile data.');
+    } finally {
+      setDeveloperLoading(false);
+    }
+  };
+
+  const handleClearWallet = async () => {
+    setDeveloperMessage(null);
+    setDeveloperError(null);
+    setDeveloperLoading(true);
+    try {
+      await clearWallet();
+      setWalletKey(null);
+      setDeveloperMessage('Local wallet key removed.');
+    } catch {
+      setDeveloperError('Unable to clear wallet data.');
+    } finally {
+      setDeveloperLoading(false);
+    }
+  };
+
+  const handleResetProfile = async () => {
+    setDeveloperMessage(null);
+    setDeveloperError(null);
+    setDeveloperLoading(true);
+    try {
+      await clearProfileSettings();
+      await loadAll(() => true);
+      setDeveloperMessage('Profile settings reset.');
+    } catch {
+      setDeveloperError('Unable to reset profile settings.');
+    } finally {
+      setDeveloperLoading(false);
+    }
+  };
+
+  const handleClearRewards = async () => {
+    setDeveloperMessage(null);
+    setDeveloperError(null);
+    setDeveloperLoading(true);
+    try {
+      await clearRewardsCache();
+      await loadAll(() => true);
+      setDeveloperMessage('Rewards cache cleared.');
+    } catch {
+      setDeveloperError('Unable to clear rewards cache.');
+    } finally {
+      setDeveloperLoading(false);
+    }
+  };
+
+  const handleDeveloperSignOut = async () => {
+    setDeveloperMessage(null);
+    setDeveloperError(null);
+    setDeveloperLoading(true);
+    try {
+      await signOut();
+      setDeveloperMessage('Signed out.');
+    } catch (error) {
+      setDeveloperError(error instanceof Error ? error.message : 'Unable to sign out.');
+    } finally {
+      setDeveloperLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeveloperMessage(null);
+    setDeveloperError(null);
+    setDeveloperLoading(true);
+    try {
+      await signOut();
+      await Promise.all([clearWallet(), clearProfileSettings(), clearRewardsCache()]);
+      setWalletKey(null);
+      await loadAll(() => true);
+      setDeveloperMessage('Signed out and cleared local data. Remote deletion requires backend support.');
+    } catch (error) {
+      setDeveloperError(error instanceof Error ? error.message : 'Unable to delete account.');
+    } finally {
+      setDeveloperLoading(false);
+    }
+  };
+
   const rules = [
     'Secure messaging activity earns daily points.',
     'Verify wallet backups for bonus rewards.',
     'Keep profile settings updated for streak boosts.',
   ];
 
-  const renderHeader = (title: string) => (
-    <View style={styles.headerRow}>
-      <TouchableOpacity style={styles.backButton} onPress={() => setView('home')} activeOpacity={0.8}>
-        <Ionicons name="arrow-back" size={22} color="#0f172a" />
-      </TouchableOpacity>
-      <Text style={styles.headerTitle}>{title}</Text>
-    </View>
-  );
-
   if (view === 'personalization') {
     return (
-      <ScrollView contentContainerStyle={scrollStyle} showsVerticalScrollIndicator={false}>
-        {renderHeader('Personalization')}
-        <View style={cardStyle}>
-          <Text style={styles.cardTitle}>Display alias</Text>
-          <TextInput
-            value={alias}
-            onChangeText={setAlias}
-            placeholder="Alias"
-            placeholderTextColor="#94a3b8"
-            style={styles.input}
-            autoCapitalize="none"
-          />
-          <Text style={styles.hint}>Optional. 3-24 characters using letters, numbers, spaces, _ and -.</Text>
-        </View>
-
-        <View style={cardStyle}>
-          <Text style={styles.cardTitle}>Avatar</Text>
-          <View style={styles.avatarRow}>
-            <View style={styles.avatarPreview}>
-              {avatarType === 'identicon' ? (
-                <View style={styles.identiconGrid}>
-                  {identicon.grid.map((filled, index) => (
-                    <View
-                      key={`cell-${index}`}
-                      style={[
-                        styles.identiconCell,
-                        { backgroundColor: filled ? identicon.color : 'transparent' },
-                      ]}
-                    />
-                  ))}
-                </View>
-              ) : (
-                <Ionicons name="person" size={34} color="#94a3b8" />
-              )}
-            </View>
-            <View style={styles.avatarOptions}>
-              <TouchableOpacity
-                style={[styles.optionButton, avatarType === 'identicon' && styles.optionButtonActive]}
-                onPress={() => setAvatarType('identicon')}
-                activeOpacity={0.8}
-              >
-                <Text style={avatarType === 'identicon' ? styles.optionTextActive : styles.optionText}>Identicon</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.optionButton, avatarType === 'none' && styles.optionButtonActive]}
-                onPress={() => setAvatarType('none')}
-                activeOpacity={0.8}
-              >
-                <Text style={avatarType === 'none' ? styles.optionTextActive : styles.optionText}>No avatar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-          <Text style={styles.hint}>Identicon is derived from your local wallet id.</Text>
-        </View>
-
-        <View style={cardStyle}>
-          <Text style={styles.cardTitle}>Theme preference</Text>
-          <View style={styles.optionRow}>
-            {(['system', 'light', 'dark'] as ThemePreference[]).map((option) => (
-              <TouchableOpacity
-                key={option}
-                style={[styles.optionButton, themePreference === option && styles.optionButtonActive]}
-                onPress={async () => {
-                  setThemePreference(option);
-                  await setThemePrefCtx(option);
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={themePreference === option ? styles.optionTextActive : styles.optionText}>
-                  {option.charAt(0).toUpperCase() + option.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <Text style={styles.hint}>Preference is saved for future theming.</Text>
-        </View>
-
-        {profileError && <Text style={styles.errorText}>{profileError}</Text>}
-        {profileMessage && <Text style={styles.successText}>{profileMessage}</Text>}
-
-        <TouchableOpacity style={styles.primaryButton} onPress={handleSaveProfile} activeOpacity={0.9}>
-          <Text style={styles.primaryButtonText}>Save changes</Text>
-        </TouchableOpacity>
-      </ScrollView>
+      <PersonalizationTab
+        scrollStyle={scrollStyle}
+        cardStyle={cardStyle}
+        onBack={() => setView('home')}
+        alias={alias}
+        onChangeAlias={setAlias}
+        avatarType={avatarType}
+        onChangeAvatarType={setAvatarType}
+        identicon={identicon}
+        themePreference={themePreference}
+        onChangeThemePreference={async (option) => {
+          setThemePreference(option);
+          await setThemePrefCtx(option);
+        }}
+        profileError={profileError}
+        profileMessage={profileMessage}
+        onSave={handleSaveProfile}
+      />
     );
   }
 
   if (view === 'auth') {
     return (
-      <ScrollView contentContainerStyle={scrollStyle} showsVerticalScrollIndicator={false}>
-        {renderHeader('Account access')}
-        <View style={cardStyle}>
-          <View style={styles.cardRow}>
-            <Text style={styles.cardTitle}>Supabase auth</Text>
-            <Ionicons name="lock-closed-outline" size={20} color="#4f46e5" />
-          </View>
-          {!isSupabaseConfigured ? (
-            <Text style={styles.cardSubtitle}>Supabase auth is not configured.</Text>
-          ) : session ? (
-            <>
-              <Text style={styles.cardSubtitle}>Signed in as {session.user.email ?? 'Unknown email'}.</Text>
-              <TouchableOpacity
-                style={[styles.secondaryButton, authLoading && styles.buttonDisabled]}
-                onPress={handleSignOut}
-                activeOpacity={0.9}
-                disabled={authLoading}
-              >
-                <Text style={styles.secondaryButtonText}>Sign out</Text>
-              </TouchableOpacity>
-              <View style={styles.divider} />
-              <Text style={styles.cardTitle}>Update account password</Text>
-              <TextInput
-                value={accountPassword}
-                onChangeText={setAccountPassword}
-                placeholder="New account password"
-                placeholderTextColor="#94a3b8"
-                style={styles.input}
-                secureTextEntry
-              />
-              <TextInput
-                value={accountConfirm}
-                onChangeText={setAccountConfirm}
-                placeholder="Confirm new password"
-                placeholderTextColor="#94a3b8"
-                style={styles.input}
-                secureTextEntry
-              />
-              <TouchableOpacity
-                style={[styles.primaryButton, authLoading && styles.buttonDisabled]}
-                onPress={handleUpdateAccountPassword}
-                activeOpacity={0.9}
-                disabled={authLoading}
-              >
-                <Text style={styles.primaryButtonText}>Update account password</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <Text style={styles.cardSubtitle}>Create an account or sign in.</Text>
-              <TextInput
-                value={authEmail}
-                onChangeText={setAuthEmail}
-                placeholder="Email"
-                placeholderTextColor="#94a3b8"
-                style={styles.input}
-                autoCapitalize="none"
-                keyboardType="email-address"
-              />
-              <TextInput
-                value={authPassword}
-                onChangeText={setAuthPassword}
-                placeholder="Password"
-                placeholderTextColor="#94a3b8"
-                style={styles.input}
-                secureTextEntry
-              />
-              <TouchableOpacity
-                style={[styles.primaryButton, authLoading && styles.buttonDisabled]}
-                onPress={handleSignUp}
-                activeOpacity={0.9}
-                disabled={authLoading}
-              >
-                <Text style={styles.primaryButtonText}>Create account</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.secondaryButton, authLoading && styles.buttonDisabled]}
-                onPress={handleSignIn}
-                activeOpacity={0.9}
-                disabled={authLoading}
-              >
-                <Text style={styles.secondaryButtonText}>Sign in</Text>
-              </TouchableOpacity>
-            </>
-          )}
-          {authError && <Text style={styles.errorText}>{authError}</Text>}
-          {authMessage && <Text style={styles.successText}>{authMessage}</Text>}
-        </View>
-      </ScrollView>
+      <AuthTab
+        scrollStyle={scrollStyle}
+        cardStyle={cardStyle}
+        onBack={() => setView('home')}
+        session={session}
+        authEmail={authEmail}
+        authPassword={authPassword}
+        accountPassword={accountPassword}
+        accountConfirm={accountConfirm}
+        authMessage={authMessage}
+        authError={authError}
+        authLoading={authLoading}
+        onChangeAuthEmail={setAuthEmail}
+        onChangeAuthPassword={setAuthPassword}
+        onChangeAccountPassword={setAccountPassword}
+        onChangeAccountConfirm={setAccountConfirm}
+        onSignUp={handleSignUp}
+        onSignIn={handleSignIn}
+        onSignOut={handleSignOut}
+        onUpdateAccountPassword={handleUpdateAccountPassword}
+      />
     );
   }
 
   if (view === 'security') {
     return (
-      <ScrollView contentContainerStyle={scrollStyle} showsVerticalScrollIndicator={false}>
-        {renderHeader('Security')}
-        <View style={cardStyle}>
-          <View style={styles.cardRow}>
-            <Text style={styles.cardTitle}>Wallet key status</Text>
-            <MaterialCommunityIcons name="shield-lock-outline" size={20} color="#4f46e5" />
-          </View>
-          <Text style={styles.cardSubtitle}>
-            {walletKey ? 'Encrypted key stored locally.' : 'No encrypted wallet key found.'}
-          </Text>
-          {walletKey && (
-            <>
-              <Text style={styles.metaText}>Wallet id: {walletKey.id}</Text>
-              <Text style={styles.metaText}>Updated: {new Date(walletKey.updatedAt).toLocaleString()}</Text>
-            </>
-          )}
-        </View>
-
-        {!walletKey ? (
-          <View style={cardStyle}>
-            <Text style={styles.cardTitle}>Create local wallet key</Text>
-            <Text style={styles.cardSubtitle}>Set a password to encrypt a new local key.</Text>
-            <TextInput
-              value={setupPassword}
-              onChangeText={setSetupPassword}
-              placeholder="New password"
-              placeholderTextColor="#94a3b8"
-              style={styles.input}
-              secureTextEntry
-            />
-            <TextInput
-              value={setupConfirm}
-              onChangeText={setSetupConfirm}
-              placeholder="Confirm password"
-              placeholderTextColor="#94a3b8"
-              style={styles.input}
-              secureTextEntry
-            />
-            <TouchableOpacity style={styles.primaryButton} onPress={handleCreateWalletKey} activeOpacity={0.9}>
-              <Text style={styles.primaryButtonText}>Create encrypted key</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={cardStyle}>
-            <Text style={styles.cardTitle}>Change wallet password</Text>
-            <TextInput
-              value={currentPassword}
-              onChangeText={setCurrentPassword}
-              placeholder="Current password"
-              placeholderTextColor="#94a3b8"
-              style={styles.input}
-              secureTextEntry
-            />
-            <TextInput
-              value={newPassword}
-              onChangeText={setNewPassword}
-              placeholder="New password"
-              placeholderTextColor="#94a3b8"
-              style={styles.input}
-              secureTextEntry
-            />
-            <TextInput
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              placeholder="Confirm new password"
-              placeholderTextColor="#94a3b8"
-              style={styles.input}
-              secureTextEntry
-            />
-            <TouchableOpacity style={styles.primaryButton} onPress={handleChangePassword} activeOpacity={0.9}>
-              <Text style={styles.primaryButtonText}>Update password</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {securityError && <Text style={styles.errorText}>{securityError}</Text>}
-        {securityMessage && <Text style={styles.successText}>{securityMessage}</Text>}
-      </ScrollView>
+      <SecurityTab
+        scrollStyle={scrollStyle}
+        cardStyle={cardStyle}
+        onBack={() => setView('home')}
+        walletKey={walletKey}
+        setupPassword={setupPassword}
+        setupConfirm={setupConfirm}
+        currentPassword={currentPassword}
+        newPassword={newPassword}
+        confirmPassword={confirmPassword}
+        securityMessage={securityMessage}
+        securityError={securityError}
+        onChangeSetupPassword={setSetupPassword}
+        onChangeSetupConfirm={setSetupConfirm}
+        onChangeCurrentPassword={setCurrentPassword}
+        onChangeNewPassword={setNewPassword}
+        onChangeConfirmPassword={setConfirmPassword}
+        onCreateWalletKey={handleCreateWalletKey}
+        onChangePassword={handleChangePassword}
+      />
     );
   }
 
   if (view === 'rewards') {
     return (
-      <ScrollView contentContainerStyle={scrollStyle} showsVerticalScrollIndicator={false}>
-        {renderHeader('RewardsHub')}
-        <View style={cardStyle}>
-          <Text style={styles.cardTitle}>Rewards balance</Text>
-          <Text style={styles.pointsValue}>{rewardsSummary?.points ?? 0} pts</Text>
-          <Text style={styles.metaText}>Tier: {rewardsSummary?.tier ?? 'bronze'}</Text>
-          <Text style={styles.metaText}>
-            Source: {rewardsSource === 'supabase' ? 'Supabase' : 'Local mock data'}
-            {effectiveUserId ? ` · User: ${effectiveUserId.slice(0, 8)}` : ''}
-          </Text>
-        </View>
+      <RewardsTab
+        scrollStyle={scrollStyle}
+        cardStyle={cardStyle}
+        onBack={() => setView('home')}
+        rewardsSummary={rewardsSummary}
+        rewardsSource={rewardsSource}
+        effectiveUserId={effectiveUserId}
+        rules={rules}
+        rewardsActivity={rewardsActivity}
+      />
+    );
+  }
 
-        <View style={cardStyle}>
-          <Text style={styles.cardTitle}>How points are earned</Text>
-          {rules.map((rule) => (
-            <Text key={rule} style={styles.listItem}>
-              - {rule}
-            </Text>
-          ))}
-        </View>
-
-        <View style={cardStyle}>
-          <Text style={styles.cardTitle}>Recent activity</Text>
-          {rewardsActivity.length === 0 ? (
-            <Text style={styles.cardSubtitle}>No activity yet.</Text>
-          ) : (
-            rewardsActivity.map((item) => (
-              <View key={item.id} style={styles.activityRow}>
-                <View style={styles.activityInfo}>
-                  <Text style={styles.activityTitle}>{item.title}</Text>
-                  <Text style={styles.cardSubtitle}>{item.description}</Text>
-                  <Text style={styles.metaText}>{new Date(item.timestamp).toLocaleString()}</Text>
-                </View>
-                <Text style={styles.pointsDelta}>{item.pointsDelta > 0 ? `+${item.pointsDelta}` : item.pointsDelta}</Text>
-              </View>
-            ))
-          )}
-        </View>
-      </ScrollView>
+  if (view === 'developer') {
+    return (
+      <DeveloperTab
+        scrollStyle={scrollStyle}
+        cardStyle={cardStyle}
+        onBack={() => setView('home')}
+        hasSession={Boolean(session)}
+        isBusy={developerLoading}
+        developerMessage={developerMessage}
+        developerError={developerError}
+        onRefreshData={handleRefreshData}
+        onClearWallet={handleClearWallet}
+        onResetProfile={handleResetProfile}
+        onClearRewards={handleClearRewards}
+        onSignOut={handleDeveloperSignOut}
+        onDeleteAccount={handleDeleteAccount}
+      />
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={scrollStyle} showsVerticalScrollIndicator={false}>
-      <View style={styles.titleBlock}>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <Text style={styles.cardSubtitle}>Manage how your account feels and stays secure.</Text>
-      </View>
-
-      <TouchableOpacity style={cardStyle} onPress={() => setView('personalization')} activeOpacity={0.85}>
-        <View style={styles.cardRow}>
-          <View style={styles.cardIcon}>
-            <Ionicons name="color-palette-outline" size={22} color="#4f46e5" />
-          </View>
-          <View style={styles.cardBody}>
-            <Text style={styles.cardTitle}>Personalization</Text>
-            <Text style={styles.cardSubtitle}>
-              Alias, avatar, and theme preferences. Source: {profileSource === 'supabase' ? 'Supabase' : 'Local'}.
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
-        </View>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={cardStyle} onPress={() => setView('auth')} activeOpacity={0.85}>
-        <View style={styles.cardRow}>
-          <View style={styles.cardIcon}>
-            <Ionicons name="log-in-outline" size={22} color="#4f46e5" />
-          </View>
-          <View style={styles.cardBody}>
-            <Text style={styles.cardTitle}>Account access</Text>
-            <Text style={styles.cardSubtitle}>Create an account, sign in, and update password.</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
-        </View>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={cardStyle} onPress={() => setView('security')} activeOpacity={0.85}>
-        <View style={styles.cardRow}>
-          <View style={styles.cardIcon}>
-            <MaterialCommunityIcons name="shield-lock-outline" size={22} color="#4f46e5" />
-          </View>
-          <View style={styles.cardBody}>
-            <Text style={styles.cardTitle}>Security</Text>
-            <Text style={styles.cardSubtitle}>Change wallet password and verify keys.</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
-        </View>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={cardStyle} onPress={() => setView('rewards')} activeOpacity={0.85}>
-        <View style={styles.cardRow}>
-          <View style={styles.cardIcon}>
-            <Ionicons name="gift-outline" size={22} color="#4f46e5" />
-          </View>
-          <View style={styles.cardBody}>
-            <Text style={styles.cardTitle}>RewardsHub</Text>
-            <Text style={styles.cardSubtitle}>Track points and recent activity.</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
-        </View>
-      </TouchableOpacity>
-    </ScrollView>
+    <ProfileHomeTab
+      scrollStyle={scrollStyle}
+      cardStyle={cardStyle}
+      profileSource={profileSource}
+      onOpenPersonalization={() => setView('personalization')}
+      onOpenAuth={() => setView('auth')}
+      onOpenSecurity={() => setView('security')}
+      onOpenRewards={() => setView('rewards')}
+      onOpenDeveloper={() => setView('developer')}
+    />
   );
 }

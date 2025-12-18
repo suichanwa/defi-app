@@ -1,9 +1,17 @@
 import 'react-native-get-random-values';
-import '@ethersproject/shims';
+import { LogBox } from 'react-native';
 import './global.css';
 import 'react-native-reanimated';
 import { registerRootComponent } from 'expo';
 
+(
+  globalThis as typeof globalThis & {
+    SHIMS_DISABLE_LOGS?: boolean;
+  }
+).SHIMS_DISABLE_LOGS = true;
+require('@ethersproject/shims');
+
+LogBox.ignoreLogs(["SafeAreaView has been deprecated"]);
 import App from './App';
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);
