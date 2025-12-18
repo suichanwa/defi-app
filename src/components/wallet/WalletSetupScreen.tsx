@@ -1,7 +1,9 @@
-import React from 'react';
-import { ActivityIndicator, Alert, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { walletStyles as styles } from '../../styles/WalletStyles';
+import { t } from '../../i18n';
+import WalletHelpModal from './WalletHelpModal';
 
 type Props = {
   flow: 'menu' | 'create' | 'import' | 'unlock' | 'backup';
@@ -66,6 +68,7 @@ export default function WalletSetupScreen({
   onGoImport,
   onLock,
 }: Props) {
+  const [showHelp, setShowHelp] = useState(false);
   if (status === 'loading') {
     return (
       <View style={styles.setupCard}>
@@ -295,28 +298,19 @@ export default function WalletSetupScreen({
     return (
       <View style={styles.setupCard}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text style={styles.setupTitle}>Set up your wallet</Text>
-          <TouchableOpacity
-            onPress={() =>
-              Alert.alert(
-                'Wallet setup',
-                'Create: generates a new seed phrase and encrypts it locally.\n\nImport: paste your 12/24-word phrase and set a password to encrypt it on this device.\n\nKeep your seed phrase offline—losing it means losing access.',
-              )
-            }
-            accessibilityLabel="Wallet setup help"
-            activeOpacity={0.8}
-          >
+          <Text style={styles.setupTitle}>{t('wallet.setupTitle')}</Text>
+          <TouchableOpacity onPress={() => setShowHelp(true)} accessibilityLabel="Wallet setup help" activeOpacity={0.8}>
             <Ionicons name="help-circle-outline" size={22} color="#4f46e5" />
           </TouchableOpacity>
         </View>
-        <Text style={styles.setupSubtitle}>Create a new wallet or import with a 12/24-word phrase.</Text>
+        <Text style={styles.setupSubtitle}>{t('wallet.setupSubtitle')}</Text>
         <TouchableOpacity
           style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}
           onPress={onGoCreate}
           activeOpacity={0.9}
           disabled={isSubmitting}
         >
-          <Text style={styles.primaryButtonText}>Create wallet</Text>
+          <Text style={styles.primaryButtonText}>{t('wallet.create')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.secondaryButton, isSubmitting && styles.buttonDisabled]}
@@ -324,8 +318,9 @@ export default function WalletSetupScreen({
           activeOpacity={0.9}
           disabled={isSubmitting}
         >
-          <Text style={styles.secondaryButtonText}>Import wallet</Text>
+          <Text style={styles.secondaryButtonText}>{t('wallet.import')}</Text>
         </TouchableOpacity>
+        <WalletHelpModal visible={showHelp} onClose={() => setShowHelp(false)} />
       </View>
     );
   }

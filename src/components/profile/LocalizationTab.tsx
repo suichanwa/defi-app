@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { profileStyles as styles } from '../../styles/ProfileStyles';
 import type { LanguageCode } from '../../types/profile';
 import ProfileHeader from './ProfileHeader';
+import { availableLanguages, t } from '../../i18n';
 
 type LocalizationTabProps = {
   scrollStyle: StyleProp<ViewStyle>;
@@ -15,12 +16,6 @@ type LocalizationTabProps = {
   message?: string | null;
   error?: string | null;
 };
-
-const LANGUAGES: { code: LanguageCode; label: string }[] = [
-  { code: 'en', label: 'English (default)' },
-  { code: 'ru', label: 'Русский' },
-  { code: 'ro', label: 'Română' },
-];
 
 export default function LocalizationTab({
   scrollStyle,
@@ -34,12 +29,12 @@ export default function LocalizationTab({
 }: LocalizationTabProps) {
   return (
     <ScrollView contentContainerStyle={scrollStyle} showsVerticalScrollIndicator={false}>
-      <ProfileHeader title="Languages" onBack={onBack} />
+      <ProfileHeader title={t('language.title')} onBack={onBack} />
       <View style={cardStyle}>
-        <Text style={styles.cardTitle}>Localization</Text>
-        <Text style={styles.cardSubtitle}>Choose your preferred language.</Text>
+        <Text style={styles.cardTitle}>{t('language.title')}</Text>
+        <Text style={styles.cardSubtitle}>{t('language.subtitle')}</Text>
         <View style={localStyles.list}>
-          {LANGUAGES.map((lang) => {
+          {availableLanguages.map((lang) => {
             const selected = lang.code === language;
             return (
               <TouchableOpacity
@@ -59,7 +54,7 @@ export default function LocalizationTab({
         {error && <Text style={styles.errorText}>{error}</Text>}
         {message && <Text style={styles.successText}>{message}</Text>}
         <TouchableOpacity style={styles.primaryButton} onPress={onSave} activeOpacity={0.9}>
-          <Text style={styles.primaryButtonText}>Save language</Text>
+          <Text style={styles.primaryButtonText}>{t('language.save')}</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

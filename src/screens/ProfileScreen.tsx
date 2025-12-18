@@ -33,6 +33,7 @@ import {
   WalletReencryptError,
 } from '../services/walletKeyStore';
 import { useTheme } from '../theme/ThemeProvider';
+import { availableLanguages, setLanguage as setI18nLanguage } from '../i18n';
 import AuthTab from '../components/profile/AuthTab';
 import DeveloperTab from '../components/profile/DeveloperTab';
 import LocalizationTab from '../components/profile/LocalizationTab';
@@ -130,23 +131,24 @@ export default function ProfileScreen() {
     const remoteProfile =
       isSupabaseConfigured && currentSession?.user?.id ? await fetchRemoteProfile(currentSession.user.id) : null;
     if (!isActive()) return;
-      const mergedProfile = remoteProfile ?? settings;
-      setProfileSource(remoteProfile ? 'supabase' : 'local');
-      setAlias(mergedProfile.alias ?? '');
-      setAvatarType(mergedProfile.avatarType ?? 'identicon');
-      const nextSeed = mergedProfile.avatarSeed ?? key?.id ?? makeSeed();
-      setAvatarSeed(nextSeed);
-      const mergedTheme = mergedProfile.themePreference ?? 'system';
-      const mergedLanguage = normalizeLanguage(mergedProfile.language);
-      setThemePreference(mergedTheme);
-      setLanguage(mergedLanguage);
-      if (mergedTheme !== themePrefCtx) {
-        await setThemePrefCtx(mergedTheme);
-      }
-      if (!mergedProfile.avatarSeed) {
-        await saveProfileSettings({ ...mergedProfile, avatarSeed: nextSeed });
-      }
-      setWalletKey(key);
+    const mergedProfile = remoteProfile ?? settings;
+    setProfileSource(remoteProfile ? 'supabase' : 'local');
+    setAlias(mergedProfile.alias ?? '');
+    setAvatarType(mergedProfile.avatarType ?? 'identicon');
+    const nextSeed = mergedProfile.avatarSeed ?? key?.id ?? makeSeed();
+    setAvatarSeed(nextSeed);
+    const mergedTheme = mergedProfile.themePreference ?? 'system';
+    const mergedLanguage = normalizeLanguage(mergedProfile.language);
+    setThemePreference(mergedTheme);
+    setLanguage(mergedLanguage);
+    setI18nLanguage(mergedLanguage);
+    if (mergedTheme !== themePrefCtx) {
+      await setThemePrefCtx(mergedTheme);
+    }
+    if (!mergedProfile.avatarSeed) {
+      await saveProfileSettings({ ...mergedProfile, avatarSeed: nextSeed });
+    }
+    setWalletKey(key);
     if (isSupabaseConfigured && remoteSummary) {
       setRewardsSummary(remoteSummary);
       setRewardsSource('supabase');
@@ -208,6 +210,7 @@ export default function ProfileScreen() {
       themePreference,
       language,
     });
+    setI18nLanguage(language);
     if (isSupabaseConfigured && session?.user?.id) {
       await upsertRemoteProfile(session.user.id, saved);
       setProfileSource('supabase');
