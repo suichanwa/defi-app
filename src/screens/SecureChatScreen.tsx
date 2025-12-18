@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, StyleSheet, View, useWindowDimensions } from 'react-native';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import ChatHeader from '../components/secureChat/ChatHeader';
 import ChatTabs from '../components/secureChat/ChatTabs';
 import ChatListScreen from '../components/secureChat/ChatListScreen';
@@ -9,57 +10,26 @@ import type { ChatMessage, ChatThread, ServerInfo } from '../types/secureChat';
 import * as date from 'date-and-time';
 import * as Location from 'expo-location';
 import { useTheme } from '../theme/ThemeProvider';
-
-const initialChats: ChatThread[] = [
-  {
-    id: 'support',
-    name: 'Secure Support',
-    participants: ['You', 'Support'],
-    peerAddress: 'local',
-    isOnline: true,
-    lastMessage: { text: 'Welcome to Secure Chat.', ts: '10:00', from: 'Support' },
-  },
-  {
-    id: 'saved',
-    name: 'Saved Messages',
-    participants: ['You'],
-    peerAddress: '',
-    isOnline: false,
-    lastMessage: { text: 'Start the server to sync peers.', ts: '09:45', from: 'System' },
-  },
-];
-
-const initialMessages: Record<string, ChatMessage[]> = {
-  support: [
-    { id: '1', chatId: 'support', author: 'Support', content: 'Welcome to Secure Chat.', timestamp: '10:00' },
-    {
-      id: '2',
-      chatId: 'support',
-      author: 'You',
-      content: 'Show me my latest transactions.',
-      timestamp: '10:02',
-      outgoing: true,
-    },
-  ],
-  saved: [
-    {
-      id: '3',
-      chatId: 'saved',
-      author: 'System',
-      content: 'Saved messages live here once your server is running.',
-      timestamp: '09:45',
-      type: 'system',
-    },
-  ],
-};
+import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
+import { getAuthSession, onAuthStateChange, type AuthSession } from '../services/auth';
+import { getAnonymousId } from '../services/identity';
 
 export default function SecureChatScreen() {
   const { colors } = useTheme();
   const [secureTab, setSecureTab] = useState<'chats' | 'connect'>('chats');
   const [chatView, setChatView] = useState<'list' | 'thread'>('list');
-  const [chats, setChats] = useState<ChatThread[]>(initialChats);
-  const [messagesByChat, setMessagesByChat] = useState<Record<string, ChatMessage[]>>(initialMessages);
-  const [selectedChatId, setSelectedChatId] = useState<string>(initialChats[0]?.id ?? '');
+  const [chats, setChats] = useState<ChatThread[]>([
+    {
+      id: 'global',
+      name: 'Global room',
+      participants: ['You'],
+      peerAddress: 'supabase-realtime',
+      isOnline: false,
+      lastMessage: { text: 'Join to start chatting.', ts: date.format(new Date(), 'HH:mm'), from: 'System' },
+    },
+  ]);
+  const [messagesByChat, setMessagesByChat] = useState<Record<string, ChatMessage[]>>({});
+  const [selectedChatId, setSelectedChatId] = useState<string>('global');
   const [draft, setDraft] = useState('');
   const [connectAddress, setConnectAddress] = useState('');
   const [connectName, setConnectName] = useState('');
@@ -67,21 +37,173 @@ export default function SecureChatScreen() {
   const [connectionLog, setConnectionLog] = useState<string[]>(['No active peer connections yet.']);
   const [timeLabel, setTimeLabel] = useState('');
   const [locationLabel, setLocationLabel] = useState('Location: requesting...');
+  const [session, setSession] = useState<AuthSession>(null);
+  const [userLabel, setUserLabel] = useState<string>('Anonymous');
+  const [roomId, setRoomId] = useState<string>('global');
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const { width } = useWindowDimensions();
   const isCompact = width < 720;
-
-  const devicePublicKey =
-    'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAw5R9LJ0ExamplePublicKeyForDemoOnly';
 
   const selectedChat = useMemo(
     () => chats.find((chat) => chat.id === selectedChatId) ?? null,
     [chats, selectedChatId],
   );
 
+  const devicePublicKey = useMemo(() => `user:${userLabel}`, [userLabel]);
+
   const selectedMessages = useMemo(
     () => messagesByChat[selectedChatId] ?? [],
     [messagesByChat, selectedChatId],
   );
+
+  const mapRowToMessage = (row: { id: string; room_id: string; author: string; content: string; created_at?: string }) => {
+    const ts = row.created_at ? new Date(row.created_at) : new Date();
+    return {
+      id: row.id,
+      chatId: row.room_id,
+      author: row.author,
+      content: row.content,
+      timestamp: ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      outgoing: row.author === userLabel,
+      type: 'text' as const,
+    };
+  };
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setConnectionLog((prev) => [
+        'Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY to enable chat.',
+        ...prev,
+      ]);
+      return undefined;
+    }
+    let active = true;
+    getAuthSession().then(async (current) => {
+      if (!active) return;
+      setSession(current);
+      const anonId = await getAnonymousId();
+      const label = current?.user?.email ?? current?.user?.id ?? `anon-${anonId.slice(-6)}`;
+      setUserLabel(label);
+    });
+    const sub = onAuthStateChange((next) => setSession(next));
+    return () => {
+      active = false;
+      sub?.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    if (!supabase) return;
+
+    // Always keep a "global" room available.
+    setChats((prev) => {
+      if (prev.find((c) => c.id === 'global')) return prev;
+      const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return [
+        {
+          id: 'global',
+          name: 'Global room',
+          participants: ['You'],
+          peerAddress: 'supabase-realtime',
+          isOnline: true,
+          lastMessage: { text: 'Connected to Supabase Realtime.', ts: now, from: 'System' },
+        },
+        ...prev,
+      ];
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+
+    // Tear down previous channel.
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    const channel = supabase.channel(`chat:${roomId}`, {
+      config: {
+        broadcast: { self: true },
+        presence: { key: session?.user?.id ?? userLabel },
+      },
+    });
+
+    channel
+      .on('broadcast', { event: 'message' }, ({ payload }) => {
+        const msg = payload as ChatMessage;
+        setMessagesByChat((prev) => {
+          const existing = prev[msg.chatId] ?? [];
+          const seen = existing.some((m) => m.id === msg.id);
+          if (seen) return prev;
+          return { ...prev, [msg.chatId]: [...existing, msg] };
+        });
+        setChats((prev) =>
+          prev.map((chat) =>
+            chat.id === msg.chatId
+              ? { ...chat, lastMessage: { text: msg.content, ts: msg.timestamp, from: msg.author } }
+              : chat,
+          ),
+        );
+      })
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState();
+        const keys = Object.keys(state);
+        setChats((prev) =>
+          prev.map((chat) => (chat.id === roomId ? { ...chat, isOnline: keys.length > 0 } : chat)),
+        );
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({ user: userLabel, room: roomId });
+          setConnectionLog((prev) => [`Joined room ${roomId}.`, ...prev]);
+          setServerInfo({ address: 'supabase', port: 0, status: 'running' });
+          setChats((prev) =>
+            prev.map((chat) => (chat.id === roomId ? { ...chat, isOnline: true } : chat)),
+          );
+          await loadHistory(roomId);
+        }
+        if (status === 'CHANNEL_ERROR') {
+          setConnectionLog((prev) => [`Failed to join room ${roomId}. Check Supabase Realtime keys.`, ...prev]);
+        }
+      });
+
+    channelRef.current = channel;
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [roomId, session, userLabel]);
+
+  const loadHistory = async (room: string) => {
+    if (!isSupabaseConfigured || !supabase) return;
+    setHistoryLoading(true);
+    const { data, error } = await supabase
+      .from('messages')
+      .select('id, room_id, author, content, created_at')
+      .eq('room_id', room)
+      .order('created_at', { ascending: true })
+      .limit(200);
+
+    if (error) {
+      setConnectionLog((prev) => [`History error: ${error.message}`, ...prev]);
+      setHistoryLoading(false);
+      return;
+    }
+
+    const mapped = (data ?? []).map(mapRowToMessage);
+    setMessagesByChat((prev) => ({ ...prev, [room]: mapped }));
+    if (mapped.length > 0) {
+      const last = mapped[mapped.length - 1];
+      setChats((prev) =>
+        prev.map((chat) =>
+          chat.id === room ? { ...chat, lastMessage: { text: last.content, ts: last.timestamp, from: last.author } } : chat,
+        ),
+      );
+    }
+    setHistoryLoading(false);
+  };
 
   useEffect(() => {
     const tick = () => setTimeLabel(date.format(new Date(), 'HH:mm:ss'));
@@ -131,16 +253,22 @@ export default function SecureChatScreen() {
 
   const handleSelectChat = (chatId: string) => {
     setSelectedChatId(chatId);
+    setRoomId(chatId);
     setChatView('thread');
+    setMessagesByChat((prev) => (prev[chatId] ? prev : { ...prev, [chatId]: [] }));
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!draft.trim() || !selectedChat) return;
+    if (!isSupabaseConfigured || !supabase) {
+      Alert.alert('Supabase not configured', 'Set SUPABASE_URL and SUPABASE_ANON_KEY to send messages.');
+      return;
+    }
     const now = new Date();
     const message: ChatMessage = {
       id: now.getTime().toString(),
       chatId: selectedChat.id,
-      author: 'You',
+      author: userLabel,
       content: draft.trim(),
       timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       outgoing: true,
@@ -160,6 +288,31 @@ export default function SecureChatScreen() {
       ),
     );
     setDraft('');
+
+    // Persist to Supabase (best-effort).
+    supabase
+      .from('messages')
+      .insert({
+        room_id: selectedChat.id,
+        author: userLabel,
+        content: message.content,
+        created_at: new Date().toISOString(),
+      })
+      .then(({ error }) => {
+        if (error) {
+          setConnectionLog((prev) => [`Save error: ${error.message}`, ...prev]);
+        }
+      });
+
+    // Broadcast to room (ephemeral).
+    const channel = channelRef.current;
+    if (channel) {
+      await channel.send({
+        type: 'broadcast',
+        event: 'message',
+        payload: { ...message, outgoing: false },
+      });
+    }
   };
 
   const handleConnectPeer = () => {
@@ -170,7 +323,7 @@ export default function SecureChatScreen() {
 
     const address = connectAddress.trim();
     const name = connectName.trim() || `Peer @ ${address}`;
-    const chatId = `peer-${Date.now()}`;
+    const chatId = address.toLowerCase().replace(/[^a-z0-9-_]/gi, '-') || `peer-${Date.now()}`;
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     setChats((prev) => [
@@ -202,6 +355,7 @@ export default function SecureChatScreen() {
 
     setConnectionLog((prev) => [`Connected to ${address}.`, ...prev]);
     setSelectedChatId(chatId);
+    setRoomId(chatId);
     setSecureTab('chats');
     setChatView('thread');
     setConnectAddress('');

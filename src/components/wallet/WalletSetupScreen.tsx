@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { walletStyles as styles } from '../../styles/WalletStyles';
 
@@ -294,7 +294,21 @@ export default function WalletSetupScreen({
   if (status === 'missing') {
     return (
       <View style={styles.setupCard}>
-        <Text style={styles.setupTitle}>Set up your wallet</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text style={styles.setupTitle}>Set up your wallet</Text>
+          <TouchableOpacity
+            onPress={() =>
+              Alert.alert(
+                'Wallet setup',
+                'Create: generates a new seed phrase and encrypts it locally.\n\nImport: paste your 12/24-word phrase and set a password to encrypt it on this device.\n\nKeep your seed phrase offline—losing it means losing access.',
+              )
+            }
+            accessibilityLabel="Wallet setup help"
+            activeOpacity={0.8}
+          >
+            <Ionicons name="help-circle-outline" size={22} color="#4f46e5" />
+          </TouchableOpacity>
+        </View>
         <Text style={styles.setupSubtitle}>Create a new wallet or import with a 12/24-word phrase.</Text>
         <TouchableOpacity
           style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}

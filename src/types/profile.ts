@@ -1,6 +1,7 @@
 export type ThemePreference = 'system' | 'light' | 'dark';
 
 export type AvatarType = 'identicon' | 'custom' | 'none';
+export type LanguageCode = 'en' | 'ru' | 'ro';
 
 export type ProfileSettings = {
   alias: string;
@@ -8,5 +9,6 @@ export type ProfileSettings = {
   avatarUri?: string;
   avatarSeed?: string;
   themePreference: ThemePreference;
+  language: LanguageCode;
   updatedAt: string;
 };

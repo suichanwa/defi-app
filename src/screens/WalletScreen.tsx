@@ -237,8 +237,8 @@ export default function WalletScreen() {
       setWalletPassword('');
       setWalletPasswordConfirm('');
       setFlowMessage('Wallet created. Back up your seed phrase.');
-    } catch {
-      setFlowError('Unable to create wallet.');
+    } catch (error) {
+      setFlowError(error instanceof Error ? error.message : 'Unable to create wallet.');
     } finally {
       setIsSubmitting(false);
     }
@@ -248,6 +248,10 @@ export default function WalletScreen() {
     resetFlowMessages();
     const phrase = normalizeMnemonic(mnemonicInput);
     const words = phrase.split(' ');
+    if (!phrase) {
+      setFlowError('Enter your 12 or 24 word phrase.');
+      return;
+    }
     if (![12, 24].includes(words.length)) {
       setFlowError('Mnemonic must be 12 or 24 words.');
       return;
@@ -269,8 +273,8 @@ export default function WalletScreen() {
       setWalletPassword('');
       setWalletPasswordConfirm('');
       setFlowMessage('Wallet imported. Back up your seed phrase.');
-    } catch {
-      setFlowError('Unable to import wallet. Check phrase and try again.');
+    } catch (error) {
+      setFlowError(error instanceof Error ? error.message : 'Unable to import wallet. Check phrase and try again.');
     } finally {
       setIsSubmitting(false);
     }

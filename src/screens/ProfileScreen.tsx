@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { profileStyles as styles } from '../styles/ProfileStyles';
-import type { AvatarType, ThemePreference } from '../types/profile';
+import type { AvatarType, LanguageCode, ThemePreference } from '../types/profile';
 import type { EncryptedWalletKey } from '../types/wallet';
 import type { RewardActivity, RewardsSummary } from '../types/rewards';
-import { clearProfileSettings, loadProfileSettings, saveProfileSettings } from '../services/profileStore';
+import { clearProfileSettings, loadProfileSettings, normalizeLanguage, saveProfileSettings } from '../services/profileStore';
 import { clearRewardsCache, loadRewardsActivity, loadRewardsSummary } from '../services/rewardsStore';
 import {
   getAuthSession,
@@ -35,12 +35,13 @@ import {
 import { useTheme } from '../theme/ThemeProvider';
 import AuthTab from '../components/profile/AuthTab';
 import DeveloperTab from '../components/profile/DeveloperTab';
+import LocalizationTab from '../components/profile/LocalizationTab';
 import PersonalizationTab from '../components/profile/PersonalizationTab';
 import ProfileHomeTab from '../components/profile/ProfileHomeTab';
 import RewardsTab from '../components/profile/RewardsTab';
 import SecurityTab from '../components/profile/SecurityTab';
 
-type ProfileView = 'home' | 'personalization' | 'security' | 'rewards' | 'auth' | 'developer';
+type ProfileView = 'home' | 'personalization' | 'security' | 'rewards' | 'auth' | 'developer' | 'localization';
 
 const ALIAS_MIN = 3;
 const ALIAS_MAX = 24;
@@ -80,6 +81,7 @@ export default function ProfileScreen() {
   const [avatarType, setAvatarType] = useState<AvatarType>('identicon');
   const [avatarSeed, setAvatarSeed] = useState('');
   const [themePreference, setThemePreference] = useState<ThemePreference>('system');
+  const [language, setLanguage] = useState<LanguageCode>('en');
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [walletKey, setWalletKey] = useState<EncryptedWalletKey | null>(null);
@@ -128,21 +130,23 @@ export default function ProfileScreen() {
     const remoteProfile =
       isSupabaseConfigured && currentSession?.user?.id ? await fetchRemoteProfile(currentSession.user.id) : null;
     if (!isActive()) return;
-    const mergedProfile = remoteProfile ?? settings;
-    setProfileSource(remoteProfile ? 'supabase' : 'local');
-    setAlias(mergedProfile.alias ?? '');
-    setAvatarType(mergedProfile.avatarType ?? 'identicon');
-    const nextSeed = mergedProfile.avatarSeed ?? key?.id ?? makeSeed();
-    setAvatarSeed(nextSeed);
-    const mergedTheme = mergedProfile.themePreference ?? 'system';
-    setThemePreference(mergedTheme);
-    if (mergedTheme !== themePrefCtx) {
-      await setThemePrefCtx(mergedTheme);
-    }
-    if (!mergedProfile.avatarSeed) {
-      await saveProfileSettings({ ...mergedProfile, avatarSeed: nextSeed });
-    }
-    setWalletKey(key);
+      const mergedProfile = remoteProfile ?? settings;
+      setProfileSource(remoteProfile ? 'supabase' : 'local');
+      setAlias(mergedProfile.alias ?? '');
+      setAvatarType(mergedProfile.avatarType ?? 'identicon');
+      const nextSeed = mergedProfile.avatarSeed ?? key?.id ?? makeSeed();
+      setAvatarSeed(nextSeed);
+      const mergedTheme = mergedProfile.themePreference ?? 'system';
+      const mergedLanguage = normalizeLanguage(mergedProfile.language);
+      setThemePreference(mergedTheme);
+      setLanguage(mergedLanguage);
+      if (mergedTheme !== themePrefCtx) {
+        await setThemePrefCtx(mergedTheme);
+      }
+      if (!mergedProfile.avatarSeed) {
+        await saveProfileSettings({ ...mergedProfile, avatarSeed: nextSeed });
+      }
+      setWalletKey(key);
     if (isSupabaseConfigured && remoteSummary) {
       setRewardsSummary(remoteSummary);
       setRewardsSource('supabase');
@@ -202,6 +206,7 @@ export default function ProfileScreen() {
       avatarType,
       avatarSeed: avatarType === 'identicon' ? identiconSeed : undefined,
       themePreference,
+      language,
     });
     if (isSupabaseConfigured && session?.user?.id) {
       await upsertRemoteProfile(session.user.id, saved);
@@ -576,6 +581,21 @@ export default function ProfileScreen() {
     );
   }
 
+  if (view === 'localization') {
+    return (
+      <LocalizationTab
+        scrollStyle={scrollStyle}
+        cardStyle={cardStyle}
+        onBack={() => setView('home')}
+        language={language}
+        onChangeLanguage={setLanguage}
+        onSave={handleSaveProfile}
+        message={profileMessage}
+        error={profileError}
+      />
+    );
+  }
+
   if (view === 'developer') {
     return (
       <DeveloperTab
@@ -605,6 +625,7 @@ export default function ProfileScreen() {
       onOpenAuth={() => setView('auth')}
       onOpenSecurity={() => setView('security')}
       onOpenRewards={() => setView('rewards')}
+      onOpenLocalization={() => setView('localization')}
       onOpenDeveloper={() => setView('developer')}
     />
   );

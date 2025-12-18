@@ -11,6 +11,7 @@ type ProfileHomeTabProps = {
   onOpenAuth: () => void;
   onOpenSecurity: () => void;
   onOpenRewards: () => void;
+  onOpenLocalization: () => void;
   onOpenDeveloper: () => void;
 };
 
@@ -22,6 +23,7 @@ export default function ProfileHomeTab({
   onOpenAuth,
   onOpenSecurity,
   onOpenRewards,
+  onOpenLocalization,
   onOpenDeveloper,
 }: ProfileHomeTabProps) {
   return (
@@ -72,14 +74,27 @@ export default function ProfileHomeTab({
         </View>
       </TouchableOpacity>
 
-      <TouchableOpacity style={cardStyle} onPress={onOpenRewards} activeOpacity={0.85}>
-        <View style={styles.cardRow}>
-          <View style={styles.cardIcon}>
-            <Ionicons name="gift-outline" size={22} color="#4f46e5" />
-          </View>
+    <TouchableOpacity style={cardStyle} onPress={onOpenRewards} activeOpacity={0.85}>
+      <View style={styles.cardRow}>
+        <View style={styles.cardIcon}>
+          <Ionicons name="gift-outline" size={22} color="#4f46e5" />
+        </View>
           <View style={styles.cardBody}>
             <Text style={styles.cardTitle}>RewardsHub</Text>
             <Text style={styles.cardSubtitle}>Track points and recent activity.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+        </View>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={cardStyle} onPress={onOpenLocalization} activeOpacity={0.85}>
+        <View style={styles.cardRow}>
+          <View style={styles.cardIcon}>
+            <Ionicons name="language-outline" size={22} color="#4f46e5" />
+          </View>
+          <View style={styles.cardBody}>
+            <Text style={styles.cardTitle}>Languages</Text>
+            <Text style={styles.cardSubtitle}>Choose English, Русский, or Română.</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
         </View>

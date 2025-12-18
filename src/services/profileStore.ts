@@ -1,4 +1,4 @@
-import type { ProfileSettings, ThemePreference } from '../types/profile';
+import type { LanguageCode, ProfileSettings, ThemePreference } from '../types/profile';
 import { getJson, removeKey, setJson } from './storage';
 
 const PROFILE_KEY = 'profile.settings.v1';
@@ -7,6 +7,7 @@ const defaultSettings = (): ProfileSettings => ({
   alias: '',
   avatarType: 'identicon',
   themePreference: 'system',
+  language: 'en',
   updatedAt: new Date().toISOString(),
 });
 
@@ -38,4 +39,9 @@ export async function clearProfileSettings(): Promise<void> {
 export function normalizeThemePreference(value?: string): ThemePreference {
   if (value === 'light' || value === 'dark') return value;
   return 'system';
+}
+
+export function normalizeLanguage(value?: string): LanguageCode {
+  if (value === 'ru' || value === 'ro') return value;
+  return 'en';
 }
