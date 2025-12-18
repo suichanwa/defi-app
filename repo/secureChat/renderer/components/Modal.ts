@@ -1,7 +1,7 @@
 import type { Component } from '../types/components';
 
 // Define proper function types instead of generic Function
-type EventListener = (...args: unknown[]) => void;
+type EventListener = (evt: Event | KeyboardEvent) => void;
 type ContentUpdateCallback = () => void;
 
 export class Modal implements Component {
