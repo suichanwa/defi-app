@@ -19,6 +19,11 @@ export const walletStyles = StyleSheet.create({
     marginTop: 8,
     fontSize: 13,
   },
+  successText: {
+    color: '#16a34a',
+    marginTop: 8,
+    fontSize: 13,
+  },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -27,8 +32,7 @@ export const walletStyles = StyleSheet.create({
   },
   metaText: {
     color: '#6b7280',
-    fontSize: 13,
-    marginLeft: 8,
+    fontSize: 12,
   },
   scrollContent: {
     paddingBottom: 120,
@@ -36,11 +40,11 @@ export const walletStyles = StyleSheet.create({
   },
   setupCard: {
     marginTop: 24,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     backgroundColor: '#ffffff',
-    padding: 16,
+    padding: 18,
   },
   setupTitle: {
     fontSize: 20,
@@ -50,6 +54,29 @@ export const walletStyles = StyleSheet.create({
   setupSubtitle: {
     marginTop: 6,
     color: '#64748b',
+  },
+  loadingRow: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginLeft: 8,
+    color: '#475569',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  summaryRow: {
+    marginTop: 10,
+  },
+  summaryLabel: {
+    color: '#64748b',
+    fontSize: 12,
+  },
+  summaryValue: {
+    marginTop: 4,
+    color: '#0f172a',
+    fontWeight: '600',
   },
   checkboxRow: {
     marginTop: 12,
@@ -94,6 +121,21 @@ export const walletStyles = StyleSheet.create({
     color: '#0f172a',
     fontWeight: '600',
   },
+  qrWrap: {
+    marginTop: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addressPill: {
+    marginTop: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 12,
+    color: '#0f172a',
+  },
   deviceCutout: {
     alignSelf: 'center',
     height: 36,
@@ -103,9 +145,39 @@ export const walletStyles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 16,
   },
+  headerRow: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  headerSubtitle: {
+    marginTop: 4,
+    color: '#64748b',
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e2e8f0',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  statusText: {
+    marginLeft: 6,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
   cardWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 16,
   },
   sideAccentLeft: {
     width: 18,
@@ -125,9 +197,9 @@ export const walletStyles = StyleSheet.create({
   },
   walletCard: {
     flex: 1,
-    backgroundColor: '#4f46e5',
-    borderRadius: 18,
-    padding: 18,
+    backgroundColor: '#0f172a',
+    borderRadius: 22,
+    padding: 20,
     ...(cardShadow ?? {}),
   },
   walletHeader: {
@@ -136,53 +208,72 @@ export const walletStyles = StyleSheet.create({
     marginBottom: 12,
   },
   pill: {
-    backgroundColor: '#3b32d2',
-    color: '#e0e7ff',
+    backgroundColor: '#1e293b',
+    color: '#e2e8f0',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: 999,
     fontSize: 12,
     fontWeight: '600',
     marginRight: 12,
   },
   walletTitle: {
-    color: '#e0e7ff',
+    color: '#e2e8f0',
     fontSize: 14,
+  },
+  balanceLabel: {
+    color: '#94a3b8',
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1.1,
   },
   balance: {
     color: '#ffffff',
     fontSize: 32,
     fontWeight: '700',
-    marginBottom: 18,
+    marginTop: 6,
+    marginBottom: 12,
+  },
+  addressText: {
+    color: '#cbd5f5',
+    fontSize: 12,
+    marginBottom: 16,
   },
   actionsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: 10,
   },
   actionButton: {
-    alignItems: 'center',
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#e2e8f0',
+    borderRadius: 14,
+    paddingVertical: 10,
+    gap: 6,
   },
   actionIcon: {
-    backgroundColor: '#eef2ff',
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 6,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 6,
   },
   actionLabel: {
-    color: '#e0e7ff',
+    color: '#0f172a',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#111827',
-    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    marginTop: 18,
+    marginTop: 20,
+    backgroundColor: '#ffffff',
   },
   searchInput: {
     flex: 1,
@@ -194,7 +285,7 @@ export const walletStyles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: 'row',
-    marginTop: 18,
+    marginTop: 16,
   },
   tabBase: {
     flex: 1,
@@ -203,10 +294,10 @@ export const walletStyles = StyleSheet.create({
     alignItems: 'center',
   },
   tabActive: {
-    backgroundColor: '#4f46e5',
+    backgroundColor: '#0f172a',
   },
   tabInactive: {
-    backgroundColor: '#e5e7eb',
+    backgroundColor: '#e2e8f0',
   },
   tabSpacing: {
     marginRight: 12,
@@ -220,20 +311,22 @@ export const walletStyles = StyleSheet.create({
     fontWeight: '700',
   },
   listCard: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
     borderRadius: 18,
     padding: 12,
     marginTop: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   tokenRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f8fafc',
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: '#e2e8f0',
   },
   tokenRowSpacing: {
     marginBottom: 10,
@@ -303,5 +396,8 @@ export const walletStyles = StyleSheet.create({
   secondaryButtonText: {
     fontWeight: '600',
     color: '#0f172a',
+  },
+  buttonDisabled: {
+    opacity: 0.7,
   },
 });

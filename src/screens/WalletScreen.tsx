@@ -1,12 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated as RNAnimated, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated as RNAnimated, ScrollView, Share, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
+import QRCode from 'react-native-qrcode-svg';
+import { formatEther, parseEther, isAddress } from 'ethers';
 import PulseBadge from '../components/PulseBadge';
 import { walletStyles as styles } from '../styles/WalletStyles';
 import { useTheme } from '../theme/ThemeProvider';
 import { useWalletSession } from '../context/WalletSessionProvider';
 import { ERC20_TOKENS } from '../config/tokens';
 import { fetchNativeBalance, fetchTokenBalances } from '../services/balances';
+import { CHAIN } from '../config/chain';
+import { getProvider } from '../services/provider';
 
 type Action = {
   label: string;
@@ -40,7 +45,7 @@ const defaultTokens: TokenBalance[] = [
 
 export default function WalletScreen() {
   const { colors } = useTheme();
-  const { status, address, unlock, createWallet, importWallet, backupCompleted, confirmBackup, lock } =
+  const { status, address, wallet, unlock, createWallet, importWallet, backupCompleted, confirmBackup, lock } =
     useWalletSession();
 
   const [prices, setPrices] = useState<Record<string, number>>({});
@@ -48,7 +53,7 @@ export default function WalletScreen() {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [chainTokens, setChainTokens] = useState<TokenBalance[]>(defaultTokens);
-  const [flow, setFlow] = useState<'menu' | 'create' | 'import' | 'unlock' | 'backup'>('menu');
+  const [flow, setFlow] = useState<'menu' | 'create' | 'import' | 'unlock' | 'backup' | 'receive' | 'send'>('menu');
   const [walletPassword, setWalletPassword] = useState('');
   const [walletPasswordConfirm, setWalletPasswordConfirm] = useState('');
   const [unlockPassword, setUnlockPassword] = useState('');
@@ -61,6 +66,12 @@ export default function WalletScreen() {
   const [flowError, setFlowError] = useState<string | null>(null);
   const [flowMessage, setFlowMessage] = useState<string | null>(null);
   const [fetchingChain, setFetchingChain] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [sendTo, setSendTo] = useState('');
+  const [sendAmount, setSendAmount] = useState('');
+  const [sendStep, setSendStep] = useState<'form' | 'confirm' | 'pending'>('form');
+  const [sendFeeEth, setSendFeeEth] = useState<string | null>(null);
+  const [sendTxHash, setSendTxHash] = useState<string | null>(null);
 
   const totalValueAnimated = useRef(new RNAnimated.Value(0)).current;
   const [displayTotal, setDisplayTotal] = useState(0);
@@ -216,6 +227,7 @@ export default function WalletScreen() {
       setFlowError('Passwords do not match.');
       return;
     }
+    setIsSubmitting(true);
     try {
       const { mnemonic } = await createWallet(walletPassword);
       const normalized = normalizeMnemonic(mnemonic);
@@ -225,6 +237,8 @@ export default function WalletScreen() {
       setFlowMessage('Wallet created. Back up your seed phrase.');
     } catch (e) {
       setFlowError('Unable to create wallet.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -245,6 +259,7 @@ export default function WalletScreen() {
       setFlowError('Passwords do not match.');
       return;
     }
+    setIsSubmitting(true);
     try {
       await importWallet(phrase, walletPassword);
       startBackupConfirm(phrase);
@@ -254,17 +269,22 @@ export default function WalletScreen() {
       setFlowMessage('Wallet imported. Back up your seed phrase.');
     } catch (e) {
       setFlowError('Unable to import wallet. Check phrase and try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleUnlock = async () => {
     resetFlowMessages();
+    setIsSubmitting(true);
     try {
       await unlock(unlockPassword);
       setFlowMessage('Wallet unlocked.');
       setUnlockPassword('');
     } catch (e) {
       setFlowError('Incorrect password.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -283,10 +303,99 @@ export default function WalletScreen() {
       setFlowError('Words do not match. Try again.');
       return;
     }
+    setIsSubmitting(true);
     await confirmBackup();
     setBackupMnemonic(null);
     setFlowMessage('Seed phrase confirmed.');
     setFlow('menu');
+    setIsSubmitting(false);
+  };
+
+  const handlePrepareSend = async () => {
+    resetFlowMessages();
+    setSendFeeEth(null);
+    setSendTxHash(null);
+    if (!wallet || !address) {
+      setFlowError('Unlock your wallet first.');
+      return;
+    }
+    if (!isAddress(sendTo.trim())) {
+      setFlowError('Enter a valid recipient address.');
+      return;
+    }
+    if (!sendAmount || Number(sendAmount) <= 0) {
+      setFlowError('Enter a valid amount.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const provider = getProvider();
+      const value = parseEther(sendAmount);
+      const gasLimit = await provider.estimateGas({ to: sendTo.trim(), value, from: address });
+      const feeData = await provider.getFeeData();
+      const feePerGas = feeData.maxFeePerGas ?? feeData.gasPrice;
+      if (!feePerGas) {
+        setFlowError('Unable to estimate network fee.');
+        return;
+      }
+      const fee = gasLimit * feePerGas;
+      setSendFeeEth(formatEther(fee));
+      setSendStep('confirm');
+    } catch (e) {
+      setFlowError('Unable to estimate fees. Check the address and amount.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSend = async () => {
+    resetFlowMessages();
+    if (!wallet || !address) {
+      setFlowError('Unlock your wallet first.');
+      return;
+    }
+    setIsSubmitting(true);
+    setSendStep('pending');
+    try {
+      const provider = getProvider();
+      const value = parseEther(sendAmount);
+      const feeData = await provider.getFeeData();
+      const tx = {
+        to: sendTo.trim(),
+        value,
+        maxFeePerGas: feeData.maxFeePerGas ?? undefined,
+        maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ?? undefined,
+        gasPrice: feeData.maxFeePerGas ? undefined : feeData.gasPrice ?? undefined,
+      };
+      const signed = await wallet.connect(provider).sendTransaction(tx);
+      setSendTxHash(signed.hash);
+      setFlowMessage('Transaction sent. Waiting for confirmation...');
+      await provider.waitForTransaction(signed.hash);
+      setFlowMessage('Transaction confirmed.');
+      setSendStep('form');
+      setSendTo('');
+      setSendAmount('');
+      setFlow('menu');
+    } catch (e) {
+      setFlowError('Transaction failed. Please try again.');
+      setSendStep('form');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCopyAddress = async () => {
+    if (!address) return;
+    await Clipboard.setStringAsync(address);
+    setFlowMessage('Address copied.');
+  };
+
+  const handleShareAddress = async () => {
+    if (!address) return;
+    await Share.share({
+      message: `My ${CHAIN.name} address:\n${address}`,
+    });
   };
 
   const renderSetup = () => {
@@ -344,26 +453,27 @@ export default function WalletScreen() {
           />
           {flowError && <Text style={styles.errorText}>{flowError}</Text>}
           {flowMessage && <Text style={styles.successText}>{flowMessage}</Text>}
-          <TouchableOpacity style={styles.primaryButton} onPress={handleConfirmBackup} activeOpacity={0.9}>
-            <Text style={styles.primaryButtonText}>I’ve backed this up</Text>
+          {isSubmitting && (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator size="small" color="#4f46e5" />
+              <Text style={styles.loadingText}>Securing wallet...</Text>
+            </View>
+          )}
+          <TouchableOpacity
+            style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}
+            onPress={handleConfirmBackup}
+            activeOpacity={0.9}
+            disabled={isSubmitting}
+          >
+            <Text style={styles.primaryButtonText}>I've backed this up</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryButton} onPress={() => lock()} activeOpacity={0.9}>
+          <TouchableOpacity
+            style={[styles.secondaryButton, isSubmitting && styles.buttonDisabled]}
+            onPress={() => lock()}
+            activeOpacity={0.9}
+            disabled={isSubmitting}
+          >
             <Text style={styles.secondaryButtonText}>Lock wallet</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-
-    if (status === 'missing') {
-      return (
-        <View style={styles.setupCard}>
-          <Text style={styles.setupTitle}>Set up your wallet</Text>
-          <Text style={styles.setupSubtitle}>Create a new wallet or import with a 12/24-word phrase.</Text>
-          <TouchableOpacity style={styles.primaryButton} onPress={() => setFlow('create')} activeOpacity={0.9}>
-            <Text style={styles.primaryButtonText}>Create wallet</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryButton} onPress={() => setFlow('import')} activeOpacity={0.9}>
-            <Text style={styles.secondaryButtonText}>Import wallet</Text>
           </TouchableOpacity>
         </View>
       );
@@ -391,10 +501,26 @@ export default function WalletScreen() {
           />
           {flowError && <Text style={styles.errorText}>{flowError}</Text>}
           {flowMessage && <Text style={styles.successText}>{flowMessage}</Text>}
-          <TouchableOpacity style={styles.primaryButton} onPress={handleCreate} activeOpacity={0.9}>
+          {isSubmitting && (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator size="small" color="#4f46e5" />
+              <Text style={styles.loadingText}>Encrypting wallet...</Text>
+            </View>
+          )}
+          <TouchableOpacity
+            style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}
+            onPress={handleCreate}
+            activeOpacity={0.9}
+            disabled={isSubmitting}
+          >
             <Text style={styles.primaryButtonText}>Create</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryButton} onPress={() => setFlow('menu')} activeOpacity={0.9}>
+          <TouchableOpacity
+            style={[styles.secondaryButton, isSubmitting && styles.buttonDisabled]}
+            onPress={() => setFlow('menu')}
+            activeOpacity={0.9}
+            disabled={isSubmitting}
+          >
             <Text style={styles.secondaryButtonText}>Back</Text>
           </TouchableOpacity>
         </View>
@@ -432,10 +558,26 @@ export default function WalletScreen() {
           />
           {flowError && <Text style={styles.errorText}>{flowError}</Text>}
           {flowMessage && <Text style={styles.successText}>{flowMessage}</Text>}
-          <TouchableOpacity style={styles.primaryButton} onPress={handleImport} activeOpacity={0.9}>
+          {isSubmitting && (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator size="small" color="#4f46e5" />
+              <Text style={styles.loadingText}>Decrypting phrase...</Text>
+            </View>
+          )}
+          <TouchableOpacity
+            style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}
+            onPress={handleImport}
+            activeOpacity={0.9}
+            disabled={isSubmitting}
+          >
             <Text style={styles.primaryButtonText}>Import</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryButton} onPress={() => setFlow('menu')} activeOpacity={0.9}>
+          <TouchableOpacity
+            style={[styles.secondaryButton, isSubmitting && styles.buttonDisabled]}
+            onPress={() => setFlow('menu')}
+            activeOpacity={0.9}
+            disabled={isSubmitting}
+          >
             <Text style={styles.secondaryButtonText}>Back</Text>
           </TouchableOpacity>
         </View>
@@ -456,8 +598,83 @@ export default function WalletScreen() {
           />
           {flowError && <Text style={styles.errorText}>{flowError}</Text>}
           {flowMessage && <Text style={styles.successText}>{flowMessage}</Text>}
-          <TouchableOpacity style={styles.primaryButton} onPress={handleUnlock} activeOpacity={0.9}>
+          {isSubmitting && (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator size="small" color="#4f46e5" />
+              <Text style={styles.loadingText}>Unlocking wallet...</Text>
+            </View>
+          )}
+          <TouchableOpacity
+            style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}
+            onPress={handleUnlock}
+            activeOpacity={0.9}
+            disabled={isSubmitting}
+          >
             <Text style={styles.primaryButtonText}>Unlock</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.secondaryButton, isSubmitting && styles.buttonDisabled]}
+            onPress={() => setFlow('menu')}
+            activeOpacity={0.9}
+            disabled={isSubmitting}
+          >
+            <Text style={styles.secondaryButtonText}>Back</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (status === 'missing') {
+      return (
+        <View style={styles.setupCard}>
+          <Text style={styles.setupTitle}>Set up your wallet</Text>
+          <Text style={styles.setupSubtitle}>Status: {status} | Flow: {flow}</Text>
+          <Text style={styles.setupSubtitle}>Create a new wallet or import with a 12/24-word phrase.</Text>
+          <TouchableOpacity
+            style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}
+            onPress={() => {
+              resetFlowMessages();
+              setFlow('create');
+            }}
+            activeOpacity={0.9}
+            disabled={isSubmitting}
+          >
+            <Text style={styles.primaryButtonText}>Create wallet</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.secondaryButton, isSubmitting && styles.buttonDisabled]}
+            onPress={() => {
+              resetFlowMessages();
+              setFlow('import');
+            }}
+            activeOpacity={0.9}
+            disabled={isSubmitting}
+          >
+            <Text style={styles.secondaryButtonText}>Import wallet</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (flow === 'receive') {
+      return (
+        <View style={styles.setupCard}>
+          <Text style={styles.setupTitle}>Receive {CHAIN.name}</Text>
+          <Text style={styles.setupSubtitle}>Share this address to receive funds.</Text>
+          {address ? (
+            <View style={styles.qrWrap}>
+              <QRCode value={address} size={200} />
+            </View>
+          ) : (
+            <Text style={styles.setupSubtitle}>Wallet address unavailable.</Text>
+          )}
+          {address && <Text style={styles.addressPill}>{address}</Text>}
+          {flowMessage && <Text style={styles.successText}>{flowMessage}</Text>}
+          <TouchableOpacity style={styles.primaryButton} onPress={handleCopyAddress} activeOpacity={0.9}>
+            <Text style={styles.primaryButtonText}>Copy address</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryButton} onPress={handleShareAddress} activeOpacity={0.9}>
+            <Text style={styles.secondaryButtonText}>Share</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.secondaryButton} onPress={() => setFlow('menu')} activeOpacity={0.9}>
             <Text style={styles.secondaryButtonText}>Back</Text>
@@ -466,10 +683,113 @@ export default function WalletScreen() {
       );
     }
 
+    if (flow === 'send') {
+      return (
+        <View style={styles.setupCard}>
+          <Text style={styles.setupTitle}>Send {CHAIN.name}</Text>
+          <Text style={styles.setupSubtitle}>Transfer native coin to another address.</Text>
+          {sendStep === 'form' && (
+            <>
+              <TextInput
+                value={sendTo}
+                onChangeText={setSendTo}
+                placeholder="Recipient address"
+                placeholderTextColor="#94a3b8"
+                style={styles.input}
+                autoCapitalize="none"
+              />
+              <TextInput
+                value={sendAmount}
+                onChangeText={setSendAmount}
+                placeholder="Amount (ETH)"
+                placeholderTextColor="#94a3b8"
+                style={styles.input}
+                keyboardType="decimal-pad"
+              />
+              {flowError && <Text style={styles.errorText}>{flowError}</Text>}
+              {isSubmitting && (
+                <View style={styles.loadingRow}>
+                  <ActivityIndicator size="small" color="#4f46e5" />
+                  <Text style={styles.loadingText}>Estimating fees...</Text>
+                </View>
+              )}
+              <TouchableOpacity
+                style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}
+                onPress={handlePrepareSend}
+                activeOpacity={0.9}
+                disabled={isSubmitting}
+              >
+                <Text style={styles.primaryButtonText}>Review send</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.secondaryButton, isSubmitting && styles.buttonDisabled]}
+                onPress={() => setFlow('menu')}
+                activeOpacity={0.9}
+                disabled={isSubmitting}
+              >
+                <Text style={styles.secondaryButtonText}>Back</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {sendStep === 'confirm' && (
+            <>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>To</Text>
+                <Text style={styles.summaryValue}>{sendTo}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Amount</Text>
+                <Text style={styles.summaryValue}>{sendAmount} ETH</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Estimated fee</Text>
+                <Text style={styles.summaryValue}>{sendFeeEth ? `${Number(sendFeeEth).toFixed(6)} ETH` : '-'}</Text>
+              </View>
+              {flowError && <Text style={styles.errorText}>{flowError}</Text>}
+              {isSubmitting && (
+                <View style={styles.loadingRow}>
+                  <ActivityIndicator size="small" color="#4f46e5" />
+                  <Text style={styles.loadingText}>Submitting transaction...</Text>
+                </View>
+              )}
+              <TouchableOpacity
+                style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}
+                onPress={handleSend}
+                activeOpacity={0.9}
+                disabled={isSubmitting}
+              >
+                <Text style={styles.primaryButtonText}>Send now</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.secondaryButton, isSubmitting && styles.buttonDisabled]}
+                onPress={() => setSendStep('form')}
+                activeOpacity={0.9}
+                disabled={isSubmitting}
+              >
+                <Text style={styles.secondaryButtonText}>Edit</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {sendStep === 'pending' && (
+            <>
+              <View style={styles.loadingRow}>
+                <ActivityIndicator size="small" color="#4f46e5" />
+                <Text style={styles.loadingText}>Waiting for confirmation...</Text>
+              </View>
+              {sendTxHash && <Text style={styles.addressPill}>{sendTxHash}</Text>}
+              {flowMessage && <Text style={styles.successText}>{flowMessage}</Text>}
+            </>
+          )}
+        </View>
+      );
+    }
+
     return null;
   };
 
-  if (status !== 'unlocked' || backupMnemonic) {
+  if (status !== 'unlocked' || backupMnemonic || flow === 'receive' || flow === 'send') {
     return (
       <ScrollView contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}>
         {renderSetup()}
@@ -479,23 +799,48 @@ export default function WalletScreen() {
 
   return (
     <ScrollView contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}>
-      <View style={styles.deviceCutout} />
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={styles.headerTitle}>Wallet</Text>
+          <Text style={styles.headerSubtitle}>On-chain balances with live pricing.</Text>
+        </View>
+        <View style={styles.statusPill}>
+          <PulseBadge size={8} color={fetchingChain ? '#f97316' : '#22c55e'} durationMs={1400} />
+          <Text style={styles.statusText}>{fetchingChain ? 'Syncing' : 'Live'}</Text>
+        </View>
+      </View>
 
       <View style={styles.cardWrapper}>
         <View style={styles.sideAccentLeft} />
         <View style={styles.walletCard}>
           <View style={styles.walletHeader}>
-            <Text style={styles.pill}>Main</Text>
+            <Text style={styles.pill}>Primary</Text>
             <Text style={styles.walletTitle}>Main Wallet</Text>
           </View>
+          <Text style={styles.balanceLabel}>Total value</Text>
           <Text style={styles.balance}>{formatCurrency(displayTotal)}</Text>
-          {address && <Text style={styles.metaText}>Address: {address}</Text>}
+          {address && <Text style={styles.addressText}>{address}</Text>}
 
           <View style={styles.actionsRow}>
             {actions.map((action) => (
-              <TouchableOpacity key={action.label} style={styles.actionButton} activeOpacity={0.85}>
+              <TouchableOpacity
+                key={action.label}
+                style={styles.actionButton}
+                activeOpacity={0.85}
+                onPress={() => {
+                  if (action.label === 'Receive') {
+                    setFlow('receive');
+                    setFlowMessage(null);
+                  }
+                  if (action.label === 'Send') {
+                    resetFlowMessages();
+                    setSendStep('form');
+                    setFlow('send');
+                  }
+                }}
+              >
                 <View style={styles.actionIcon}>
-                  <MaterialCommunityIcons name={action.icon} size={26} color="#4f46e5" />
+                  <MaterialCommunityIcons name={action.icon} size={20} color="#111827" />
                 </View>
                 <Text style={styles.actionLabel}>{action.label}</Text>
               </TouchableOpacity>
@@ -515,9 +860,7 @@ export default function WalletScreen() {
         <Text style={styles.errorText}>{error}</Text>
       ) : (
         <View style={styles.metaRow}>
-          <PulseBadge size={10} color={fetchingChain ? '#f97316' : '#22c55e'} durationMs={1400} />
-          <Text style={styles.metaText}>{fetchingChain ? 'Syncing on-chain balances...' : 'Real-time prices'}</Text>
-          {lastUpdated && <Text style={styles.metaText}>- Updated {lastUpdated}</Text>}
+          <Text style={styles.metaText}>Prices: {lastUpdated ? `Updated ${lastUpdated}` : 'Loading...'}</Text>
         </View>
       )}
 
