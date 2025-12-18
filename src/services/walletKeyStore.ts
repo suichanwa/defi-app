@@ -3,6 +3,9 @@ import type { EncryptedWalletKey } from '../types/wallet';
 import { getJson, removeKey, setJson } from './storage';
 import { deleteSecureItem, getSecureItem, setSecureItem } from './secureStore';
 
+// Default scrypt params are heavy on mobile; reduce N for faster UX while keeping reasonable security.
+const FAST_SCRYPT = { N: 1 << 14, r: 8, p: 1 };
+
 const METADATA_KEY = 'wallet.metadata.v1';
 const SECURE_KEY = 'wallet.encrypted.v1';
 const LEGACY_KEY = 'wallet.encryptedKey.v1';
@@ -58,7 +61,7 @@ export async function saveEncryptedWalletKey(record: EncryptedWalletKey): Promis
 
 export async function encryptWalletKey(privateKey: string, password: string): Promise<EncryptedWalletKey> {
   const wallet = new Wallet(privateKey);
-  const encryptedJson = await wallet.encrypt(password);
+  const encryptedJson = await wallet.encrypt(password, { scrypt: FAST_SCRYPT });
   const timestamp = new Date().toISOString();
   return {
     id: wallet.address,
@@ -76,7 +79,7 @@ export async function decryptWalletKey(encryptedJson: string, password: string):
 
 export async function createInitialWalletKey(password: string): Promise<EncryptedWalletKey> {
   const wallet = Wallet.createRandom();
-  const encryptedJson = await wallet.encrypt(password);
+  const encryptedJson = await wallet.encrypt(password, { scrypt: FAST_SCRYPT });
   const timestamp = new Date().toISOString();
   const record: EncryptedWalletKey = {
     id: wallet.address,

@@ -13,6 +13,8 @@ type ProfileHomeTabProps = {
   onOpenRewards: () => void;
   onOpenLocalization: () => void;
   onOpenDeveloper: () => void;
+  onOpenAbout: () => void;
+  buildLabel: string;
 };
 
 export default function ProfileHomeTab({
@@ -25,12 +27,21 @@ export default function ProfileHomeTab({
   onOpenRewards,
   onOpenLocalization,
   onOpenDeveloper,
+  onOpenAbout,
+  buildLabel,
 }: ProfileHomeTabProps) {
   return (
     <ScrollView contentContainerStyle={scrollStyle} showsVerticalScrollIndicator={false}>
       <View style={styles.titleBlock}>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <Text style={styles.cardSubtitle}>Manage how your account feels and stays secure.</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View>
+            <Text style={styles.headerTitle}>Profile</Text>
+            <Text style={styles.cardSubtitle}>Manage how your account feels and stays secure.</Text>
+          </View>
+          <View style={styles.pill}>
+            <Text style={styles.pillText}>{buildLabel}</Text>
+          </View>
+        </View>
       </View>
 
       <TouchableOpacity style={cardStyle} onPress={onOpenPersonalization} activeOpacity={0.85}>
@@ -108,6 +119,19 @@ export default function ProfileHomeTab({
           <View style={styles.cardBody}>
             <Text style={styles.cardTitle}>Developer</Text>
             <Text style={styles.cardSubtitle}>Debug tools, local resets, and account actions.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+        </View>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={cardStyle} onPress={onOpenAbout} activeOpacity={0.85}>
+        <View style={styles.cardRow}>
+          <View style={styles.cardIcon}>
+            <Ionicons name="information-circle-outline" size={22} color="#4f46e5" />
+          </View>
+          <View style={styles.cardBody}>
+            <Text style={styles.cardTitle}>About app</Text>
+            <Text style={styles.cardSubtitle}>What this project is about.</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
         </View>

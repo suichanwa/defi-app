@@ -35,6 +35,8 @@ type Props = {
   onGoCreate: () => void;
   onGoImport: () => void;
   onLock: () => void;
+  onBiometricUnlock: () => void;
+  biometricsAvailable: boolean;
 };
 
 export default function WalletSetupScreen({
@@ -67,6 +69,8 @@ export default function WalletSetupScreen({
   onGoCreate,
   onGoImport,
   onLock,
+  onBiometricUnlock,
+  biometricsAvailable,
 }: Props) {
   const [showHelp, setShowHelp] = useState(false);
   if (status === 'loading') {
@@ -282,6 +286,16 @@ export default function WalletSetupScreen({
         >
           <Text style={styles.primaryButtonText}>Unlock</Text>
         </TouchableOpacity>
+        {biometricsAvailable && (
+          <TouchableOpacity
+            style={[styles.secondaryButton, isSubmitting && styles.buttonDisabled]}
+            onPress={onBiometricUnlock}
+            activeOpacity={0.9}
+            disabled={isSubmitting}
+          >
+            <Text style={styles.secondaryButtonText}>Use fingerprint</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={[styles.secondaryButton, isSubmitting && styles.buttonDisabled]}
           onPress={onBackToMenu}

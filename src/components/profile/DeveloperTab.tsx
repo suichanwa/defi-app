@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, ScrollView, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { profileStyles as styles } from '../../styles/ProfileStyles';
 import ProfileHeader from './ProfileHeader';
@@ -18,13 +18,6 @@ type DeveloperTabProps = {
   onClearRewards: () => void;
   onSignOut: () => void;
   onDeleteAccount: () => void;
-};
-
-const confirmAction = (title: string, message: string, onConfirm: () => void) => {
-  Alert.alert(title, message, [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Confirm', style: 'destructive', onPress: onConfirm },
-  ]);
 };
 
 export default function DeveloperTab({
@@ -70,9 +63,7 @@ export default function DeveloperTab({
         <Text style={styles.cardSubtitle}>These actions wipe local data on this device.</Text>
         <TouchableOpacity
           style={[styles.secondaryButton, isBusy && styles.buttonDisabled]}
-          onPress={() =>
-            confirmAction('Forget wallet key', 'Remove the encrypted wallet key from this device?', onClearWallet)
-          }
+          onPress={onClearWallet}
           activeOpacity={0.9}
           disabled={isBusy}
         >
@@ -80,9 +71,7 @@ export default function DeveloperTab({
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.secondaryButton, isBusy && styles.buttonDisabled]}
-          onPress={() =>
-            confirmAction('Reset profile settings', 'Clear local profile preferences?', onResetProfile)
-          }
+          onPress={onResetProfile}
           activeOpacity={0.9}
           disabled={isBusy}
         >
@@ -90,9 +79,7 @@ export default function DeveloperTab({
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.secondaryButton, isBusy && styles.buttonDisabled]}
-          onPress={() =>
-            confirmAction('Clear rewards cache', 'Reset locally cached rewards data?', onClearRewards)
-          }
+          onPress={onClearRewards}
           activeOpacity={0.9}
           disabled={isBusy}
         >

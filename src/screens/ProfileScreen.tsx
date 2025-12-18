@@ -25,24 +25,26 @@ import { isSupabaseConfigured } from '../services/supabaseClient';
 import { fetchRemoteProfile, upsertRemoteProfile } from '../services/profileRemote';
 import {
   changeWalletPassword,
-  clearWallet,
   createInitialWalletKey,
   loadEncryptedWalletKey,
   WalletKeyNotFoundError,
   WalletPasswordError,
   WalletReencryptError,
 } from '../services/walletKeyStore';
+import { useWalletSession } from '../context/WalletSessionProvider';
 import { useTheme } from '../theme/ThemeProvider';
 import { availableLanguages, setLanguage as setI18nLanguage } from '../i18n';
 import AuthTab from '../components/profile/AuthTab';
 import DeveloperTab from '../components/profile/DeveloperTab';
+import AboutAppTab from '../components/profile/AboutAppTab';
 import LocalizationTab from '../components/profile/LocalizationTab';
 import PersonalizationTab from '../components/profile/PersonalizationTab';
 import ProfileHomeTab from '../components/profile/ProfileHomeTab';
 import RewardsTab from '../components/profile/RewardsTab';
 import SecurityTab from '../components/profile/SecurityTab';
+import StatusDialog from '../components/common/StatusDialog';
 
-type ProfileView = 'home' | 'personalization' | 'security' | 'rewards' | 'auth' | 'developer' | 'localization';
+type ProfileView = 'home' | 'personalization' | 'security' | 'rewards' | 'auth' | 'developer' | 'localization' | 'about';
 
 const ALIAS_MIN = 3;
 const ALIAS_MAX = 24;
@@ -104,12 +106,14 @@ export default function ProfileScreen() {
   const [developerMessage, setDeveloperMessage] = useState<string | null>(null);
   const [developerError, setDeveloperError] = useState<string | null>(null);
   const [developerLoading, setDeveloperLoading] = useState(false);
+  const [showDeveloperDialog, setShowDeveloperDialog] = useState(false);
   const [rewardsSummary, setRewardsSummary] = useState<RewardsSummary | null>(null);
   const [rewardsActivity, setRewardsActivity] = useState<RewardActivity[]>([]);
   const [rewardsSource, setRewardsSource] = useState<'local' | 'supabase'>('local');
   const [profileSource, setProfileSource] = useState<'local' | 'supabase'>('local');
   const [effectiveUserId, setEffectiveUserId] = useState<string | null>(null);
   const { preference: themePrefCtx, setPreference: setThemePrefCtx, colors } = useTheme();
+  const { forgetWallet } = useWalletSession();
   const cardStyle = useMemo(
     () => [styles.card, { backgroundColor: colors.card, borderColor: colors.border }],
     [colors],
@@ -407,8 +411,10 @@ export default function ProfileScreen() {
     try {
       await loadAll(() => true);
       setDeveloperMessage('Profile data reloaded.');
+      setShowDeveloperDialog(true);
     } catch {
       setDeveloperError('Unable to reload profile data.');
+      setShowDeveloperDialog(true);
     } finally {
       setDeveloperLoading(false);
     }
@@ -419,11 +425,13 @@ export default function ProfileScreen() {
     setDeveloperError(null);
     setDeveloperLoading(true);
     try {
-      await clearWallet();
+      await forgetWallet();
       setWalletKey(null);
       setDeveloperMessage('Local wallet key removed.');
+      setShowDeveloperDialog(true);
     } catch {
       setDeveloperError('Unable to clear wallet data.');
+      setShowDeveloperDialog(true);
     } finally {
       setDeveloperLoading(false);
     }
@@ -437,8 +445,10 @@ export default function ProfileScreen() {
       await clearProfileSettings();
       await loadAll(() => true);
       setDeveloperMessage('Profile settings reset.');
+      setShowDeveloperDialog(true);
     } catch {
       setDeveloperError('Unable to reset profile settings.');
+      setShowDeveloperDialog(true);
     } finally {
       setDeveloperLoading(false);
     }
@@ -452,8 +462,10 @@ export default function ProfileScreen() {
       await clearRewardsCache();
       await loadAll(() => true);
       setDeveloperMessage('Rewards cache cleared.');
+      setShowDeveloperDialog(true);
     } catch {
       setDeveloperError('Unable to clear rewards cache.');
+      setShowDeveloperDialog(true);
     } finally {
       setDeveloperLoading(false);
     }
@@ -466,8 +478,10 @@ export default function ProfileScreen() {
     try {
       await signOut();
       setDeveloperMessage('Signed out.');
+      setShowDeveloperDialog(true);
     } catch (error) {
       setDeveloperError(error instanceof Error ? error.message : 'Unable to sign out.');
+      setShowDeveloperDialog(true);
     } finally {
       setDeveloperLoading(false);
     }
@@ -479,12 +493,14 @@ export default function ProfileScreen() {
     setDeveloperLoading(true);
     try {
       await signOut();
-      await Promise.all([clearWallet(), clearProfileSettings(), clearRewardsCache()]);
+      await Promise.all([forgetWallet(), clearProfileSettings(), clearRewardsCache()]);
       setWalletKey(null);
       await loadAll(() => true);
       setDeveloperMessage('Signed out and cleared local data. Remote deletion requires backend support.');
+      setShowDeveloperDialog(true);
     } catch (error) {
       setDeveloperError(error instanceof Error ? error.message : 'Unable to delete account.');
+      setShowDeveloperDialog(true);
     } finally {
       setDeveloperLoading(false);
     }
@@ -602,22 +618,39 @@ export default function ProfileScreen() {
 
   if (view === 'developer') {
     return (
-      <DeveloperTab
-        scrollStyle={scrollStyle}
-        cardStyle={cardStyle}
-        onBack={() => setView('home')}
-        hasSession={Boolean(session)}
-        isBusy={developerLoading}
-        developerMessage={developerMessage}
-        developerError={developerError}
-        onRefreshData={handleRefreshData}
-        onClearWallet={handleClearWallet}
-        onResetProfile={handleResetProfile}
-        onClearRewards={handleClearRewards}
-        onSignOut={handleDeveloperSignOut}
-        onDeleteAccount={handleDeleteAccount}
-      />
+      <>
+        <DeveloperTab
+          scrollStyle={scrollStyle}
+          cardStyle={cardStyle}
+          onBack={() => setView('home')}
+          hasSession={Boolean(session)}
+          isBusy={developerLoading}
+          developerMessage={developerMessage}
+          developerError={developerError}
+          onRefreshData={handleRefreshData}
+          onClearWallet={handleClearWallet}
+          onResetProfile={handleResetProfile}
+          onClearRewards={handleClearRewards}
+          onSignOut={handleDeveloperSignOut}
+          onDeleteAccount={handleDeleteAccount}
+        />
+        <StatusDialog
+          visible={showDeveloperDialog && (!!developerMessage || !!developerError)}
+          title={developerError ? 'Action failed' : 'Action completed'}
+          message={developerError ?? developerMessage ?? ''}
+          variant={developerError ? 'error' : 'success'}
+          onClose={() => {
+            setShowDeveloperDialog(false);
+            setDeveloperMessage(null);
+            setDeveloperError(null);
+          }}
+        />
+      </>
     );
+  }
+
+  if (view === 'about') {
+    return <AboutAppTab scrollStyle={scrollStyle} cardStyle={cardStyle} onBack={() => setView('home')} />;
   }
 
   return (
@@ -631,6 +664,8 @@ export default function ProfileScreen() {
       onOpenRewards={() => setView('rewards')}
       onOpenLocalization={() => setView('localization')}
       onOpenDeveloper={() => setView('developer')}
+      onOpenAbout={() => setView('about')}
+      buildLabel="dev build 0.08"
     />
   );
 }

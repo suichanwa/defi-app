@@ -7,8 +7,10 @@ import {
   encryptWalletKey,
   loadEncryptedWalletKey,
   markBackupCompleted,
+  clearWallet as clearWalletStorage,
   saveEncryptedWalletKey,
 } from '../services/walletKeyStore';
+import { clearBiometricPassword } from '../services/biometrics';
 
 type Status = 'loading' | 'missing' | 'locked' | 'unlocked';
 
@@ -22,6 +24,7 @@ type WalletSession = {
   createWallet: (password: string) => Promise<{ mnemonic: string; address: string }>;
   importWallet: (mnemonic: string, password: string) => Promise<{ address: string }>;
   confirmBackup: () => Promise<void>;
+  forgetWallet: () => Promise<void>;
 };
 
 const WalletSessionContext = createContext<WalletSession | null>(null);
@@ -96,6 +99,16 @@ export function WalletSessionProvider({ children }: { children: React.ReactNode 
     clearLockTimer();
   };
 
+  const forgetWallet = async () => {
+    clearLockTimer();
+    await clearWalletStorage();
+    await clearBiometricPassword();
+    setWallet(null);
+    setAddress(null);
+    setBackupCompletedState(false);
+    setStatus('missing');
+  };
+
   const createWallet = async (password: string) => {
     const record = await createInitialWalletKey(password);
     setAddress(record.id);
@@ -137,6 +150,7 @@ export function WalletSessionProvider({ children }: { children: React.ReactNode 
       createWallet,
       importWallet,
       confirmBackup,
+      forgetWallet,
     }),
     [status, address, wallet, backupCompletedState],
   );

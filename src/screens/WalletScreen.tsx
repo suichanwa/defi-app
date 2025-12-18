@@ -14,6 +14,14 @@ import { getProvider } from '../services/provider';
 import WalletSetupScreen from '../components/wallet/WalletSetupScreen';
 import ReceiveScreen from '../components/wallet/ReceiveScreen';
 import SendScreen from '../components/wallet/SendScreen';
+import { walletErrorMessage } from '../utils/walletErrors';
+import ErrorDialog from '../components/common/ErrorDialog';
+import {
+  canUseBiometrics,
+  getBiometricPassword,
+  promptBiometric,
+  saveBiometricPassword,
+} from '../services/biometrics';
 
 type Action = {
   label: string;
@@ -74,9 +82,12 @@ export default function WalletScreen() {
   const [sendStep, setSendStep] = useState<'form' | 'confirm' | 'pending'>('form');
   const [sendFeeEth, setSendFeeEth] = useState<string | null>(null);
   const [sendTxHash, setSendTxHash] = useState<string | null>(null);
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
+  const [biometricsAvailable, setBiometricsAvailable] = useState(false);
 
   const totalValueAnimated = useRef(new RNAnimated.Value(0)).current;
   const [displayTotal, setDisplayTotal] = useState(0);
+  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const trackedPairs = useMemo(() => chainTokens.filter((t) => t.pair).map((t) => t.pair as string), [chainTokens]);
 
@@ -223,13 +234,16 @@ export default function WalletScreen() {
     const policy = passwordPolicy(walletPassword);
     if (policy) {
       setFlowError(policy);
+      setShowErrorDialog(true);
       return;
     }
     if (walletPassword !== walletPasswordConfirm) {
       setFlowError('Passwords do not match.');
+      setShowErrorDialog(true);
       return;
     }
     setIsSubmitting(true);
+    startSlowMessage('Yeah, this might take a moment...');
     try {
       const { mnemonic } = await createWallet(walletPassword);
       const normalized = normalizeMnemonic(mnemonic);
@@ -237,9 +251,14 @@ export default function WalletScreen() {
       setWalletPassword('');
       setWalletPasswordConfirm('');
       setFlowMessage('Wallet created. Back up your seed phrase.');
+      if (biometricsAvailable) {
+        await saveBiometricPassword(walletPassword);
+      }
     } catch (error) {
-      setFlowError(error instanceof Error ? error.message : 'Unable to create wallet.');
+      setFlowError(walletErrorMessage(error, 'create'));
+      setShowErrorDialog(true);
     } finally {
+      clearSlowMessage();
       setIsSubmitting(false);
     }
   };
@@ -250,22 +269,27 @@ export default function WalletScreen() {
     const words = phrase.split(' ');
     if (!phrase) {
       setFlowError('Enter your 12 or 24 word phrase.');
+      setShowErrorDialog(true);
       return;
     }
     if (![12, 24].includes(words.length)) {
       setFlowError('Mnemonic must be 12 or 24 words.');
+      setShowErrorDialog(true);
       return;
     }
     const policy = passwordPolicy(walletPassword);
     if (policy) {
       setFlowError(policy);
+      setShowErrorDialog(true);
       return;
     }
     if (walletPassword !== walletPasswordConfirm) {
       setFlowError('Passwords do not match.');
+      setShowErrorDialog(true);
       return;
     }
     setIsSubmitting(true);
+    startSlowMessage('Yeah, this might take a moment...');
     try {
       await importWallet(phrase, walletPassword);
       startBackupConfirm(phrase);
@@ -273,9 +297,14 @@ export default function WalletScreen() {
       setWalletPassword('');
       setWalletPasswordConfirm('');
       setFlowMessage('Wallet imported. Back up your seed phrase.');
+      if (biometricsAvailable) {
+        await saveBiometricPassword(walletPassword);
+      }
     } catch (error) {
-      setFlowError(error instanceof Error ? error.message : 'Unable to import wallet. Check phrase and try again.');
+      setFlowError(walletErrorMessage(error, 'import'));
+      setShowErrorDialog(true);
     } finally {
+      clearSlowMessage();
       setIsSubmitting(false);
     }
   };
@@ -283,13 +312,52 @@ export default function WalletScreen() {
   const handleUnlock = async () => {
     resetFlowMessages();
     setIsSubmitting(true);
+    startSlowMessage('Yeah, this might take a moment...');
     try {
       await unlock(unlockPassword);
       setFlowMessage('Wallet unlocked.');
+      if (biometricsAvailable) {
+        await saveBiometricPassword(unlockPassword);
+      }
       setUnlockPassword('');
-    } catch {
-      setFlowError('Incorrect password.');
+    } catch (error) {
+      setFlowError(walletErrorMessage(error, 'unlock'));
+      setShowErrorDialog(true);
     } finally {
+      clearSlowMessage();
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleBiometricUnlock = async () => {
+    resetFlowMessages();
+    if (!biometricsAvailable) {
+      setFlowError('Biometric unlock not available on this device.');
+      setShowErrorDialog(true);
+      return;
+    }
+    const auth = await promptBiometric('Unlock wallet');
+    if (!auth.success) {
+      setFlowError(auth.error ?? 'Biometric unlock canceled.');
+      setShowErrorDialog(true);
+      return;
+    }
+    const stored = await getBiometricPassword();
+    if (!stored) {
+      setFlowError('No biometric password stored yet. Unlock once with your password first.');
+      setShowErrorDialog(true);
+      return;
+    }
+    setIsSubmitting(true);
+    startSlowMessage('Yeah, this might take a moment...');
+    try {
+      await unlock(stored);
+      setFlowMessage('Wallet unlocked.');
+    } catch (error) {
+      setFlowError(walletErrorMessage(error, 'unlock'));
+      setShowErrorDialog(true);
+    } finally {
+      clearSlowMessage();
       setIsSubmitting(false);
     }
   };
@@ -323,6 +391,24 @@ export default function WalletScreen() {
     setFlowMessage('Address copied.');
   };
 
+  const startSlowMessage = (text: string) => {
+    if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+    slowTimerRef.current = setTimeout(() => {
+      setFlowMessage((prev) => prev ?? text);
+    }, 5000);
+  };
+
+  const clearSlowMessage = () => {
+    if (slowTimerRef.current) {
+      clearTimeout(slowTimerRef.current);
+      slowTimerRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    canUseBiometrics().then(setBiometricsAvailable).catch(() => setBiometricsAvailable(false));
+  }, []);
+
   const handleShareAddress = async () => {
     if (!address) return;
     await Share.share({
@@ -336,14 +422,17 @@ export default function WalletScreen() {
     setSendTxHash(null);
     if (!wallet || !address) {
       setFlowError('Unlock your wallet first.');
+      setShowErrorDialog(true);
       return;
     }
     if (!ethers.utils.isAddress(sendTo.trim())) {
       setFlowError('Enter a valid recipient address.');
+      setShowErrorDialog(true);
       return;
     }
     if (!sendAmount || Number(sendAmount) <= 0) {
       setFlowError('Enter a valid amount.');
+      setShowErrorDialog(true);
       return;
     }
     setIsSubmitting(true);
@@ -360,8 +449,9 @@ export default function WalletScreen() {
       const fee = gasLimit.mul(feePerGas);
       setSendFeeEth(ethers.utils.formatEther(fee));
       setSendStep('confirm');
-    } catch {
-      setFlowError('Unable to estimate fees. Check the address and amount.');
+    } catch (error) {
+      setFlowError(walletErrorMessage(error, 'send'));
+      setShowErrorDialog(true);
     } finally {
       setIsSubmitting(false);
     }
@@ -395,9 +485,10 @@ export default function WalletScreen() {
       setSendTo('');
       setSendAmount('');
       setFlow('menu');
-    } catch {
-      setFlowError('Transaction failed. Please try again.');
+    } catch (error) {
+      setFlowError(walletErrorMessage(error, 'send'));
       setSendStep('form');
+      setShowErrorDialog(true);
     } finally {
       setIsSubmitting(false);
     }
@@ -406,6 +497,15 @@ export default function WalletScreen() {
   if (status !== 'unlocked' || backupMnemonic || flow === 'receive' || flow === 'send') {
     return (
       <ScrollView contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}>
+        <ErrorDialog
+          visible={!!flowError && showErrorDialog}
+          title="Wallet error"
+          message={flowError ?? ''}
+          onClose={() => {
+            setShowErrorDialog(false);
+            setFlowError(null);
+          }}
+        />
         {flow === 'receive' ? (
           <ReceiveScreen
             chainName={CHAIN.name}
@@ -469,6 +569,8 @@ export default function WalletScreen() {
               setFlow('import');
             }}
             onLock={lock}
+            onBiometricUnlock={handleBiometricUnlock}
+            biometricsAvailable={biometricsAvailable}
           />
         )}
       </ScrollView>

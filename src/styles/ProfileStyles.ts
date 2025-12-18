@@ -8,6 +8,19 @@ export const profileStyles = StyleSheet.create({
   titleBlock: {
     marginBottom: 16,
   },
+  pill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+  },
+  pillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0f172a',
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
