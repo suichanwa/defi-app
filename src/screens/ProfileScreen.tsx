@@ -392,6 +392,7 @@ export default function ProfileScreen() {
         avatarType,
         avatarSeed: created.id,
         themePreference,
+        language,
       });
     }
     setSetupPassword('');
