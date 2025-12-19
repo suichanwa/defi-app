@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ScrollView, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Alert, ScrollView, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createProfileStyles } from '../../styles/ProfileStyles';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -46,7 +46,7 @@ export default function DeveloperTab({
       <View style={cardStyle}>
         <View style={styles.cardRow}>
           <Text style={styles.cardTitle}>Debug tools</Text>
-          <Ionicons name="bug-outline" size={20} color="#4f46e5" />
+          <Ionicons name="bug-outline" size={20} color={colors.accent} />
         </View>
         <Text style={styles.cardSubtitle}>Refresh local state and cached data.</Text>
         <TouchableOpacity
@@ -62,7 +62,7 @@ export default function DeveloperTab({
       <View style={cardStyle}>
         <View style={styles.cardRow}>
           <Text style={styles.cardTitle}>Local resets</Text>
-          <Ionicons name="trash-outline" size={20} color="#f97316" />
+          <Ionicons name="trash-outline" size={20} color={colors.accent} />
         </View>
         <Text style={styles.cardSubtitle}>These actions wipe local data on this device.</Text>
         <TouchableOpacity
@@ -94,7 +94,7 @@ export default function DeveloperTab({
       <View style={cardStyle}>
         <View style={styles.cardRow}>
           <Text style={styles.cardTitle}>Account controls</Text>
-          <Ionicons name="warning-outline" size={20} color="#ef4444" />
+          <Ionicons name="warning-outline" size={20} color={colors.accent} />
         </View>
         <Text style={styles.cardSubtitle}>
           Deleting the account requires backend support. These actions sign out and clear local data.
@@ -109,13 +109,16 @@ export default function DeveloperTab({
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.secondaryButton, (isBusy || !hasSession) && styles.buttonDisabled]}
-          onPress={() =>
-            confirmAction(
+          onPress={() => {
+            Alert.alert(
               'Delete account',
               'This will sign you out and clear local data. Remote deletion is not automatic.',
-              onDeleteAccount,
-            )
-          }
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Delete', style: 'destructive', onPress: onDeleteAccount },
+              ],
+            );
+          }}
           activeOpacity={0.9}
           disabled={isBusy || !hasSession}
         >

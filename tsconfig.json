@@ -1,33 +1,97 @@
 {
-  "extends": "expo/tsconfig.base.json",
+  // Point directly to the Expo base config so the TS server resolves JSX/react-native types.
+  "extends": "./node_modules/expo/tsconfig.base.json",
   "compilerOptions": {
     "strict": true,
     "baseUrl": "./src",
     "paths": {
-      "@env": ["../types/env.d.ts"],
-      "@components": ["components"],
-      "@components/*": ["components/*"],
-      "@screens": ["screens"],
-      "@screens/*": ["screens/*"],
-      "@hooks": ["hooks"],
-      "@hooks/*": ["hooks/*"],
-      "@services": ["services/index"],
-      "@services/*": ["services/*"],
-      "@app-types": ["types"],
-      "@app-types/*": ["types/*"],
-      "@styles/*": ["styles/*"],
-      "@context": ["context"],
-      "@context/*": ["context/*"],
-      "@theme": ["theme"],
-      "@theme/*": ["theme/*"],
-      "@i18n": ["i18n"],
-      "@i18n/*": ["i18n/*"],
-      "@utils": ["utils"],
-      "@utils/*": ["utils/*"],
-      "@constants": ["constants"],
-      "@constants/*": ["constants/*"],
-      "@config": ["config"],
-      "@config/*": ["config/*"]
+      "@env": [
+        "../types/env.d.ts"
+      ],
+      "@components": [
+        "components"
+      ],
+      "@components/*": [
+        "components/*"
+      ],
+      "@screens": [
+        "screens"
+      ],
+      "@screens/*": [
+        "screens/*"
+      ],
+      "@hooks": [
+        "hooks"
+      ],
+      "@hooks/*": [
+        "hooks/*"
+      ],
+      "@services": [
+        "services/index"
+      ],
+      "@services/*": [
+        "services/*"
+      ],
+      "@app-types": [
+        "types"
+      ],
+      "@app-types/*": [
+        "types/*"
+      ],
+      "@styles/*": [
+        "styles/*"
+      ],
+      "@context": [
+        "context"
+      ],
+      "@context/*": [
+        "context/*"
+      ],
+      "@theme": [
+        "theme"
+      ],
+      "@theme/*": [
+        "theme/*"
+      ],
+      "@i18n": [
+        "i18n"
+      ],
+      "@i18n/*": [
+        "i18n/*"
+      ],
+      "@utils": [
+        "utils"
+      ],
+      "@utils/*": [
+        "utils/*"
+      ],
+      "@constants": [
+        "constants"
+      ],
+      "@constants/*": [
+        "constants/*"
+      ],
+      "@config": [
+        "config"
+      ],
+      "@config/*": [
+        "config/*"
+      ]
     }
-  }
+  },
+  "include": [
+    "src/**/*",
+    "App.tsx",
+    "index.ts",
+    "nativewind-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "android",
+    "ios",
+    "repo",
+    "supabase",
+    "metro.config.js",
+    "babel.config.js"
+  ]
 }

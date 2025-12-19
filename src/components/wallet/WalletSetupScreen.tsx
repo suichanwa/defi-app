@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { walletStyles as styles } from '../../styles/WalletStyles';
+import { createWalletStyles } from '../../styles/WalletStyles';
 import { t } from '../../i18n';
 import WalletHelpModal from './WalletHelpModal';
+import { useTheme } from '../../theme/ThemeProvider';
 
 type Props = {
   flow: 'menu' | 'create' | 'import' | 'unlock' | 'backup';
@@ -72,6 +73,8 @@ export default function WalletSetupScreen({
   onBiometricUnlock,
   biometricsAvailable,
 }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const [showHelp, setShowHelp] = useState(false);
   if (status === 'loading') {
     return (
@@ -104,7 +107,7 @@ export default function WalletSetupScreen({
           <Ionicons
             name={backupAcknowledged ? 'checkbox-outline' : 'square-outline'}
             size={20}
-            color={backupAcknowledged ? '#16a34a' : '#1f2937'}
+            color={backupAcknowledged ? '#16a34a' : colors.text}
           />
           <Text style={styles.checkboxLabel}>I wrote it down safely.</Text>
         </TouchableOpacity>

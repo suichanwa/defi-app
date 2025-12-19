@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { availableLanguages, setLanguage as setI18nLanguage } from '@i18n';
 import type { AvatarType, LanguageCode, ThemePreference } from '@app-types/profile';
 import { createProfileStyles } from '@styles/ProfileStyles';
+import type { LocalSession } from '@hooks/useProfileAuth';
 import {
   fetchRemoteProfile,
   getAuthSession,
@@ -44,7 +45,7 @@ type ProfilePreferencesArgs = {
     setPreference: (pref: ThemePreference) => Promise<void> | void;
     colors: { card: string; border: string; background: string };
   };
-  session?: AuthSession;
+  session?: AuthSession | LocalSession | null;
 };
 
 const initialState: ProfilePreferencesState = {

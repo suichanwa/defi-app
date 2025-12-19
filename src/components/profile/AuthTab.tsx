@@ -3,6 +3,7 @@ import { ScrollView, Text, TextInput, TouchableOpacity, View, type StyleProp, ty
 import { Ionicons } from '@expo/vector-icons';
 import { createProfileStyles } from '../../styles/ProfileStyles';
 import type { AuthSession } from '../../services/auth';
+import type { LocalSession } from '../../hooks/useProfileAuth';
 import { isSupabaseConfigured } from '../../services/supabaseClient';
 import { useTheme } from '../../theme/ThemeProvider';
 import ProfileHeader from './ProfileHeader';
@@ -11,7 +12,7 @@ type AuthTabProps = {
   scrollStyle: StyleProp<ViewStyle>;
   cardStyle: StyleProp<ViewStyle>;
   onBack: () => void;
-  session: AuthSession;
+  session: AuthSession | LocalSession | null;
   authEmail: string;
   authPassword: string;
   accountPassword: string;
@@ -59,7 +60,7 @@ export default function AuthTab({
       <View style={cardStyle}>
         <View style={styles.cardRow}>
           <Text style={styles.cardTitle}>Supabase auth</Text>
-          <Ionicons name="lock-closed-outline" size={20} color="#4f46e5" />
+          <Ionicons name="lock-closed-outline" size={20} color={colors.accent} />
         </View>
         {!isSupabaseConfigured ? (
           <Text style={styles.cardSubtitle}>Supabase auth is not configured.</Text>

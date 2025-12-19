@@ -10,15 +10,18 @@ type ProfileHeaderProps = {
 };
 
 export default function ProfileHeader({ title, onBack }: ProfileHeaderProps) {
-  const { colors } = useTheme();
+  const { colors, resolved } = useTheme();
   const styles = useMemo(() => createProfileStyles(colors), [colors]);
+  const backIconColor = resolved === 'light' ? '#ffffff' : colors.background;
 
   return (
-    <View style={styles.headerRow}>
-      <TouchableOpacity style={styles.backButton} onPress={onBack} activeOpacity={0.8}>
-        <Ionicons name="arrow-back" size={22} color={colors.text} />
+    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+      <TouchableOpacity onPress={onBack}>
+        <Ionicons name="arrow-back" size={24} color={colors.text} />
       </TouchableOpacity>
-      <Text style={styles.headerTitle}>{title}</Text>
+      <Text style={{ fontSize: 20, fontWeight: 'bold', marginLeft: 12, color: colors.text }}>
+        {title}
+      </Text>
     </View>
   );
 }

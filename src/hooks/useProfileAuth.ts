@@ -32,6 +32,7 @@ const EMAIL_REGEX = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const PASSWORD_MIN = 8;
 
 type LocalSession = { user: { id: string; email?: string } };
+export type { LocalSession };
 
 const isSignupDisabledError = (error: unknown) => {
   const msg = error instanceof Error ? error.message : String(error ?? '');

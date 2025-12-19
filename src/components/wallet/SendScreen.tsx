@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ActivityIndicator, Animated, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { walletStyles as styles } from '../../styles/WalletStyles';
+import { createWalletStyles } from '../../styles/WalletStyles';
+import { useTheme } from '../../theme/ThemeProvider';
 import { useWalletCardAnimation } from '../../animations/walletAnimations';
 
 type Props = {
@@ -36,6 +37,8 @@ export default function SendScreen({
   onEdit,
   onBack,
 }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const { animatedStyle } = useWalletCardAnimation([sendStep]);
 
   return (

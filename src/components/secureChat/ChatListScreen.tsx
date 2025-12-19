@@ -1,7 +1,8 @@
-import React, { useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import PulseBadge from '../PulseBadge';
 import type { ChatThread } from '../../types/secureChat';
+import { useTheme } from '../../theme/ThemeProvider';
 
 type Props = {
   chats: ChatThread[];
@@ -11,6 +12,8 @@ type Props = {
 };
 
 export default function ChatListScreen({ chats, selectedChatId, onSelectChat, onOpenSelected }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gesture) => {
@@ -65,70 +68,72 @@ export default function ChatListScreen({ chats, selectedChatId, onSelectChat, on
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    marginTop: 16,
-    flex: 1,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  subtitle: {
-    marginTop: 4,
-    color: '#64748b',
-  },
-  listContent: {
-    paddingTop: 16,
-    paddingBottom: 120,
-  },
-  chatCard: {
-    marginBottom: 12,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#ffffff',
-  },
-  chatCardActive: {
-    borderColor: '#6366f1',
-    backgroundColor: '#eef2ff',
-  },
-  chatRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-  },
-  chatMeta: {
-    flex: 1,
-    paddingRight: 8,
-  },
-  chatName: {
-    fontWeight: '600',
-    color: '#0f172a',
-  },
-  chatPreview: {
-    marginTop: 4,
-    color: '#64748b',
-  },
-  chatStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  chatStatusText: {
-    marginLeft: 6,
-    fontSize: 12,
-    color: '#1f2937',
-  },
-  chatPeer: {
-    marginTop: 8,
-    fontSize: 12,
-    color: '#64748b',
-  },
-});
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
+  StyleSheet.create({
+    container: {
+      marginTop: 16,
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    subtitle: {
+      marginTop: 4,
+      color: colors.muted,
+    },
+    listContent: {
+      paddingTop: 16,
+      paddingBottom: 120,
+    },
+    chatCard: {
+      marginBottom: 12,
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.card,
+    },
+    chatCardActive: {
+      borderColor: colors.accent,
+      backgroundColor: colors.accent + '12',
+    },
+    chatRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+    },
+    chatMeta: {
+      flex: 1,
+      paddingRight: 8,
+    },
+    chatName: {
+      fontWeight: '600',
+      color: colors.text,
+    },
+    chatPreview: {
+      marginTop: 4,
+      color: colors.muted,
+    },
+    chatStatus: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    chatStatusText: {
+      marginLeft: 6,
+      fontSize: 12,
+      color: colors.text,
+    },
+    chatPeer: {
+      marginTop: 8,
+      fontSize: 12,
+      color: colors.muted,
+    },
+  });

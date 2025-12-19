@@ -83,7 +83,7 @@ export default function PersonalizationTab({
             ) : avatarType === 'custom' && avatarUri ? (
               <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
             ) : (
-              <Ionicons name="person" size={34} color="#94a3b8" />
+              <Ionicons name="person" size={34} color={colors.muted} />
             )}
           </View>
           <View style={styles.avatarOptions}>

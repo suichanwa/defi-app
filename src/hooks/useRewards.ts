@@ -10,6 +10,7 @@ import {
   loadRewardsSummary,
 } from '@services';
 import type { AuthSession } from '@services';
+import type { LocalSession } from '@hooks/useProfileAuth';
 
 type RewardsState = {
   rewardsSummary: RewardsSummary | null;
@@ -35,7 +36,7 @@ const initialStatus: RewardsStatus = {
   error: null,
 };
 
-export function useRewards({ session }: { session: AuthSession }) {
+export function useRewards({ session }: { session: AuthSession | LocalSession | null }) {
   const [state, setState] = useState<RewardsState>(initialState);
   const [status, setStatus] = useState<RewardsStatus>(initialStatus);
 

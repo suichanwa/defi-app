@@ -56,7 +56,7 @@ export default function SecurityTab({
       <View style={cardStyle}>
         <View style={styles.cardRow}>
           <Text style={styles.cardTitle}>Wallet key status</Text>
-          <MaterialCommunityIcons name="shield-lock-outline" size={20} color="#4f46e5" />
+          <MaterialCommunityIcons name="shield-lock-outline" size={20} color={colors.accent} />
         </View>
         <Text style={styles.cardSubtitle}>
           {walletKey ? 'Encrypted key stored locally.' : 'No encrypted wallet key found.'}

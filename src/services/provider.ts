@@ -1,11 +1,11 @@
-import { JsonRpcProvider } from 'ethers';
+import { providers } from 'ethers';
 import { CHAIN } from '../config/chain';
 
-let provider: JsonRpcProvider | null = null;
+let provider: providers.JsonRpcProvider | null = null;
 
-export function getProvider(): JsonRpcProvider {
+export function getProvider(): providers.JsonRpcProvider {
   if (provider) return provider;
-  provider = new JsonRpcProvider(CHAIN.rpcUrl, {
+  provider = new providers.JsonRpcProvider(CHAIN.rpcUrl, {
     name: CHAIN.name,
     chainId: CHAIN.chainId,
   });

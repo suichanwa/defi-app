@@ -19,6 +19,7 @@ import { useRewards } from '@hooks/useRewards';
 import { useWalletSecurity } from '@hooks/useWalletSecurity';
 import { useTheme } from '@theme/ThemeProvider';
 import { buildIdenticon } from '@utils/identicon';
+import type { LocalSession } from '@hooks/useProfileAuth';
 
 type ProfileView = 'home' | 'personalization' | 'security' | 'rewards' | 'auth' | 'developer' | 'localization' | 'about';
 
@@ -107,7 +108,7 @@ export default function ProfileScreen() {
     );
   };
 
-  let content: JSX.Element;
+  let content: React.ReactNode;
 
   switch (view) {
     case 'personalization':
@@ -265,7 +266,7 @@ export default function ProfileScreen() {
           onOpenLocalization={() => setView('localization')}
           onOpenDeveloper={() => setView('developer')}
           onOpenAbout={() => setView('about')}
-          buildLabel="dev build 0.08"
+          buildLabel="dev build 0.10"
         />
       );
   }

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Animated, Text, TouchableOpacity, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
-import { walletStyles as styles } from '../../styles/WalletStyles';
+import { createWalletStyles } from '../../styles/WalletStyles';
+import { useTheme } from '../../theme/ThemeProvider';
 import { useWalletCardAnimation } from '../../animations/walletAnimations';
 
 type Props = {
@@ -14,6 +15,8 @@ type Props = {
 };
 
 export default function ReceiveScreen({ chainName, address, flowMessage, onCopy, onShare, onBack }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const { animatedStyle } = useWalletCardAnimation([address]);
 
   return (

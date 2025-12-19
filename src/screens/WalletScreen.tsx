@@ -4,7 +4,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { ethers } from 'ethers';
 import PulseBadge from '../components/PulseBadge';
-import { walletStyles as styles } from '../styles/WalletStyles';
+import { createWalletStyles } from '../styles/WalletStyles';
 import { useTheme } from '../theme/ThemeProvider';
 import { useWalletSession } from '../context/WalletSessionProvider';
 import { ERC20_TOKENS } from '../config/tokens';
@@ -55,6 +55,7 @@ const defaultTokens: TokenBalance[] = [
 
 export default function WalletScreen() {
   const { colors } = useTheme();
+  const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const { status, address, wallet, unlock, createWallet, importWallet, backupCompleted, confirmBackup, lock } =
     useWalletSession();
 
