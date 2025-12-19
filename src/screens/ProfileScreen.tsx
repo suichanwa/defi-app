@@ -1,6 +1,17 @@
 import React, { useMemo, useState } from 'react';
-import { AboutAppTab, AuthTab, DeveloperTab, LocalizationTab, PersonalizationTab, ProfileHomeTab, RewardsTab, SecurityTab } from '@components/profile';
+import {
+  AboutAppTab,
+  AuthTab,
+  DeveloperTab,
+  LocalizationTab,
+  PersonalizationTab,
+  ProfileHomeTab,
+  ProfileTabTransition,
+  RewardsTab,
+  SecurityTab,
+} from '@components/profile';
 import { StatusDialog } from '@components/common';
+import { REWARD_RULES } from '@constants/profile';
 import { useWalletSession } from '@context/WalletSessionProvider';
 import { useProfileAuth } from '@hooks/useProfileAuth';
 import { useProfilePreferences } from '@hooks/useProfilePreferences';
@@ -96,162 +107,162 @@ export default function ProfileScreen() {
     );
   };
 
-  const rules = [
-    'Secure messaging activity earns daily points.',
-    'Verify wallet backups for bonus rewards.',
-    'Keep profile settings updated for streak boosts.',
-  ];
+  let content: JSX.Element;
 
-  if (view === 'personalization') {
-    return (
-      <PersonalizationTab
-        scrollStyle={profile.styles.scrollStyle}
-        cardStyle={profile.styles.cardStyle}
-        onBack={() => setView('home')}
-        alias={profile.state.alias}
-        onChangeAlias={profile.actions.setAlias}
-        avatarType={profile.state.avatarType}
-        onChangeAvatarType={profile.actions.setAvatarType}
-        identicon={identicon}
-        themePreference={profile.state.themePreference}
-        onChangeThemePreference={profile.actions.setThemePreference}
-        profileError={profile.status.error}
-        profileMessage={profile.status.message}
-        onSave={profile.actions.save}
-      />
-    );
-  }
-
-  if (view === 'auth') {
-    return (
-      <AuthTab
-        scrollStyle={profile.styles.scrollStyle}
-        cardStyle={profile.styles.cardStyle}
-        onBack={() => setView('home')}
-        session={auth.state.session}
-        authEmail={auth.state.email}
-        authPassword={auth.state.password}
-        accountPassword={auth.state.accountPassword}
-        accountConfirm={auth.state.accountConfirm}
-        authMessage={auth.state.message}
-        authError={auth.state.error}
-        authLoading={auth.state.loading}
-        onChangeAuthEmail={(value) => auth.actions.setField('email', value)}
-        onChangeAuthPassword={(value) => auth.actions.setField('password', value)}
-        onChangeAccountPassword={(value) => auth.actions.setField('accountPassword', value)}
-        onChangeAccountConfirm={(value) => auth.actions.setField('accountConfirm', value)}
-        onSignUp={auth.actions.signUp}
-        onSignIn={auth.actions.signIn}
-        onSignOut={auth.actions.signOut}
-        onUpdateAccountPassword={auth.actions.updatePassword}
-      />
-    );
-  }
-
-  if (view === 'security') {
-    return (
-      <SecurityTab
-        scrollStyle={profile.styles.scrollStyle}
-        cardStyle={profile.styles.cardStyle}
-        onBack={() => setView('home')}
-        walletKey={security.state.walletKey}
-        setupPassword={security.state.setupPassword}
-        setupConfirm={security.state.setupConfirm}
-        currentPassword={security.state.currentPassword}
-        newPassword={security.state.newPassword}
-        confirmPassword={security.state.confirmPassword}
-        securityMessage={security.status.message}
-        securityError={security.status.error}
-        onChangeSetupPassword={(value) => security.actions.setField('setupPassword', value)}
-        onChangeSetupConfirm={(value) => security.actions.setField('setupConfirm', value)}
-        onChangeCurrentPassword={(value) => security.actions.setField('currentPassword', value)}
-        onChangeNewPassword={(value) => security.actions.setField('newPassword', value)}
-        onChangeConfirmPassword={(value) => security.actions.setField('confirmPassword', value)}
-        onCreateWalletKey={security.actions.createWalletKey}
-        onChangePassword={security.actions.changePassword}
-      />
-    );
-  }
-
-  if (view === 'rewards') {
-    return (
-      <RewardsTab
-        scrollStyle={profile.styles.scrollStyle}
-        cardStyle={profile.styles.cardStyle}
-        onBack={() => setView('home')}
-        rewardsSummary={rewards.state.rewardsSummary}
-        rewardsSource={rewards.state.rewardsSource}
-        effectiveUserId={rewards.state.effectiveUserId}
-        rules={rules}
-        rewardsActivity={rewards.state.rewardsActivity}
-      />
-    );
-  }
-
-  if (view === 'localization') {
-    return (
-      <LocalizationTab
-        scrollStyle={profile.styles.scrollStyle}
-        cardStyle={profile.styles.cardStyle}
-        onBack={() => setView('home')}
-        language={profile.state.language}
-        onChangeLanguage={profile.actions.setLanguage}
-        onSave={profile.actions.save}
-        message={profile.status.message}
-        error={profile.status.error}
-      />
-    );
-  }
-
-  if (view === 'developer') {
-    return (
-      <>
-        <DeveloperTab
+  switch (view) {
+    case 'personalization':
+      content = (
+        <PersonalizationTab
           scrollStyle={profile.styles.scrollStyle}
           cardStyle={profile.styles.cardStyle}
           onBack={() => setView('home')}
-          hasSession={Boolean(auth.state.session)}
-          isBusy={developerStatus.loading}
-          developerMessage={developerStatus.message}
-          developerError={developerStatus.error}
-          onRefreshData={handleRefreshData}
-          onClearWallet={handleClearWallet}
-          onResetProfile={handleResetProfile}
-          onClearRewards={handleClearRewards}
-          onSignOut={handleDeveloperSignOut}
-          onDeleteAccount={handleDeleteAccount}
+          alias={profile.state.alias}
+          onChangeAlias={profile.actions.setAlias}
+          avatarType={profile.state.avatarType}
+          onChangeAvatarType={profile.actions.setAvatarType}
+          identicon={identicon}
+          themePreference={profile.state.themePreference}
+          onChangeThemePreference={profile.actions.setThemePreference}
+          profileError={profile.status.error}
+          profileMessage={profile.status.message}
+          onSave={profile.actions.save}
         />
-        <StatusDialog
-          visible={developerDialog && (!!developerStatus.message || !!developerStatus.error)}
-          title={developerStatus.error ? 'Action failed' : 'Action completed'}
-          message={developerStatus.error ?? developerStatus.message ?? ''}
-          variant={developerStatus.error ? 'error' : 'success'}
-          onClose={() => {
-            setDeveloperDialog(false);
-            setDeveloperStatus((prev) => ({ ...prev, message: null, error: null }));
-          }}
+      );
+      break;
+    case 'auth':
+      content = (
+        <AuthTab
+          scrollStyle={profile.styles.scrollStyle}
+          cardStyle={profile.styles.cardStyle}
+          onBack={() => setView('home')}
+          session={auth.state.session}
+          authEmail={auth.state.email}
+          authPassword={auth.state.password}
+          accountPassword={auth.state.accountPassword}
+          accountConfirm={auth.state.accountConfirm}
+          authMessage={auth.state.message}
+          authError={auth.state.error}
+          authLoading={auth.state.loading}
+          onChangeAuthEmail={(value) => auth.actions.setField('email', value)}
+          onChangeAuthPassword={(value) => auth.actions.setField('password', value)}
+          onChangeAccountPassword={(value) => auth.actions.setField('accountPassword', value)}
+          onChangeAccountConfirm={(value) => auth.actions.setField('accountConfirm', value)}
+          onSignUp={auth.actions.signUp}
+          onSignIn={auth.actions.signIn}
+          onSignOut={auth.actions.signOut}
+          onUpdateAccountPassword={auth.actions.updatePassword}
         />
-      </>
-    );
+      );
+      break;
+    case 'security':
+      content = (
+        <SecurityTab
+          scrollStyle={profile.styles.scrollStyle}
+          cardStyle={profile.styles.cardStyle}
+          onBack={() => setView('home')}
+          walletKey={security.state.walletKey}
+          setupPassword={security.state.setupPassword}
+          setupConfirm={security.state.setupConfirm}
+          currentPassword={security.state.currentPassword}
+          newPassword={security.state.newPassword}
+          confirmPassword={security.state.confirmPassword}
+          securityMessage={security.status.message}
+          securityError={security.status.error}
+          onChangeSetupPassword={(value) => security.actions.setField('setupPassword', value)}
+          onChangeSetupConfirm={(value) => security.actions.setField('setupConfirm', value)}
+          onChangeCurrentPassword={(value) => security.actions.setField('currentPassword', value)}
+          onChangeNewPassword={(value) => security.actions.setField('newPassword', value)}
+          onChangeConfirmPassword={(value) => security.actions.setField('confirmPassword', value)}
+          onCreateWalletKey={security.actions.createWalletKey}
+          onChangePassword={security.actions.changePassword}
+        />
+      );
+      break;
+    case 'rewards':
+      content = (
+        <RewardsTab
+          scrollStyle={profile.styles.scrollStyle}
+          cardStyle={profile.styles.cardStyle}
+          onBack={() => setView('home')}
+          rewardsSummary={rewards.state.rewardsSummary}
+          rewardsSource={rewards.state.rewardsSource}
+          effectiveUserId={rewards.state.effectiveUserId}
+          rules={REWARD_RULES}
+          rewardsActivity={rewards.state.rewardsActivity}
+        />
+      );
+      break;
+    case 'localization':
+      content = (
+        <LocalizationTab
+          scrollStyle={profile.styles.scrollStyle}
+          cardStyle={profile.styles.cardStyle}
+          onBack={() => setView('home')}
+          language={profile.state.language}
+          onChangeLanguage={profile.actions.setLanguage}
+          onSave={profile.actions.save}
+          message={profile.status.message}
+          error={profile.status.error}
+        />
+      );
+      break;
+    case 'developer':
+      content = (
+        <>
+          <DeveloperTab
+            scrollStyle={profile.styles.scrollStyle}
+            cardStyle={profile.styles.cardStyle}
+            onBack={() => setView('home')}
+            hasSession={Boolean(auth.state.session)}
+            isBusy={developerStatus.loading}
+            developerMessage={developerStatus.message}
+            developerError={developerStatus.error}
+            onRefreshData={handleRefreshData}
+            onClearWallet={handleClearWallet}
+            onResetProfile={handleResetProfile}
+            onClearRewards={handleClearRewards}
+            onSignOut={handleDeveloperSignOut}
+            onDeleteAccount={handleDeleteAccount}
+          />
+          <StatusDialog
+            visible={developerDialog && (!!developerStatus.message || !!developerStatus.error)}
+            title={developerStatus.error ? 'Action failed' : 'Action completed'}
+            message={developerStatus.error ?? developerStatus.message ?? ''}
+            variant={developerStatus.error ? 'error' : 'success'}
+            onClose={() => {
+              setDeveloperDialog(false);
+              setDeveloperStatus((prev) => ({ ...prev, message: null, error: null }));
+            }}
+          />
+        </>
+      );
+      break;
+    case 'about':
+      content = (
+        <AboutAppTab
+          scrollStyle={profile.styles.scrollStyle}
+          cardStyle={profile.styles.cardStyle}
+          onBack={() => setView('home')}
+        />
+      );
+      break;
+    default:
+      content = (
+        <ProfileHomeTab
+          scrollStyle={profile.styles.scrollStyle}
+          cardStyle={profile.styles.cardStyle}
+          profileSource={profile.state.profileSource}
+          onOpenPersonalization={() => setView('personalization')}
+          onOpenAuth={() => setView('auth')}
+          onOpenSecurity={() => setView('security')}
+          onOpenRewards={() => setView('rewards')}
+          onOpenLocalization={() => setView('localization')}
+          onOpenDeveloper={() => setView('developer')}
+          onOpenAbout={() => setView('about')}
+          buildLabel="dev build 0.08"
+        />
+      );
   }
 
-  if (view === 'about') {
-    return <AboutAppTab scrollStyle={profile.styles.scrollStyle} cardStyle={profile.styles.cardStyle} onBack={() => setView('home')} />;
-  }
-
-  return (
-    <ProfileHomeTab
-      scrollStyle={profile.styles.scrollStyle}
-      cardStyle={profile.styles.cardStyle}
-      profileSource={profile.state.profileSource}
-      onOpenPersonalization={() => setView('personalization')}
-      onOpenAuth={() => setView('auth')}
-      onOpenSecurity={() => setView('security')}
-      onOpenRewards={() => setView('rewards')}
-      onOpenLocalization={() => setView('localization')}
-      onOpenDeveloper={() => setView('developer')}
-      onOpenAbout={() => setView('about')}
-      buildLabel="dev build 0.08"
-    />
-  );
+  return <ProfileTabTransition viewKey={view}>{content}</ProfileTabTransition>;
 }

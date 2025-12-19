@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { availableLanguages, setLanguage as setI18nLanguage } from '@i18n';
 import type { AvatarType, LanguageCode, ThemePreference } from '@app-types/profile';
+import { profileStyles as styles } from '@styles/ProfileStyles';
 import {
   fetchRemoteProfile,
   getAuthSession,
@@ -62,6 +63,20 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
   const [state, setState] = useState<ProfilePreferencesState>(initialState);
   const [status, setStatus] = useState<ProfilePreferencesStatus>(initialStatus);
 
+  const updateStatus = (next: Partial<ProfilePreferencesStatus>) =>
+    setStatus((prev) => ({ ...prev, ...next }));
+
+  const validateAlias = (value: string) => {
+    const trimmed = value.trim();
+    if (trimmed.length > 0 && (trimmed.length < ALIAS_MIN || trimmed.length > ALIAS_MAX)) {
+      return `Alias must be ${ALIAS_MIN}-${ALIAS_MAX} characters.`;
+    }
+    if (trimmed.length > 0 && !ALIAS_REGEX.test(trimmed)) {
+      return 'Alias can only use letters, numbers, spaces, _ and -.';
+    }
+    return null;
+  };
+
   const cardStyle = useMemo<StyleProp<ViewStyle>>(
     () => [styles.card, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }],
     [theme.colors],
@@ -73,7 +88,8 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
 
   const loadProfile = useCallback(
     async (isActive: () => boolean) => {
-      setStatus((prev) => ({ ...prev, loading: true, error: null }));
+      if (!isActive()) return;
+      updateStatus({ loading: true, error: null });
       try {
         const [settings, key] = await Promise.all([loadProfileSettings(), loadEncryptedWalletKey()]);
         const currentSession = session ?? (await getAuthSession());
@@ -102,10 +118,11 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
         if (!merged.avatarSeed) {
           await saveProfileSettings({ ...merged, avatarSeed: nextSeed });
         }
-        setStatus((prev) => ({ ...prev, loading: false }));
+        if (!isActive()) return;
+        updateStatus({ loading: false });
       } catch (error) {
         if (!isActive()) return;
-        setStatus({ loading: false, message: null, error: error instanceof Error ? error.message : 'Unable to load profile.' });
+        updateStatus({ loading: false, message: null, error: error instanceof Error ? error.message : 'Unable to load profile.' });
       }
     },
     [session, theme],
@@ -129,14 +146,11 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
   };
 
   const save = async () => {
-    setStatus({ loading: true, message: null, error: null });
+    updateStatus({ loading: true, message: null, error: null });
     const trimmed = state.alias.trim();
-    if (trimmed.length > 0 && (trimmed.length < ALIAS_MIN || trimmed.length > ALIAS_MAX)) {
-      setStatus({ loading: false, message: null, error: `Alias must be ${ALIAS_MIN}-${ALIAS_MAX} characters.` });
-      return;
-    }
-    if (trimmed.length > 0 && !ALIAS_REGEX.test(trimmed)) {
-      setStatus({ loading: false, message: null, error: 'Alias can only use letters, numbers, spaces, _ and -.' });
+    const aliasError = validateAlias(trimmed);
+    if (aliasError) {
+      updateStatus({ loading: false, message: null, error: aliasError });
       return;
     }
     try {
@@ -153,14 +167,14 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
         setState((prev) => ({ ...prev, profileSource: 'supabase' }));
       }
       setState((prev) => ({ ...prev, alias: saved.alias }));
-      setStatus({ loading: false, message: 'Profile preferences saved.', error: null });
+      updateStatus({ loading: false, message: 'Profile preferences saved.', error: null });
     } catch (error) {
-      setStatus({ loading: false, message: null, error: error instanceof Error ? error.message : 'Unable to save profile.' });
+      updateStatus({ loading: false, message: null, error: error instanceof Error ? error.message : 'Unable to save profile.' });
     }
   };
 
   const reset = async () => {
-    setStatus({ loading: true, message: null, error: null });
+    updateStatus({ loading: true, message: null, error: null });
     try {
       await saveProfileSettings({
         alias: '',
@@ -170,9 +184,9 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
         language: 'en',
       });
       await loadProfile(() => true);
-      setStatus({ loading: false, message: 'Profile settings reset.', error: null });
+      updateStatus({ loading: false, message: 'Profile settings reset.', error: null });
     } catch {
-      setStatus({ loading: false, message: null, error: 'Unable to reset profile settings.' });
+      updateStatus({ loading: false, message: null, error: 'Unable to reset profile settings.' });
     }
   };
 
