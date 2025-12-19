@@ -26,18 +26,18 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 const lightPalette: Palette = {
   background: '#ffffff',
   card: '#f8fafc',
-  muted: '#e5e7eb',
+  muted: '#475569',
   text: '#0f172a',
   nav: '#e5e7eb',
   accent: '#4f46e5',
   accentText: '#ffffff',
-  border: '#e2e8f0',
+  border: '#cbd5e1',
 };
 
 const darkPalette: Palette = {
   background: '#0b1220',
   card: '#111827',
-  muted: '#1f2937',
+  muted: '#94a3b8',
   text: '#e5e7eb',
   nav: '#111827',
   accent: '#8b7bff',

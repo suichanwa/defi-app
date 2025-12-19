@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, ViewStyle } from 'react-native';
+import { Animated, Platform, StyleSheet, ViewStyle } from 'react-native';
 
 type ProfileTabTransitionProps = {
   children: React.ReactNode;
@@ -32,12 +32,12 @@ export default function ProfileTabTransition({
     Animated.timing(opacity, {
       toValue: 1,
       duration: durationMs,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
     Animated.timing(translateY, {
       toValue: 0,
       duration: durationMs,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   }, [viewKey, enabled, durationMs, offset, opacity, translateY]);
 

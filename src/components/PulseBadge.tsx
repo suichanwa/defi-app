@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, View, ViewStyle } from 'react-native';
+import { Animated, Platform, StyleSheet, View, ViewStyle } from 'react-native';
 
 type Props = {
   size?: number;
@@ -18,12 +18,12 @@ const PulseBadge: React.FC<Props> = ({ size = 10, color = '#10b981', durationMs 
         Animated.timing(scale, {
           toValue: 1,
           duration: durationMs,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(opacity, {
           toValue: 0,
           duration: durationMs,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ]),
     );

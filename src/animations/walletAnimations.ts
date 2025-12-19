@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Animated } from 'react-native';
+import { Animated, Platform } from 'react-native';
 
 export const useWalletCardAnimation = (deps: unknown[] = []) => {
   const opacity = useRef(new Animated.Value(0)).current;
@@ -12,12 +12,12 @@ export const useWalletCardAnimation = (deps: unknown[] = []) => {
       Animated.timing(opacity, {
         toValue: 1,
         duration: 200,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(translateY, {
         toValue: 0,
         duration: 200,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -24,7 +24,7 @@ export default function ProfileHomeTab({
   profileSource,
   onOpenPersonalization,
   onOpenAuth,
-  onOpenSecurity,
+  onOpenSecurit,
   onOpenRewards,
   onOpenLocalization,
   onOpenDeveloper,
