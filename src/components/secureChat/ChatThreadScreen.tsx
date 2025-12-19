@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import {
+  Image,
   KeyboardAvoidingView,
   PanResponder,
   Platform,
@@ -19,6 +20,7 @@ type Props = {
   messages: ChatMessage[];
   draft: string;
   serverInfo: ServerInfo | null;
+  userAvatarUri?: string;
   onBack: () => void;
   onDraftChange: (value: string) => void;
   onSend: () => void;
@@ -29,6 +31,7 @@ export default function ChatThreadScreen({
   messages,
   draft,
   serverInfo,
+  userAvatarUri,
   onBack,
   onDraftChange,
   onSend,
@@ -102,21 +105,41 @@ export default function ChatThreadScreen({
           showsVerticalScrollIndicator={false}
         >
           {messages.map((msg) => {
+            if (msg.type === 'system') {
+              return (
+                <View key={msg.id} style={[styles.messageBubble, styles.messageSystem]}>
+                  <Text style={styles.messageText}>{msg.content}</Text>
+                  <Text style={styles.messageTime}>{msg.timestamp}</Text>
+                </View>
+              );
+            }
             const bubbleStyle = [
               styles.messageBubble,
-              msg.type === 'system'
-                ? styles.messageSystem
-                : msg.outgoing
-                ? styles.messageOutgoing
-                : styles.messageIncoming,
+              msg.outgoing ? styles.messageOutgoing : styles.messageIncoming,
             ];
             const textStyle = msg.outgoing ? styles.messageTextOutgoing : styles.messageText;
             const timeStyle = msg.outgoing ? styles.messageTimeOutgoing : styles.messageTime;
+            const initial = (msg.author || '?').slice(0, 1).toUpperCase();
+            const renderAvatar = (uri?: string, fallback?: string, outgoing?: boolean) =>
+              uri ? (
+                <Image source={{ uri }} style={styles.avatarImage} />
+              ) : (
+                <View style={[styles.avatarCircle, outgoing ? styles.avatarOutgoing : styles.avatarIncoming]}>
+                  <Text style={styles.avatarInitial}>{fallback ?? initial}</Text>
+                </View>
+              );
             return (
-              <View key={msg.id} style={bubbleStyle}>
-                <Text style={textStyle}>{msg.author}</Text>
-                <Text style={[textStyle, styles.messageBody]}>{msg.content}</Text>
-                <Text style={timeStyle}>{msg.timestamp}</Text>
+              <View
+                key={msg.id}
+                style={[styles.messageRow, msg.outgoing ? styles.rowOutgoing : styles.rowIncoming]}
+              >
+                {!msg.outgoing && renderAvatar(undefined, initial, false)}
+                <View style={bubbleStyle}>
+                  <Text style={textStyle}>{msg.author}</Text>
+                  <Text style={[textStyle, styles.messageBody]}>{msg.content}</Text>
+                  <Text style={timeStyle}>{msg.timestamp}</Text>
+                </View>
+                {msg.outgoing && renderAvatar(userAvatarUri, 'You', true)}
               </View>
             );
           })}
@@ -218,6 +241,46 @@ const styles = StyleSheet.create({
   },
   messageContent: {
     paddingBottom: 12,
+  },
+  messageRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginBottom: 8,
+  },
+  rowOutgoing: {
+    justifyContent: 'flex-end',
+  },
+  rowIncoming: {
+    justifyContent: 'flex-start',
+  },
+  avatarCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    marginLeft: 4,
+    backgroundColor: '#e2e8f0',
+  },
+  avatarIncoming: {
+    backgroundColor: '#e2e8f0',
+  },
+  avatarOutgoing: {
+    backgroundColor: '#c7d2fe',
+    marginLeft: 8,
+    marginRight: 0,
+  },
+  avatarInitial: {
+    color: '#0f172a',
+    fontWeight: '700',
+  },
+  avatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginHorizontal: 8,
+    backgroundColor: '#e2e8f0',
   },
   messageBubble: {
     marginBottom: 12,

@@ -13,6 +13,7 @@ import { useTheme } from '../theme/ThemeProvider';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 import { getAuthSession, onAuthStateChange, type AuthSession } from '../services/auth';
 import { getAnonymousId } from '../services/identity';
+import { loadProfileSettings } from '../services/profileStore';
 
 export default function SecureChatScreen() {
   const { colors } = useTheme();
@@ -42,6 +43,7 @@ export default function SecureChatScreen() {
   const [roomId, setRoomId] = useState<string>('global');
   const channelRef = useRef<RealtimeChannel | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [userAvatarUri, setUserAvatarUri] = useState<string | undefined>(undefined);
   const { width } = useWindowDimensions();
   const isCompact = width < 720;
 
@@ -90,6 +92,20 @@ export default function SecureChatScreen() {
     return () => {
       active = false;
       sub?.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    loadProfileSettings().then((settings) => {
+      if (!mounted) return;
+      if (settings.alias) {
+        setUserLabel(settings.alias);
+      }
+      setUserAvatarUri(settings.avatarUri);
+    });
+    return () => {
+      mounted = false;
     };
   }, []);
 
@@ -433,6 +449,7 @@ export default function SecureChatScreen() {
             messages={selectedMessages}
             draft={draft}
             serverInfo={serverInfo}
+            userAvatarUri={userAvatarUri}
             onBack={() => setChatView('list')}
             onDraftChange={setDraft}
             onSend={handleSendMessage}

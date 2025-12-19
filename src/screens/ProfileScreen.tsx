@@ -120,6 +120,12 @@ export default function ProfileScreen() {
           onChangeAlias={profile.actions.setAlias}
           avatarType={profile.state.avatarType}
           onChangeAvatarType={profile.actions.setAvatarType}
+          avatarUri={profile.state.avatarUri}
+          onPickAvatar={profile.actions.pickAvatar}
+          onClearAvatar={() => {
+            profile.actions.setAvatarUri(undefined);
+            profile.actions.setAvatarType('none');
+          }}
           identicon={identicon}
           themePreference={profile.state.themePreference}
           onChangeThemePreference={profile.actions.setThemePreference}

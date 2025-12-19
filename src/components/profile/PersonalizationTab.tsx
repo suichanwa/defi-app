@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, Text, TextInput, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Image, ScrollView, Text, TextInput, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { profileStyles as styles } from '../../styles/ProfileStyles';
 import type { AvatarType, ThemePreference } from '../../types/profile';
@@ -18,6 +18,9 @@ type PersonalizationTabProps = {
   onChangeAlias: (value: string) => void;
   avatarType: AvatarType;
   onChangeAvatarType: (value: AvatarType) => void;
+  avatarUri?: string;
+  onPickAvatar: () => void;
+  onClearAvatar: () => void;
   identicon: IdenticonData;
   themePreference: ThemePreference;
   onChangeThemePreference: (value: ThemePreference) => Promise<void> | void;
@@ -34,6 +37,9 @@ export default function PersonalizationTab({
   onChangeAlias,
   avatarType,
   onChangeAvatarType,
+  avatarUri,
+  onPickAvatar,
+  onClearAvatar,
   identicon,
   themePreference,
   onChangeThemePreference,
@@ -70,6 +76,8 @@ export default function PersonalizationTab({
                   />
                 ))}
               </View>
+            ) : avatarType === 'custom' && avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
             ) : (
               <Ionicons name="person" size={34} color="#94a3b8" />
             )}
@@ -83,15 +91,38 @@ export default function PersonalizationTab({
               <Text style={avatarType === 'identicon' ? styles.optionTextActive : styles.optionText}>Identicon</Text>
             </TouchableOpacity>
             <TouchableOpacity
+              style={[styles.optionButton, avatarType === 'custom' && styles.optionButtonActive]}
+              onPress={() => onChangeAvatarType('custom')}
+              activeOpacity={0.8}
+            >
+              <Text style={avatarType === 'custom' ? styles.optionTextActive : styles.optionText}>Custom photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[styles.optionButton, avatarType === 'none' && styles.optionButtonActive]}
               onPress={() => onChangeAvatarType('none')}
               activeOpacity={0.8}
             >
               <Text style={avatarType === 'none' ? styles.optionTextActive : styles.optionText}>No avatar</Text>
             </TouchableOpacity>
+            <View style={styles.optionRow}>
+              <TouchableOpacity style={styles.secondaryButton} onPress={onPickAvatar} activeOpacity={0.85}>
+                <Text style={styles.secondaryButtonText}>Upload photo</Text>
+              </TouchableOpacity>
+              {avatarUri ? (
+                <TouchableOpacity
+                  style={[styles.secondaryButton, { marginLeft: 8, backgroundColor: '#fee2e2' }]}
+                  onPress={onClearAvatar}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[styles.secondaryButtonText, { color: '#b91c1c' }]}>Remove</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
           </View>
         </View>
-        <Text style={styles.hint}>Identicon is derived from your local wallet id.</Text>
+        <Text style={styles.hint}>
+          Identicon is derived from your local wallet id. Custom photo stays on this device and appears in chat bubbles.
+        </Text>
       </View>
 
       <View style={cardStyle}>

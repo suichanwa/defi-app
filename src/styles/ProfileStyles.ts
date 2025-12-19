@@ -112,6 +112,11 @@ export const profileStyles = StyleSheet.create({
     margin: 1,
     borderRadius: 2,
   },
+  avatarImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+  },
   avatarOptions: {
     marginLeft: 16,
     flex: 1,

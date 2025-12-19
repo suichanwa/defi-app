@@ -15,6 +15,7 @@ import {
 } from '@services';
 import { makeSeed } from '@utils/identicon';
 import type { StyleProp, ViewStyle } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 
 const ALIAS_MIN = 3;
 const ALIAS_MAX = 24;
@@ -24,6 +25,7 @@ type ProfilePreferencesState = {
   alias: string;
   avatarType: AvatarType;
   avatarSeed: string;
+  avatarUri?: string;
   themePreference: ThemePreference;
   language: LanguageCode;
   profileSource: 'local' | 'supabase';
@@ -48,6 +50,7 @@ const initialState: ProfilePreferencesState = {
   alias: '',
   avatarType: 'identicon',
   avatarSeed: '',
+  avatarUri: undefined,
   themePreference: 'system',
   language: 'en',
   profileSource: 'local',
@@ -106,6 +109,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
           alias: merged.alias ?? '',
           avatarType: merged.avatarType ?? 'identicon',
           avatarSeed: nextSeed,
+          avatarUri: merged.avatarUri,
           themePreference: mergedTheme,
           language: mergedLanguage,
           profileSource: remoteProfile ? 'supabase' : 'local',
@@ -137,12 +141,35 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
   }, [loadProfile]);
 
   const setAlias = (value: string) => setState((prev) => ({ ...prev, alias: value }));
-  const setAvatarType = (value: AvatarType) => setState((prev) => ({ ...prev, avatarType: value }));
+  const setAvatarType = (value: AvatarType) =>
+    setState((prev) => ({ ...prev, avatarType: value, ...(value !== 'custom' ? { avatarUri: undefined } : {} ) }));
   const setAvatarSeed = (value: string) => setState((prev) => ({ ...prev, avatarSeed: value }));
+  const setAvatarUri = (value?: string) => setState((prev) => ({ ...prev, avatarUri: value }));
   const setLanguage = (value: LanguageCode) => setState((prev) => ({ ...prev, language: value }));
   const setThemePreference = async (value: ThemePreference) => {
     setState((prev) => ({ ...prev, themePreference: value }));
     await theme.setPreference(value);
+  };
+
+  const pickAvatar = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      updateStatus({ error: 'Media permission is required to pick an avatar.' });
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled) {
+      const uri = result.assets[0]?.uri;
+      if (uri) {
+        setState((prev) => ({ ...prev, avatarUri: uri, avatarType: 'custom' }));
+        updateStatus({ error: null });
+      }
+    }
   };
 
   const save = async () => {
@@ -153,11 +180,16 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
       updateStatus({ loading: false, message: null, error: aliasError });
       return;
     }
+    if (state.avatarType === 'custom' && !state.avatarUri) {
+      updateStatus({ loading: false, message: null, error: 'Pick a photo to use a custom avatar.' });
+      return;
+    }
     try {
       const saved = await saveProfileSettings({
         alias: trimmed,
         avatarType: state.avatarType,
         avatarSeed: state.avatarType === 'identicon' ? state.avatarSeed : undefined,
+        avatarUri: state.avatarType === 'custom' ? state.avatarUri : undefined,
         themePreference: state.themePreference,
         language: state.language,
       });
@@ -180,6 +212,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
         alias: '',
         avatarType: 'identicon',
         avatarSeed: '',
+        avatarUri: undefined,
         themePreference: 'system',
         language: 'en',
       });
@@ -197,8 +230,10 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
       setAlias,
       setAvatarType,
       setAvatarSeed,
+      setAvatarUri,
       setLanguage,
       setThemePreference,
+      pickAvatar,
       save,
       reload: () => loadProfile(() => true),
       reset,
