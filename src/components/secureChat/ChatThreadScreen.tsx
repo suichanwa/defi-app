@@ -1,7 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
+  Keyboard,
   PanResponder,
   Platform,
   ScrollView,
@@ -37,6 +38,7 @@ export default function ChatThreadScreen({
   onSend,
 }: Props) {
   const scrollRef = useRef<ScrollView | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gesture) => {
@@ -60,6 +62,18 @@ export default function ChatThreadScreen({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+      scrollToBottom();
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   if (!chat) {
     return (
@@ -87,7 +101,7 @@ export default function ChatThreadScreen({
     <KeyboardAvoidingView
       style={styles.keyboardAvoid}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={80}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 96 : 0}
     >
       <View style={styles.container} {...panResponder.panHandlers}>
         <View style={styles.headerRow}>
@@ -113,7 +127,10 @@ export default function ChatThreadScreen({
         <ScrollView
           ref={scrollRef}
           style={styles.messageList}
-          contentContainerStyle={styles.messageContent}
+          contentContainerStyle={[
+            styles.messageContent,
+            { paddingBottom: styles.messageContent.paddingBottom + keyboardHeight + 80 },
+          ]}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={scrollToBottom}
         >
