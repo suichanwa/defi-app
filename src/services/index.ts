@@ -1,4 +1,5 @@
 export * from './auth';
+export * from './avatarStorage';
 export * from './identity';
 export * from './profileRemote';
 export * from './profileStore';

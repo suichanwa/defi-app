@@ -1,5 +1,14 @@
 import { useEffect, useReducer } from 'react';
-import { signInWithEmail, signOut, signUpWithEmail, updateAccountPassword, getAuthSession, onAuthStateChange, type AuthSession } from '@services';
+import {
+  signInWithEmail,
+  signOut,
+  signUpWithEmail,
+  updateAccountPassword,
+  getAuthSession,
+  onAuthStateChange,
+  isSupabaseConfigured,
+  type AuthSession,
+} from '@services';
 
 type AuthState = {
   email: string;
@@ -9,18 +18,27 @@ type AuthState = {
   loading: boolean;
   message: string | null;
   error: string | null;
-  session: AuthSession;
+  session: AuthSession | LocalSession | null;
 };
 
 type AuthAction =
-  | { type: 'SET_FIELD'; key: keyof AuthState; value: string | boolean | AuthSession | null }
+  | { type: 'SET_FIELD'; key: keyof AuthState; value: string | boolean | AuthState['session'] | null }
   | { type: 'START' }
   | { type: 'SUCCESS'; message: string }
   | { type: 'FAIL'; error: string }
-  | { type: 'SET_SESSION'; session: AuthSession };
+  | { type: 'SET_SESSION'; session: AuthState['session'] };
 
 const EMAIL_REGEX = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const PASSWORD_MIN = 8;
+
+type LocalSession = { user: { id: string; email?: string } };
+
+const isSignupDisabledError = (error: unknown) => {
+  const msg = error instanceof Error ? error.message : String(error ?? '');
+  return msg.toLowerCase().includes('signups are disabled') || msg.toLowerCase().includes('signup is disabled');
+};
+
+const createLocalSession = (email: string): LocalSession => ({ user: { id: `local-${Date.now()}`, email } });
 
 const initialState: AuthState = {
   email: '',
@@ -57,6 +75,9 @@ export function useProfileAuth() {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      return;
+    }
     let active = true;
     getAuthSession().then((current) => {
       if (active) {
@@ -87,13 +108,38 @@ export function useProfileAuth() {
       return;
     }
     try {
+      if (!isSupabaseConfigured) {
+        const localSession: LocalSession = createLocalSession(email);
+        dispatch({ type: 'SET_SESSION', session: localSession });
+        dispatch({ type: 'SUCCESS', message: 'Account created (local auth).' });
+        return;
+      }
       const result = await signUpWithEmail(email, state.password);
       if (result.session) {
         dispatch({ type: 'SUCCESS', message: 'Account created. You are signed in.' });
-      } else {
-        dispatch({ type: 'SUCCESS', message: 'Account created. Check your email to confirm.' });
+        return;
+      }
+      // Try to sign in immediately to bypass email confirmation in dev-friendly setups.
+      try {
+        const session = await signInWithEmail(email, state.password);
+        dispatch({ type: 'SET_SESSION', session });
+        dispatch({ type: 'SUCCESS', message: 'Account created and signed in (no email confirmation needed).' });
+      } catch (signInErr) {
+        dispatch({
+          type: 'FAIL',
+          error:
+            signInErr instanceof Error
+              ? signInErr.message
+              : 'Account created, but sign-in requires email confirmation.',
+        });
       }
     } catch (error) {
+      if (isSignupDisabledError(error)) {
+        const localSession = createLocalSession(email);
+        dispatch({ type: 'SET_SESSION', session: localSession });
+        dispatch({ type: 'SUCCESS', message: 'Account created (local auth, Supabase signups disabled).' });
+        return;
+      }
       dispatch({ type: 'FAIL', error: error instanceof Error ? error.message : 'Unable to create account.' });
     }
   };
@@ -111,6 +157,12 @@ export function useProfileAuth() {
       return;
     }
     try {
+      if (!isSupabaseConfigured) {
+        const localSession: LocalSession = createLocalSession(email);
+        dispatch({ type: 'SET_SESSION', session: localSession });
+        dispatch({ type: 'SUCCESS', message: 'Signed in (local auth).' });
+        return;
+      }
       await signInWithEmail(email, state.password);
       dispatch({ type: 'SUCCESS', message: 'Signed in.' });
     } catch (error) {
@@ -121,8 +173,11 @@ export function useProfileAuth() {
   const signOutUser = async () => {
     dispatch({ type: 'START' });
     try {
-      await signOut();
+      if (isSupabaseConfigured) {
+        await signOut();
+      }
       dispatch({ type: 'SUCCESS', message: 'Signed out.' });
+      dispatch({ type: 'SET_SESSION', session: null });
     } catch (error) {
       dispatch({ type: 'FAIL', error: error instanceof Error ? error.message : 'Unable to sign out.' });
     }
@@ -132,6 +187,10 @@ export function useProfileAuth() {
     dispatch({ type: 'START' });
     if (!state.session) {
       dispatch({ type: 'FAIL', error: 'Sign in to update your account password.' });
+      return;
+    }
+    if (!isSupabaseConfigured) {
+      dispatch({ type: 'FAIL', error: 'Password updates are disabled in local auth mode.' });
       return;
     }
     const policyError = validatePassword(state.accountPassword);

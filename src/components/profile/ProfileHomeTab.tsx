@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ScrollView, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { profileStyles as styles } from '../../styles/ProfileStyles';
+import { createProfileStyles } from '../../styles/ProfileStyles';
+import { useTheme } from '../../theme/ThemeProvider';
 
 type ProfileHomeTabProps = {
   scrollStyle: StyleProp<ViewStyle>;
@@ -30,6 +31,9 @@ export default function ProfileHomeTab({
   onOpenAbout,
   buildLabel,
 }: ProfileHomeTabProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createProfileStyles(colors), [colors]);
+
   return (
     <ScrollView contentContainerStyle={scrollStyle} showsVerticalScrollIndicator={false}>
       <View style={styles.titleBlock}>

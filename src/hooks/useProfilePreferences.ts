@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { availableLanguages, setLanguage as setI18nLanguage } from '@i18n';
 import type { AvatarType, LanguageCode, ThemePreference } from '@app-types/profile';
-import { profileStyles as styles } from '@styles/ProfileStyles';
+import { createProfileStyles } from '@styles/ProfileStyles';
 import {
   fetchRemoteProfile,
   getAuthSession,
@@ -16,6 +16,7 @@ import {
 import { makeSeed } from '@utils/identicon';
 import type { StyleProp, ViewStyle } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { uploadAvatar } from '@services/avatarStorage';
 
 const ALIAS_MIN = 3;
 const ALIAS_MAX = 24;
@@ -80,14 +81,9 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
     return null;
   };
 
-  const cardStyle = useMemo<StyleProp<ViewStyle>>(
-    () => [styles.card, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }],
-    [theme.colors],
-  );
-  const scrollStyle = useMemo<StyleProp<ViewStyle>>(
-    () => [styles.scrollContent, { backgroundColor: theme.colors.background }],
-    [theme.colors],
-  );
+  const themedStyles = useMemo(() => createProfileStyles(theme.colors as any), [theme.colors]);
+  const cardStyle = themedStyles.card as StyleProp<ViewStyle>;
+  const scrollStyle = themedStyles.scrollContent as StyleProp<ViewStyle>;
 
   const loadProfile = useCallback(
     async (isActive: () => boolean) => {
@@ -185,11 +181,16 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
       return;
     }
     try {
+      let remoteAvatarUrl = state.avatarUri;
+      if (state.avatarType === 'custom' && state.avatarUri && isSupabaseConfigured && session?.user?.id) {
+        remoteAvatarUrl = await uploadAvatar(session.user.id, state.avatarUri);
+        setState((prev) => ({ ...prev, avatarUri: remoteAvatarUrl }));
+      }
       const saved = await saveProfileSettings({
         alias: trimmed,
         avatarType: state.avatarType,
         avatarSeed: state.avatarType === 'identicon' ? state.avatarSeed : undefined,
-        avatarUri: state.avatarType === 'custom' ? state.avatarUri : undefined,
+        avatarUri: state.avatarType === 'custom' ? remoteAvatarUrl : undefined,
         themePreference: state.themePreference,
         language: state.language,
       });

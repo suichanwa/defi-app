@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ScrollView, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { profileStyles as styles } from '../../styles/ProfileStyles';
+import { createProfileStyles } from '../../styles/ProfileStyles';
+import { useTheme } from '../../theme/ThemeProvider';
 import ProfileHeader from './ProfileHeader';
 
 type AboutAppTabProps = {
@@ -10,6 +11,9 @@ type AboutAppTabProps = {
 };
 
 export default function AboutAppTab({ scrollStyle, cardStyle, onBack }: AboutAppTabProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createProfileStyles(colors), [colors]);
+
   return (
     <ScrollView contentContainerStyle={scrollStyle} showsVerticalScrollIndicator={false}>
       <ProfileHeader title="About app" onBack={onBack} />

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ScrollView, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { profileStyles as styles } from '../../styles/ProfileStyles';
+import { createProfileStyles } from '../../styles/ProfileStyles';
 import type { RewardActivity, RewardsSummary } from '../../types/rewards';
+import { useTheme } from '../../theme/ThemeProvider';
 import ProfileHeader from './ProfileHeader';
 
 type RewardsTabProps = {
@@ -25,6 +26,9 @@ export default function RewardsTab({
   rules,
   rewardsActivity,
 }: RewardsTabProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createProfileStyles(colors), [colors]);
+
   return (
     <ScrollView contentContainerStyle={scrollStyle} showsVerticalScrollIndicator={false}>
       <ProfileHeader title="RewardsHub" onBack={onBack} />

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ScrollView, Text, TextInput, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { profileStyles as styles } from '../../styles/ProfileStyles';
+import { createProfileStyles } from '../../styles/ProfileStyles';
 import type { EncryptedWalletKey } from '../../types/wallet';
+import { useTheme } from '../../theme/ThemeProvider';
 import ProfileHeader from './ProfileHeader';
 
 type SecurityTabProps = {
@@ -46,6 +47,9 @@ export default function SecurityTab({
   onCreateWalletKey,
   onChangePassword,
 }: SecurityTabProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createProfileStyles(colors), [colors]);
+
   return (
     <ScrollView contentContainerStyle={scrollStyle} showsVerticalScrollIndicator={false}>
       <ProfileHeader title="Security" onBack={onBack} />

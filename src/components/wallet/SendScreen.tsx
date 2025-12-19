@@ -1,6 +1,7 @@
 import React from 'react';
-import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { walletStyles as styles } from '../../styles/WalletStyles';
+import { useWalletCardAnimation } from '../../animations/walletAnimations';
 
 type Props = {
   chainName: string;
@@ -35,8 +36,10 @@ export default function SendScreen({
   onEdit,
   onBack,
 }: Props) {
+  const { animatedStyle } = useWalletCardAnimation([sendStep]);
+
   return (
-    <View style={styles.setupCard}>
+    <Animated.View style={[styles.setupCard, animatedStyle]}>
       <Text style={styles.setupTitle}>Send {chainName}</Text>
       <Text style={styles.setupSubtitle}>Transfer native coin to another address.</Text>
       {sendStep === 'form' && (
@@ -132,6 +135,6 @@ export default function SendScreen({
           {flowMessage && <Text style={styles.successText}>{flowMessage}</Text>}
         </>
       )}
-    </View>
+    </Animated.View>
   );
 }

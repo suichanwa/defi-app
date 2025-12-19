@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ScrollView, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { profileStyles as styles } from '../../styles/ProfileStyles';
+import { createProfileStyles } from '../../styles/ProfileStyles';
+import { useTheme } from '../../theme/ThemeProvider';
 import ProfileHeader from './ProfileHeader';
 
 type DeveloperTabProps = {
@@ -35,6 +36,9 @@ export default function DeveloperTab({
   onSignOut,
   onDeleteAccount,
 }: DeveloperTabProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createProfileStyles(colors), [colors]);
+
   return (
     <ScrollView contentContainerStyle={scrollStyle} showsVerticalScrollIndicator={false}>
       <ProfileHeader title="Developer" onBack={onBack} />

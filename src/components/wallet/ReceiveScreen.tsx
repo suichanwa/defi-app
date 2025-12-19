@@ -1,7 +1,8 @@
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Text, TouchableOpacity, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { walletStyles as styles } from '../../styles/WalletStyles';
+import { useWalletCardAnimation } from '../../animations/walletAnimations';
 
 type Props = {
   chainName: string;
@@ -13,8 +14,10 @@ type Props = {
 };
 
 export default function ReceiveScreen({ chainName, address, flowMessage, onCopy, onShare, onBack }: Props) {
+  const { animatedStyle } = useWalletCardAnimation([address]);
+
   return (
-    <View style={styles.setupCard}>
+    <Animated.View style={[styles.setupCard, animatedStyle]}>
       <Text style={styles.setupTitle}>Receive {chainName}</Text>
       <Text style={styles.setupSubtitle}>Share this address to receive funds.</Text>
       {address ? (
@@ -35,6 +38,6 @@ export default function ReceiveScreen({ chainName, address, flowMessage, onCopy,
       <TouchableOpacity style={styles.secondaryButton} onPress={onBack} activeOpacity={0.9}>
         <Text style={styles.secondaryButtonText}>Back</Text>
       </TouchableOpacity>
-    </View>
+    </Animated.View>
   );
 }

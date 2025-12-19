@@ -6,6 +6,7 @@ type ProfileRow = {
   email: string | null;
   alias: string | null;
   avatar_type: string | null;
+  avatar_url: string | null;
   avatar_seed: string | null;
   theme_preference: string | null;
   language: string | null;
@@ -16,7 +17,7 @@ export async function fetchRemoteProfile(userId: string): Promise<ProfileSetting
   if (!supabase) return null;
   const { data, error } = await supabase
     .from('user_profiles')
-    .select('alias, avatar_type, avatar_seed, theme_preference, language, updated_at')
+    .select('alias, avatar_type, avatar_url, avatar_seed, theme_preference, language, updated_at')
     .eq('id', userId)
     .maybeSingle<ProfileRow>();
 
@@ -25,6 +26,7 @@ export async function fetchRemoteProfile(userId: string): Promise<ProfileSetting
   return {
     alias: data.alias ?? '',
     avatarType: (data.avatar_type as ProfileSettings['avatarType']) ?? 'identicon',
+    avatarUri: data.avatar_url ?? undefined,
     avatarSeed: data.avatar_seed ?? undefined,
     themePreference: (data.theme_preference as ProfileSettings['themePreference']) ?? 'system',
     language: (data.language as ProfileSettings['language']) ?? 'en',
@@ -38,6 +40,7 @@ export async function upsertRemoteProfile(userId: string, settings: ProfileSetti
     id: userId,
     alias: settings.alias,
     avatar_type: settings.avatarType,
+    avatar_url: settings.avatarUri ?? null,
     avatar_seed: settings.avatarSeed,
     theme_preference: settings.themePreference,
     language: settings.language,

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Image, ScrollView, Text, TextInput, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { profileStyles as styles } from '../../styles/ProfileStyles';
+import { createProfileStyles } from '../../styles/ProfileStyles';
 import type { AvatarType, ThemePreference } from '../../types/profile';
+import { useTheme } from '../../theme/ThemeProvider';
 import ProfileHeader from './ProfileHeader';
 
 type IdenticonData = {
@@ -47,6 +48,9 @@ export default function PersonalizationTab({
   profileMessage,
   onSave,
 }: PersonalizationTabProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createProfileStyles(colors), [colors]);
+
   return (
     <ScrollView contentContainerStyle={scrollStyle} showsVerticalScrollIndicator={false}>
       <ProfileHeader title="Personalization" onBack={onBack} />
@@ -104,17 +108,19 @@ export default function PersonalizationTab({
             >
               <Text style={avatarType === 'none' ? styles.optionTextActive : styles.optionText}>No avatar</Text>
             </TouchableOpacity>
-            <View style={styles.optionRow}>
-              <TouchableOpacity style={styles.secondaryButton} onPress={onPickAvatar} activeOpacity={0.85}>
-                <Text style={styles.secondaryButtonText}>Upload photo</Text>
+            <View style={styles.actionRow}>
+              <TouchableOpacity style={[styles.chipButton, styles.chipPrimary]} onPress={onPickAvatar} activeOpacity={0.88}>
+                <Ionicons name="image-outline" size={16} color="#ffffff" />
+                <Text style={styles.chipPrimaryText}>Upload photo</Text>
               </TouchableOpacity>
               {avatarUri ? (
                 <TouchableOpacity
-                  style={[styles.secondaryButton, { marginLeft: 8, backgroundColor: '#fee2e2' }]}
+                  style={[styles.chipButton, styles.chipGhost]}
                   onPress={onClearAvatar}
-                  activeOpacity={0.85}
+                  activeOpacity={0.88}
                 >
-                  <Text style={[styles.secondaryButtonText, { color: '#b91c1c' }]}>Remove</Text>
+                  <Ionicons name="trash-outline" size={16} color="#b91c1c" />
+                  <Text style={styles.chipGhostText}>Remove</Text>
                 </TouchableOpacity>
               ) : null}
             </View>

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { profileStyles as styles } from '../../styles/ProfileStyles';
+import { createProfileStyles } from '../../styles/ProfileStyles';
 import type { LanguageCode } from '../../types/profile';
+import { useTheme } from '../../theme/ThemeProvider';
 import ProfileHeader from './ProfileHeader';
 import { availableLanguages, t } from '../../i18n';
 
@@ -27,6 +28,51 @@ export default function LocalizationTab({
   message,
   error,
 }: LocalizationTabProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createProfileStyles(colors), [colors]);
+  const localStyles = useMemo(
+    () =>
+      StyleSheet.create({
+        list: {
+          marginTop: 12,
+        },
+        row: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingVertical: 10,
+          paddingHorizontal: 12,
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor: colors.border,
+          marginBottom: 8,
+          backgroundColor: colors.card,
+        },
+        rowActive: {
+          borderColor: colors.accent,
+          backgroundColor: colors.muted,
+        },
+        radio: {
+          width: 22,
+          height: 22,
+          borderRadius: 11,
+          borderWidth: 2,
+          borderColor: colors.border,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: 10,
+        },
+        radioActive: {
+          borderColor: colors.accent,
+          backgroundColor: colors.accent,
+        },
+        label: {
+          fontSize: 15,
+          color: colors.text,
+        },
+      }),
+    [colors],
+  );
+
   return (
     <ScrollView contentContainerStyle={scrollStyle} showsVerticalScrollIndicator={false}>
       <ProfileHeader title={t('language.title')} onBack={onBack} />
@@ -62,39 +108,4 @@ export default function LocalizationTab({
 }
 
 const localStyles = StyleSheet.create({
-  list: {
-    marginTop: 12,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginBottom: 8,
-  },
-  rowActive: {
-    borderColor: '#4f46e5',
-    backgroundColor: '#eef2ff',
-  },
-  radio: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: '#cbd5e1',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  radioActive: {
-    borderColor: '#4f46e5',
-    backgroundColor: '#4f46e5',
-  },
-  label: {
-    fontSize: 15,
-    color: '#0f172a',
-  },
 });
