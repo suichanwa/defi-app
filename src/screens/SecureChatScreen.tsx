@@ -7,6 +7,7 @@ import ChatListScreen from '../components/secureChat/ChatListScreen';
 import ChatThreadScreen from '../components/secureChat/ChatThreadScreen';
 import ConnectScreen from '../components/secureChat/ConnectScreen';
 import type { ChatMessage, ChatThread, ServerInfo } from '../types/secureChat';
+import type { AvatarType } from '../types/profile';
 import * as date from 'date-and-time';
 import * as Location from 'expo-location';
 import { useTheme } from '../theme/ThemeProvider';
@@ -14,6 +15,7 @@ import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 import { getAuthSession, onAuthStateChange, type AuthSession } from '../services/auth';
 import { getAnonymousId } from '../services/identity';
 import { loadProfileSettings } from '../services/profileStore';
+import { useChatAvatar } from '../hooks/useChatAvatar';
 
 export default function SecureChatScreen() {
   const { colors } = useTheme();
@@ -44,6 +46,9 @@ export default function SecureChatScreen() {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [userAvatarUri, setUserAvatarUri] = useState<string | undefined>(undefined);
+  const [userAvatarType, setUserAvatarType] = useState<AvatarType>('identicon');
+  const [userAvatarSeed, setUserAvatarSeed] = useState<string | undefined>(undefined);
+  const [isChannelReady, setIsChannelReady] = useState(false);
   const { width } = useWindowDimensions();
   const isCompact = width < 720;
 
@@ -54,6 +59,13 @@ export default function SecureChatScreen() {
 
   const devicePublicKey = useMemo(() => `user:${userLabel}`, [userLabel]);
 
+  const resolveAvatar = useChatAvatar({
+    currentUserLabel: userLabel,
+    currentAvatarType: userAvatarType,
+    currentAvatarUri: userAvatarUri,
+    currentAvatarSeed: userAvatarSeed,
+  });
+
   const selectedMessages = useMemo(
     () => messagesByChat[selectedChatId] ?? [],
     [messagesByChat, selectedChatId],
@@ -61,6 +73,7 @@ export default function SecureChatScreen() {
 
   const mapRowToMessage = (row: { id: string; room_id: string; author: string; content: string; created_at?: string }) => {
     const ts = row.created_at ? new Date(row.created_at) : new Date();
+    const outgoingAvatarUri = userAvatarType === 'custom' ? userAvatarUri : undefined;
     return {
       id: row.id,
       chatId: row.room_id,
@@ -68,6 +81,7 @@ export default function SecureChatScreen() {
       content: row.content,
       timestamp: ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       outgoing: row.author === userLabel,
+      avatarUri: row.author === userLabel ? outgoingAvatarUri : undefined,
       type: 'text' as const,
     };
   };
@@ -103,6 +117,8 @@ export default function SecureChatScreen() {
         setUserLabel(settings.alias);
       }
       setUserAvatarUri(settings.avatarUri);
+      setUserAvatarType(settings.avatarType ?? 'identicon');
+      setUserAvatarSeed(settings.avatarSeed);
     });
     return () => {
       mounted = false;
@@ -133,6 +149,7 @@ export default function SecureChatScreen() {
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
+    setIsChannelReady(false);
 
     // Tear down previous channel.
     if (channelRef.current) {
@@ -173,6 +190,7 @@ export default function SecureChatScreen() {
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
+          setIsChannelReady(true);
           await channel.track({ user: userLabel, room: roomId });
           setConnectionLog((prev) => [`Joined room ${roomId}.`, ...prev]);
           setServerInfo({ address: 'supabase', port: 0, status: 'running' });
@@ -182,12 +200,14 @@ export default function SecureChatScreen() {
           await loadHistory(roomId);
         }
         if (status === 'CHANNEL_ERROR') {
+          setIsChannelReady(false);
           setConnectionLog((prev) => [`Failed to join room ${roomId}. Check Supabase Realtime keys.`, ...prev]);
         }
       });
 
     channelRef.current = channel;
     return () => {
+      setIsChannelReady(false);
       if (supabase) {
         supabase.removeChannel(channel);
       }
@@ -283,12 +303,14 @@ export default function SecureChatScreen() {
       return;
     }
     const now = new Date();
+    const outgoingAvatarUri = userAvatarType === 'custom' ? userAvatarUri : undefined;
     const message: ChatMessage = {
       id: now.getTime().toString(),
       chatId: selectedChat.id,
       author: userLabel,
       content: draft.trim(),
       timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      avatarUri: outgoingAvatarUri,
       outgoing: true,
       type: 'text',
     };
@@ -325,11 +347,16 @@ export default function SecureChatScreen() {
     // Broadcast to room (ephemeral).
     const channel = channelRef.current;
     if (channel) {
-      await channel.send({
-        type: 'broadcast',
-        event: 'message',
-        payload: { ...message, outgoing: false },
-      });
+      const payload = { ...message, outgoing: false };
+      if (isChannelReady) {
+        await channel.send({
+          type: 'broadcast',
+          event: 'message',
+          payload,
+        });
+      } else {
+        await channel.httpSend('message', payload);
+      }
     }
   };
 
@@ -451,10 +478,10 @@ export default function SecureChatScreen() {
             messages={selectedMessages}
             draft={draft}
             serverInfo={serverInfo}
-            userAvatarUri={userAvatarUri}
             onBack={() => setChatView('list')}
             onDraftChange={setDraft}
             onSend={handleSendMessage}
+            resolveAvatar={resolveAvatar}
           />
         </View>
       ) : (

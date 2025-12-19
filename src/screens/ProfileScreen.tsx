@@ -267,7 +267,7 @@ export default function ProfileScreen() {
           onOpenLocalization={() => setView('localization')}
           onOpenDeveloper={() => setView('developer')}
           onOpenAbout={() => setView('about')}
-          buildLabel="dev build 0.10"
+          buildLabel="dev build 0.11"
         />
       );
   }

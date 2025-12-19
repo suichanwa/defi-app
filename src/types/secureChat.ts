@@ -4,9 +4,15 @@ export type ChatMessage = {
   author: string;
   content: string;
   timestamp: string;
+  avatarUri?: string;
   outgoing?: boolean;
   type?: 'text' | 'system';
 };
+
+export type ChatAvatarSource =
+  | { kind: 'image'; uri: string }
+  | { kind: 'identicon'; seed: string }
+  | { kind: 'initials'; initials: string };
 
 export type ChatThread = {
   id: string;

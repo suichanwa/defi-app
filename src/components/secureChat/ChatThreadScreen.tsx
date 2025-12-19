@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Image,
   KeyboardAvoidingView,
   Keyboard,
   PanResponder,
@@ -14,18 +13,19 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import PulseBadge from '../PulseBadge';
-import type { ChatMessage, ChatThread, ServerInfo } from '../../types/secureChat';
+import type { ChatAvatarSource, ChatMessage, ChatThread, ServerInfo } from '../../types/secureChat';
 import { useTheme } from '../../theme/ThemeProvider';
+import ChatAvatar from './ChatAvatar';
 
 type Props = {
   chat: ChatThread | null;
   messages: ChatMessage[];
   draft: string;
   serverInfo: ServerInfo | null;
-  userAvatarUri?: string;
   onBack: () => void;
   onDraftChange: (value: string) => void;
   onSend: () => void;
+  resolveAvatar: (message: ChatMessage) => ChatAvatarSource;
 };
 
 export default function ChatThreadScreen({
@@ -33,10 +33,10 @@ export default function ChatThreadScreen({
   messages,
   draft,
   serverInfo,
-  userAvatarUri,
   onBack,
   onDraftChange,
   onSend,
+  resolveAvatar,
 }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createChatStyles(colors), [colors]);
@@ -157,25 +157,21 @@ export default function ChatThreadScreen({
             const authorStyle = msg.outgoing ? styles.messageTextOutgoing : styles.messageText;
             const bodyStyle = msg.outgoing ? styles.messageBodyOutgoing : styles.messageBody;
             const timeStyle = msg.outgoing ? styles.messageTimeOutgoing : styles.messageTime;
-            const initial = (msg.author || '?').slice(0, 1).toUpperCase();
-            const renderAvatar = (uri?: string, fallback?: string, outgoing?: boolean) =>
-              uri ? (
-                <Image source={{ uri }} style={styles.avatarImage} />
-              ) : (
-                <View style={[styles.avatarCircle, outgoing ? styles.avatarOutgoing : styles.avatarIncoming]}>
-                  <Text style={styles.avatarInitial}>{fallback ?? initial}</Text>
-                </View>
-              );
             const isOutgoing = Boolean(msg.outgoing);
+            const avatarSource = resolveAvatar(msg);
             return (
               <View key={msg.id} style={[styles.messageRow, isOutgoing ? styles.rowOutgoing : styles.rowIncoming]}>
-                {!isOutgoing && renderAvatar(undefined, initial, false)}
+                {!isOutgoing && (
+                  <ChatAvatar source={avatarSource} variant="incoming" style={styles.avatarSlotIncoming} />
+                )}
                 <View style={bubbleStyle}>
                   <Text style={authorStyle}>{msg.author}</Text>
                   <Text style={bodyStyle}>{msg.content}</Text>
                   <Text style={timeStyle}>{msg.timestamp}</Text>
                 </View>
-                {isOutgoing && renderAvatar(userAvatarUri, 'You', true)}
+                {isOutgoing && (
+                  <ChatAvatar source={avatarSource} variant="outgoing" style={styles.avatarSlotOutgoing} />
+                )}
               </View>
             );
           })}
@@ -293,36 +289,15 @@ const createChatStyles = (colors: { background: string; card: string; text: stri
       flexDirection: 'row',
       justifyContent: 'flex-start',
     },
-    avatarCircle: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      alignItems: 'center',
-      justifyContent: 'center',
+    avatarSlotIncoming: {
       marginRight: 8,
       marginLeft: 4,
       marginTop: 2,
-      backgroundColor: colors.border,
     },
-    avatarIncoming: {
-      backgroundColor: colors.border,
-    },
-    avatarOutgoing: {
-      backgroundColor: `${colors.accent}33`,
+    avatarSlotOutgoing: {
       marginLeft: 8,
       marginRight: 0,
-    },
-    avatarInitial: {
-      color: colors.text,
-      fontWeight: '700',
-    },
-    avatarImage: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      marginHorizontal: 8,
       marginTop: 2,
-      backgroundColor: colors.border,
     },
     messageBubble: {
       marginBottom: 0,
