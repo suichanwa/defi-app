@@ -2,8 +2,32 @@
   "extends": "expo/tsconfig.base.json",
   "compilerOptions": {
     "strict": true,
+    "baseUrl": "./src",
     "paths": {
-      "@env": ["./types/env.d.ts"]
+      "@env": ["../types/env.d.ts"],
+      "@components": ["components"],
+      "@components/*": ["components/*"],
+      "@screens": ["screens"],
+      "@screens/*": ["screens/*"],
+      "@hooks": ["hooks"],
+      "@hooks/*": ["hooks/*"],
+      "@services": ["services/index"],
+      "@services/*": ["services/*"],
+      "@app-types": ["types"],
+      "@app-types/*": ["types/*"],
+      "@styles/*": ["styles/*"],
+      "@context": ["context"],
+      "@context/*": ["context/*"],
+      "@theme": ["theme"],
+      "@theme/*": ["theme/*"],
+      "@i18n": ["i18n"],
+      "@i18n/*": ["i18n/*"],
+      "@utils": ["utils"],
+      "@utils/*": ["utils/*"],
+      "@constants": ["constants"],
+      "@constants/*": ["constants/*"],
+      "@config": ["config"],
+      "@config/*": ["config/*"]
     }
   }
 }
