@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, Platform, StyleSheet, ViewStyle } from 'react-native';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { Animated, PanResponder, Platform, StyleSheet, ViewStyle } from 'react-native';
 
 type ProfileTabTransitionProps = {
   children: React.ReactNode;
@@ -8,6 +8,7 @@ type ProfileTabTransitionProps = {
   durationMs?: number;
   offset?: number;
   style?: ViewStyle;
+  onBackSwipe?: () => void;
 };
 
 /**
@@ -21,9 +22,28 @@ export default function ProfileTabTransition({
   durationMs = 180,
   offset = 12,
   style,
+  onBackSwipe,
 }: ProfileTabTransitionProps) {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(offset)).current;
+  const panResponder = useMemo(() => {
+    if (!onBackSwipe) return null;
+    const edgeWidth = 28;
+    const minDistance = 72;
+    const minVelocity = 0.2;
+    return PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) => {
+        const isFromEdge = gesture.x0 <= edgeWidth || gesture.moveX <= edgeWidth;
+        const isHorizontal = Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2;
+        return isFromEdge && isHorizontal && gesture.dx > 12;
+      },
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dx > minDistance && gesture.vx > minVelocity) {
+          onBackSwipe();
+        }
+      },
+    });
+  }, [onBackSwipe]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -46,7 +66,10 @@ export default function ProfileTabTransition({
   }
 
   return (
-    <Animated.View style={[styles.container, style, { opacity, transform: [{ translateY }] }]}>
+    <Animated.View
+      style={[styles.container, style, { opacity, transform: [{ translateY }] }]}
+      {...(panResponder?.panHandlers ?? {})}
+    >
       {children}
     </Animated.View>
   );

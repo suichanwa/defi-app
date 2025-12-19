@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   AboutAppTab,
   AuthTab,
@@ -47,6 +47,7 @@ export default function ProfileScreen() {
 
   const identiconSeed = security.state.walletKey?.id ?? profile.state.avatarSeed;
   const identicon = useMemo(() => buildIdenticon(identiconSeed || 'seed'), [identiconSeed]);
+  const handleBackToHome = useCallback(() => setView('home'), []);
 
   const setDeveloperFeedback = (next: { message: string | null; error: string | null }) => {
     setDeveloperStatus((prev) => ({ ...prev, loading: false, ...next }));
@@ -271,5 +272,9 @@ export default function ProfileScreen() {
       );
   }
 
-  return <ProfileTabTransition viewKey={view}>{content}</ProfileTabTransition>;
+  return (
+    <ProfileTabTransition viewKey={view} onBackSwipe={view === 'home' ? undefined : handleBackToHome}>
+      {content}
+    </ProfileTabTransition>
+  );
 }

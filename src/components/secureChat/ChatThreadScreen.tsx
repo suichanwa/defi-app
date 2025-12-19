@@ -42,19 +42,23 @@ export default function ChatThreadScreen({
   const styles = useMemo(() => createChatStyles(colors), [colors]);
   const scrollRef = useRef<ScrollView | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const panResponder = useRef(
-    PanResponder.create({
+  const panResponder = useMemo(() => {
+    const edgeWidth = 28;
+    const minDistance = 72;
+    const minVelocity = 0.2;
+    return PanResponder.create({
       onMoveShouldSetPanResponder: (_, gesture) => {
-        const isHorizontal = Math.abs(gesture.dx) > Math.abs(gesture.dy);
-        return isHorizontal && gesture.dx < -12;
+        const isFromEdge = gesture.x0 <= edgeWidth || gesture.moveX <= edgeWidth;
+        const isHorizontal = Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2;
+        return isFromEdge && isHorizontal && gesture.dx > 12;
       },
       onPanResponderRelease: (_, gesture) => {
-        if (gesture.dx < -60 && gesture.vx < -0.3) {
+        if (gesture.dx > minDistance && gesture.vx > minVelocity) {
           onBack();
         }
       },
-    }),
-  ).current;
+    });
+  }, [onBack]);
 
   const scrollToBottom = () => {
     requestAnimationFrame(() => {
