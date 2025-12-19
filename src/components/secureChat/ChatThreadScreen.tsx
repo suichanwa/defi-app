@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
@@ -36,6 +36,7 @@ export default function ChatThreadScreen({
   onDraftChange,
   onSend,
 }: Props) {
+  const scrollRef = useRef<ScrollView | null>(null);
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gesture) => {
@@ -49,6 +50,16 @@ export default function ChatThreadScreen({
       },
     }),
   ).current;
+
+  const scrollToBottom = () => {
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   if (!chat) {
     return (
@@ -100,9 +111,11 @@ export default function ChatThreadScreen({
         </View>
 
         <ScrollView
+          ref={scrollRef}
           style={styles.messageList}
           contentContainerStyle={styles.messageContent}
           showsVerticalScrollIndicator={false}
+          onContentSizeChange={scrollToBottom}
         >
           {messages.map((msg) => {
             if (msg.type === 'system') {
@@ -117,7 +130,8 @@ export default function ChatThreadScreen({
               styles.messageBubble,
               msg.outgoing ? styles.messageOutgoing : styles.messageIncoming,
             ];
-            const textStyle = msg.outgoing ? styles.messageTextOutgoing : styles.messageText;
+            const authorStyle = msg.outgoing ? styles.messageTextOutgoing : styles.messageText;
+            const bodyStyle = msg.outgoing ? styles.messageBodyOutgoing : styles.messageBody;
             const timeStyle = msg.outgoing ? styles.messageTimeOutgoing : styles.messageTime;
             const initial = (msg.author || '?').slice(0, 1).toUpperCase();
             const renderAvatar = (uri?: string, fallback?: string, outgoing?: boolean) =>
@@ -128,18 +142,16 @@ export default function ChatThreadScreen({
                   <Text style={styles.avatarInitial}>{fallback ?? initial}</Text>
                 </View>
               );
+            const isOutgoing = Boolean(msg.outgoing);
             return (
-              <View
-                key={msg.id}
-                style={[styles.messageRow, msg.outgoing ? styles.rowOutgoing : styles.rowIncoming]}
-              >
-                {!msg.outgoing && renderAvatar(undefined, initial, false)}
+              <View key={msg.id} style={[styles.messageRow, isOutgoing ? styles.rowOutgoing : styles.rowIncoming]}>
+                {!isOutgoing && renderAvatar(undefined, initial, false)}
                 <View style={bubbleStyle}>
-                  <Text style={textStyle}>{msg.author}</Text>
-                  <Text style={[textStyle, styles.messageBody]}>{msg.content}</Text>
+                  <Text style={authorStyle}>{msg.author}</Text>
+                  <Text style={bodyStyle}>{msg.content}</Text>
                   <Text style={timeStyle}>{msg.timestamp}</Text>
                 </View>
-                {msg.outgoing && renderAvatar(userAvatarUri, 'You', true)}
+                {isOutgoing && renderAvatar(userAvatarUri, 'You', true)}
               </View>
             );
           })}
@@ -244,23 +256,26 @@ const styles = StyleSheet.create({
   },
   messageRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    marginBottom: 8,
+    alignItems: 'flex-start',
+    marginBottom: 10,
   },
   rowOutgoing: {
+    flexDirection: 'row',
     justifyContent: 'flex-end',
   },
   rowIncoming: {
+    flexDirection: 'row',
     justifyContent: 'flex-start',
   },
   avatarCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
     marginLeft: 4,
+    marginTop: 2,
     backgroundColor: '#e2e8f0',
   },
   avatarIncoming: {
@@ -276,18 +291,19 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   avatarImage: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     marginHorizontal: 8,
+    marginTop: 2,
     backgroundColor: '#e2e8f0',
   },
   messageBubble: {
-    marginBottom: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    maxWidth: '85%',
+    marginBottom: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
+    maxWidth: '78%',
   },
   messageIncoming: {
     alignSelf: 'flex-start',
@@ -302,24 +318,34 @@ const styles = StyleSheet.create({
     backgroundColor: '#bae6fd',
   },
   messageText: {
-    fontWeight: '600',
+    fontWeight: '700',
+    fontSize: 13,
     color: '#0f172a',
   },
   messageTextOutgoing: {
-    fontWeight: '600',
+    fontWeight: '700',
+    fontSize: 13,
     color: '#ffffff',
   },
   messageBody: {
     marginTop: 4,
-    fontWeight: '400',
+    fontWeight: '500',
+    fontSize: 15,
+    color: '#0f172a',
+  },
+  messageBodyOutgoing: {
+    marginTop: 4,
+    fontWeight: '500',
+    fontSize: 15,
+    color: '#ffffff',
   },
   messageTime: {
-    marginTop: 8,
+    marginTop: 6,
     fontSize: 11,
     color: '#64748b',
   },
   messageTimeOutgoing: {
-    marginTop: 8,
+    marginTop: 6,
     fontSize: 11,
     color: '#c7d2fe',
   },
