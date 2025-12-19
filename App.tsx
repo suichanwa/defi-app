@@ -7,7 +7,7 @@ import WalletScreen from './src/screens/WalletScreen';
 import SecureChatScreen from './src/screens/SecureChatScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import { appShellStyles as styles } from './src/styles/AppShellStyles';
-import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme } from './src/theme/ThemeProvider';
 import { WalletSessionProvider } from './src/context/WalletSessionProvider';
 
@@ -36,7 +36,7 @@ function AppContent() {
   const chatPointerEvents = activeTab === 'secureChat' ? 'auto' : 'none';
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+    <View style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <View
         style={{
           paddingTop: insets.top,
@@ -117,7 +117,7 @@ function AppContent() {
           </TouchableOpacity>
         </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 

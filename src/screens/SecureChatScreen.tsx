@@ -188,7 +188,9 @@ export default function SecureChatScreen() {
 
     channelRef.current = channel;
     return () => {
-      supabase.removeChannel(channel);
+      if (supabase) {
+        supabase.removeChannel(channel);
+      }
     };
   }, [roomId, session, userLabel]);
 

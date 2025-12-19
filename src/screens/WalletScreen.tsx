@@ -92,8 +92,13 @@ export default function WalletScreen() {
 
   const trackedPairs = useMemo(() => chainTokens.filter((t) => t.pair).map((t) => t.pair as string), [chainTokens]);
 
-  const formatCurrency = (value: number) =>
-    Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(value);
+  const formatCurrency = (value: number) => {
+    if (typeof Intl !== 'undefined' && typeof Intl.NumberFormat === 'function') {
+      return Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(value);
+    }
+    const rounded = Math.round(value * 100) / 100;
+    return `$${rounded.toFixed(2)}`;
+  };
 
   const fetchPrices = async () => {
     if (trackedPairs.length === 0) return;
