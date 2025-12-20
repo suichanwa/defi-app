@@ -15,6 +15,7 @@ type ProfileHomeTabProps = {
   onOpenLocalization: () => void;
   onOpenDeveloper: () => void;
   onOpenAbout: () => void;
+  onOpenChangelog: () => void;
   buildLabel: string;
 };
 
@@ -29,6 +30,7 @@ export default function ProfileHomeTab({
   onOpenLocalization,
   onOpenDeveloper,
   onOpenAbout,
+  onOpenChangelog,
   buildLabel,
 }: ProfileHomeTabProps) {
   const { colors } = useTheme();
@@ -143,6 +145,19 @@ export default function ProfileHomeTab({
           <View style={styles.cardBody}>
             <Text style={styles.cardTitle}>About app</Text>
             <Text style={styles.cardSubtitle}>What this project is about.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+        </View>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={cardStyle} onPress={onOpenChangelog} activeOpacity={0.85}>
+        <View style={styles.cardRow}>
+          <View style={styles.cardIcon}>
+            <Ionicons name="list-outline" size={22} color={colors.accent} />
+          </View>
+          <View style={styles.cardBody}>
+            <Text style={styles.cardTitle}>Changelog</Text>
+            <Text style={styles.cardSubtitle}>Latest updates and recent changes.</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.muted} />
         </View>

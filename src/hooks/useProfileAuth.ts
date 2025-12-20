@@ -72,6 +72,31 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 const validatePassword = (value: string) =>
   value.length < PASSWORD_MIN ? `Password must be at least ${PASSWORD_MIN} characters.` : null;
 
+const normalizeAuthError = (error: unknown, fallback: string) => {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  const lower = message.toLowerCase();
+  if (!message) return fallback;
+  if (lower.includes('user already registered') || lower.includes('email already')) {
+    return 'Account already exists. Try signing in.';
+  }
+  if (lower.includes('invalid login credentials')) {
+    return 'Incorrect email or password.';
+  }
+  if (lower.includes('email not confirmed')) {
+    return 'Confirm your email before signing in.';
+  }
+  if (lower.includes('password') && lower.includes('least')) {
+    return message;
+  }
+  if (lower.includes('rate limit') || lower.includes('too many requests')) {
+    return 'Too many attempts. Please wait and try again.';
+  }
+  if (lower.includes('signup') && lower.includes('disabled')) {
+    return 'Signups are disabled right now.';
+  }
+  return message || fallback;
+};
+
 export function useProfileAuth() {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
@@ -141,7 +166,7 @@ export function useProfileAuth() {
         dispatch({ type: 'SUCCESS', message: 'Account created (local auth, Supabase signups disabled).' });
         return;
       }
-      dispatch({ type: 'FAIL', error: error instanceof Error ? error.message : 'Unable to create account.' });
+      dispatch({ type: 'FAIL', error: normalizeAuthError(error, 'Unable to create account.') });
     }
   };
 
@@ -167,7 +192,7 @@ export function useProfileAuth() {
       await signInWithEmail(email, state.password);
       dispatch({ type: 'SUCCESS', message: 'Signed in.' });
     } catch (error) {
-      dispatch({ type: 'FAIL', error: error instanceof Error ? error.message : 'Unable to sign in.' });
+      dispatch({ type: 'FAIL', error: normalizeAuthError(error, 'Unable to sign in.') });
     }
   };
 
@@ -209,7 +234,7 @@ export function useProfileAuth() {
       dispatch({ type: 'SET_FIELD', key: 'accountConfirm', value: '' });
       dispatch({ type: 'SUCCESS', message: 'Account password updated.' });
     } catch (error) {
-      dispatch({ type: 'FAIL', error: error instanceof Error ? error.message : 'Unable to update password.' });
+      dispatch({ type: 'FAIL', error: normalizeAuthError(error, 'Unable to update password.') });
     }
   };
 

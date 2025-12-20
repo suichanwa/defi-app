@@ -46,5 +46,6 @@ export async function upsertRemoteProfile(userId: string, settings: ProfileSetti
     language: settings.language,
     updated_at: settings.updatedAt,
   };
-  await supabase.from('user_profiles').upsert(payload);
+  const { error } = await supabase.from('user_profiles').upsert(payload);
+  if (error) throw error;
 }

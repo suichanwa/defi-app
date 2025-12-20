@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { ScrollView, Text, TextInput, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createProfileStyles } from '../../styles/ProfileStyles';
 import type { AuthSession } from '../../services/auth';
@@ -53,6 +53,21 @@ export default function AuthTab({
 }: AuthTabProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createProfileStyles(colors), [colors]);
+  const lastMessageRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!authMessage || authMessage === lastMessageRef.current) return;
+    const normalized = authMessage.toLowerCase();
+    if (normalized.includes('account created')) {
+      const detail = isSupabaseConfigured
+        ? session
+          ? 'You are signed in and ready to go.'
+          : 'Check your email to confirm the account before signing in.'
+        : 'Local-only account created on this device.';
+      Alert.alert('Account created', detail);
+    }
+    lastMessageRef.current = authMessage;
+  }, [authMessage, session]);
 
   return (
     <ScrollView contentContainerStyle={scrollStyle} showsVerticalScrollIndicator={false}>

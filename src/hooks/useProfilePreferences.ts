@@ -66,6 +66,37 @@ const initialStatus: ProfilePreferencesStatus = {
   error: null,
 };
 
+const isSupabaseSession = (value: AuthSession | LocalSession | null | undefined): value is NonNullable<AuthSession> =>
+  Boolean(value && typeof value === 'object' && 'access_token' in value);
+
+const resolveProfileId = async (currentSession: AuthSession | LocalSession | null | undefined) => {
+  if (!isSupabaseConfigured) return null;
+  if (isSupabaseSession(currentSession)) {
+    return currentSession.user?.id ?? null;
+  }
+  if (currentSession) {
+    return null;
+  }
+  const anonId = await getAnonymousId();
+  return toAnonymousProfileId(anonId);
+};
+
+const normalizeProfileError = (error: unknown, fallback: string) => {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  const lower = message.toLowerCase();
+  if (!message) return fallback;
+  if (lower.includes('bucket') && lower.includes('not found')) {
+    return 'Avatar upload failed. Create a public storage bucket named "avatars" in Supabase.';
+  }
+  if (lower.includes('row level security') || lower.includes('permission') || lower.includes('unauthorized')) {
+    return 'Supabase policy blocked the request. Check RLS and storage policies.';
+  }
+  if (lower.includes('invalid input syntax for type uuid')) {
+    return 'Supabase expects UUIDs for profile ids. Update user_profiles.id to text for anon/local profiles.';
+  }
+  return message || fallback;
+};
+
 export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs) {
   const [state, setState] = useState<ProfilePreferencesState>(initialState);
   const [status, setStatus] = useState<ProfilePreferencesStatus>(initialStatus);
@@ -96,15 +127,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
       try {
         const [settings, key] = await Promise.all([loadProfileSettings(), loadEncryptedWalletKey()]);
         const currentSession = session ?? (await getAuthSession());
-        let profileId: string | null = null;
-        if (isSupabaseConfigured) {
-          if (currentSession?.user?.id) {
-            profileId = currentSession.user.id;
-          } else {
-            const anonId = await getAnonymousId();
-            profileId = toAnonymousProfileId(anonId);
-          }
-        }
+        const profileId = await resolveProfileId(currentSession);
         const remoteProfile = profileId ? await fetchRemoteProfile(profileId) : null;
         if (!isActive()) return;
 
@@ -132,7 +155,11 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
         updateStatus({ loading: false });
       } catch (error) {
         if (!isActive()) return;
-        updateStatus({ loading: false, message: null, error: error instanceof Error ? error.message : 'Unable to load profile.' });
+        updateStatus({
+          loading: false,
+          message: null,
+          error: normalizeProfileError(error, 'Unable to load profile.'),
+        });
       }
     },
     [applyThemePreference, session],
@@ -148,7 +175,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
 
   const setAlias = (value: string) => setState((prev) => ({ ...prev, alias: value }));
   const setAvatarType = (value: AvatarType) =>
-    setState((prev) => ({ ...prev, avatarType: value, ...(value !== 'custom' ? { avatarUri: undefined } : {} ) }));
+    setState((prev) => ({ ...prev, avatarType: value, ...(value !== 'custom' ? { avatarUri: undefined } : {}) }));
   const setAvatarSeed = (value: string) => setState((prev) => ({ ...prev, avatarSeed: value }));
   const setAvatarUri = (value?: string) => setState((prev) => ({ ...prev, avatarUri: value }));
   const setLanguage = (value: LanguageCode) => setState((prev) => ({ ...prev, language: value }));
@@ -191,19 +218,21 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
       return;
     }
     try {
-      let profileId: string | null = null;
-      if (isSupabaseConfigured) {
-        if (session?.user?.id) {
-          profileId = session.user.id;
-        } else {
-          const anonId = await getAnonymousId();
-          profileId = toAnonymousProfileId(anonId);
-        }
-      }
+      const currentSession = session ?? (await getAuthSession());
+      const profileId = await resolveProfileId(currentSession);
       let remoteAvatarUrl = state.avatarUri;
       if (state.avatarType === 'custom' && state.avatarUri && profileId) {
-        remoteAvatarUrl = await uploadAvatar(profileId, state.avatarUri);
-        setState((prev) => ({ ...prev, avatarUri: remoteAvatarUrl }));
+        try {
+          remoteAvatarUrl = await uploadAvatar(profileId, state.avatarUri);
+          setState((prev) => ({ ...prev, avatarUri: remoteAvatarUrl }));
+        } catch (uploadError) {
+          updateStatus({
+            loading: false,
+            message: null,
+            error: normalizeProfileError(uploadError, 'Unable to upload avatar.'),
+          });
+          return;
+        }
       }
       const saved = await saveProfileSettings({
         alias: trimmed,
@@ -215,13 +244,22 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
       });
       setI18nLanguage(state.language);
       if (profileId) {
-        await upsertRemoteProfile(profileId, saved);
-        setState((prev) => ({ ...prev, profileSource: 'supabase' }));
+        try {
+          await upsertRemoteProfile(profileId, saved);
+          setState((prev) => ({ ...prev, profileSource: 'supabase' }));
+        } catch (remoteError) {
+          updateStatus({
+            loading: false,
+            message: null,
+            error: normalizeProfileError(remoteError, 'Unable to sync profile to Supabase.'),
+          });
+          return;
+        }
       }
       setState((prev) => ({ ...prev, alias: saved.alias }));
       updateStatus({ loading: false, message: 'Profile preferences saved.', error: null });
     } catch (error) {
-      updateStatus({ loading: false, message: null, error: error instanceof Error ? error.message : 'Unable to save profile.' });
+      updateStatus({ loading: false, message: null, error: normalizeProfileError(error, 'Unable to save profile.') });
     }
   };
 

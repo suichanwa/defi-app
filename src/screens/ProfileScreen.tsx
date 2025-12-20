@@ -3,6 +3,7 @@ import { BackHandler, Platform } from 'react-native';
 import {
   AboutAppTab,
   AuthTab,
+  ChangelogTab,
   DeveloperTab,
   LocalizationTab,
   PersonalizationTab,
@@ -22,7 +23,16 @@ import { useTheme } from '@theme/ThemeProvider';
 import { buildIdenticon } from '@utils/identicon';
 import type { LocalSession } from '@hooks/useProfileAuth';
 
-type ProfileView = 'home' | 'personalization' | 'security' | 'rewards' | 'auth' | 'developer' | 'localization' | 'about';
+type ProfileView =
+  | 'home'
+  | 'personalization'
+  | 'security'
+  | 'rewards'
+  | 'auth'
+  | 'developer'
+  | 'localization'
+  | 'about'
+  | 'changelog';
 
 export default function ProfileScreen() {
   const [view, setView] = useState<ProfileView>('home');
@@ -266,6 +276,15 @@ export default function ProfileScreen() {
         />
       );
       break;
+    case 'changelog':
+      content = (
+        <ChangelogTab
+          scrollStyle={profile.styles.scrollStyle}
+          cardStyle={profile.styles.cardStyle}
+          onBack={() => setView('home')}
+        />
+      );
+      break;
     default:
       content = (
         <ProfileHomeTab
@@ -279,7 +298,8 @@ export default function ProfileScreen() {
           onOpenLocalization={() => setView('localization')}
           onOpenDeveloper={() => setView('developer')}
           onOpenAbout={() => setView('about')}
-          buildLabel="dev build 0.11"
+          onOpenChangelog={() => setView('changelog')}
+          buildLabel="dev build 0.12"
         />
       );
   }
