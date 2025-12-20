@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { useTheme } from '../../theme/ThemeProvider';
 
 type Props = {
   isCompact: boolean;
@@ -9,16 +10,22 @@ type Props = {
 
 export default function ChatHeader({ isCompact, timeLabel, locationLabel }: Props) {
   const hasMeta = Boolean(timeLabel || locationLabel);
+  const { colors, resolved } = useTheme();
+  const titleColor = resolved === 'dark' ? colors.accent : colors.text;
 
   return (
     <View style={[styles.container, isCompact && styles.containerCompact]}>
       <View style={styles.titleBlock}>
-        <Text style={styles.title}>Secure Chat</Text>
-        <Text style={styles.subtitle}>Components mirrored from repo/secureChat</Text>
+        <Text style={[styles.title, { color: titleColor }]}>Secure Chat</Text>
+        <Text style={[styles.subtitle, { color: colors.muted }]}>Components mirrored from repo/secureChat</Text>
         {hasMeta ? (
           <View style={styles.metaRow}>
-            {timeLabel ? <Text style={styles.metaText}>Local time: {timeLabel}</Text> : null}
-            {locationLabel ? <Text style={styles.metaHint}>{locationLabel}</Text> : null}
+            {timeLabel ? (
+              <Text style={[styles.metaText, { color: colors.muted }]}>Local time: {timeLabel}</Text>
+            ) : null}
+            {locationLabel ? (
+              <Text style={[styles.metaHint, { color: colors.muted }]}>{locationLabel}</Text>
+            ) : null}
           </View>
         ) : null}
       </View>
@@ -42,11 +49,9 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#0f172a',
   },
   subtitle: {
     marginTop: 4,
-    color: '#64748b',
   },
   metaRow: {
     marginTop: 8,
@@ -56,10 +61,9 @@ const styles = StyleSheet.create({
   metaText: {
     marginRight: 12,
     fontSize: 12,
-    color: '#64748b',
   },
   metaHint: {
     fontSize: 12,
-    color: '#94a3b8',
+    opacity: 0.85,
   },
 });
