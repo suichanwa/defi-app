@@ -1,12 +1,24 @@
+import type { AvatarType } from './profile';
+
 export type ChatMessage = {
   id: string;
   chatId: string;
+  authorId?: string;
   author: string;
   content: string;
   timestamp: string;
   avatarUri?: string;
   outgoing?: boolean;
   type?: 'text' | 'system';
+};
+
+export type ChatAuthorProfile = {
+  id: string;
+  alias?: string;
+  avatarType?: AvatarType;
+  avatarUri?: string;
+  avatarSeed?: string;
+  updatedAt?: string;
 };
 
 export type ChatAvatarSource =
@@ -20,7 +32,7 @@ export type ChatThread = {
   participants: string[];
   peerAddress?: string;
   isOnline?: boolean;
-  lastMessage?: { text: string; ts: string; from: string };
+  lastMessage?: { text: string; ts: string; from: string; authorId?: string };
 };
 
 export type ServerInfo = {

@@ -5,12 +5,14 @@ import { createProfileStyles } from '@styles/ProfileStyles';
 import type { LocalSession } from '@hooks/useProfileAuth';
 import {
   fetchRemoteProfile,
+  getAnonymousId,
   getAuthSession,
   isSupabaseConfigured,
   loadEncryptedWalletKey,
   loadProfileSettings,
   normalizeLanguage,
   saveProfileSettings,
+  toAnonymousProfileId,
   upsertRemoteProfile,
   type AuthSession,
 } from '@services';
@@ -67,6 +69,7 @@ const initialStatus: ProfilePreferencesStatus = {
 export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs) {
   const [state, setState] = useState<ProfilePreferencesState>(initialState);
   const [status, setStatus] = useState<ProfilePreferencesStatus>(initialStatus);
+  const applyThemePreference = theme.setPreference;
 
   const updateStatus = (next: Partial<ProfilePreferencesStatus>) =>
     setStatus((prev) => ({ ...prev, ...next }));
@@ -93,8 +96,16 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
       try {
         const [settings, key] = await Promise.all([loadProfileSettings(), loadEncryptedWalletKey()]);
         const currentSession = session ?? (await getAuthSession());
-        const useSupabaseProfile = Boolean(isSupabaseConfigured && currentSession?.user?.id);
-        const remoteProfile = useSupabaseProfile ? await fetchRemoteProfile(currentSession!.user!.id) : null;
+        let profileId: string | null = null;
+        if (isSupabaseConfigured) {
+          if (currentSession?.user?.id) {
+            profileId = currentSession.user.id;
+          } else {
+            const anonId = await getAnonymousId();
+            profileId = toAnonymousProfileId(anonId);
+          }
+        }
+        const remoteProfile = profileId ? await fetchRemoteProfile(profileId) : null;
         if (!isActive()) return;
 
         const merged = remoteProfile ?? settings;
@@ -113,9 +124,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
         });
 
         setI18nLanguage(mergedLanguage);
-        if (mergedTheme !== theme.preference) {
-          await theme.setPreference(mergedTheme);
-        }
+        await applyThemePreference(mergedTheme);
         if (!merged.avatarSeed) {
           await saveProfileSettings({ ...merged, avatarSeed: nextSeed });
         }
@@ -126,7 +135,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
         updateStatus({ loading: false, message: null, error: error instanceof Error ? error.message : 'Unable to load profile.' });
       }
     },
-    [session, theme],
+    [applyThemePreference, session],
   );
 
   useEffect(() => {
@@ -145,7 +154,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
   const setLanguage = (value: LanguageCode) => setState((prev) => ({ ...prev, language: value }));
   const setThemePreference = async (value: ThemePreference) => {
     setState((prev) => ({ ...prev, themePreference: value }));
-    await theme.setPreference(value);
+    await applyThemePreference(value);
   };
 
   const pickAvatar = async () => {
@@ -182,9 +191,18 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
       return;
     }
     try {
+      let profileId: string | null = null;
+      if (isSupabaseConfigured) {
+        if (session?.user?.id) {
+          profileId = session.user.id;
+        } else {
+          const anonId = await getAnonymousId();
+          profileId = toAnonymousProfileId(anonId);
+        }
+      }
       let remoteAvatarUrl = state.avatarUri;
-      if (state.avatarType === 'custom' && state.avatarUri && isSupabaseConfigured && session?.user?.id) {
-        remoteAvatarUrl = await uploadAvatar(session.user.id, state.avatarUri);
+      if (state.avatarType === 'custom' && state.avatarUri && profileId) {
+        remoteAvatarUrl = await uploadAvatar(profileId, state.avatarUri);
         setState((prev) => ({ ...prev, avatarUri: remoteAvatarUrl }));
       }
       const saved = await saveProfileSettings({
@@ -196,8 +214,8 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
         language: state.language,
       });
       setI18nLanguage(state.language);
-      if (isSupabaseConfigured && session?.user?.id) {
-        await upsertRemoteProfile(session.user.id, saved);
+      if (profileId) {
+        await upsertRemoteProfile(profileId, saved);
         setState((prev) => ({ ...prev, profileSource: 'supabase' }));
       }
       setState((prev) => ({ ...prev, alias: saved.alias }));

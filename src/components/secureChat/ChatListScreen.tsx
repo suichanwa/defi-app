@@ -40,6 +40,10 @@ export default function ChatListScreen({ chats, selectedChatId, onSelectChat, on
       <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
         {chats.map((chat) => {
           const isActive = chat.id === selectedChatId;
+          const lastMessage = chat.lastMessage;
+          const previewText = lastMessage
+            ? `${lastMessage.from ? `${lastMessage.from}: ` : ''}${lastMessage.text}`
+            : 'No messages yet.';
           return (
             <TouchableOpacity
               key={chat.id}
@@ -50,7 +54,7 @@ export default function ChatListScreen({ chats, selectedChatId, onSelectChat, on
               <View style={styles.chatRow}>
                 <View style={styles.chatMeta}>
                   <Text style={styles.chatName}>{chat.name}</Text>
-                  <Text style={styles.chatPreview}>{chat.lastMessage?.text || 'No messages yet.'}</Text>
+                  <Text style={styles.chatPreview}>{previewText}</Text>
                 </View>
                 <View style={styles.chatStatus}>
                   <PulseBadge size={9} color={chat.isOnline ? '#22c55e' : '#f97316'} />

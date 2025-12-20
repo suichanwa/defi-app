@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Appearance } from 'react-native';
 import type { ThemePreference } from '../types/profile';
 import { loadProfileSettings, saveProfileSettings } from '../services/profileStore';
@@ -60,36 +60,39 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setResolved(pref === 'system' ? system : pref);
     };
     load();
-    const sub = Appearance.addChangeListener(({ colorScheme }) => {
-      setResolved((prev) => {
-        if (preference === 'system') {
-          return colorScheme === 'dark' ? 'dark' : 'light';
-        }
-        return prev;
-      });
-    });
     return () => {
       mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const sub = Appearance.addChangeListener(({ colorScheme }) => {
+      if (preference !== 'system') return;
+      setResolved(colorScheme === 'dark' ? 'dark' : 'light');
+    });
+    return () => {
       sub.remove();
     };
   }, [preference]);
 
-  const setPreference = async (next: ThemePreference) => {
+  const setPreference = useCallback(async (next: ThemePreference) => {
     setPref(next);
     const system = Appearance.getColorScheme() === 'dark' ? 'dark' : 'light';
     setResolved(next === 'system' ? system : next);
     const settings = await loadProfileSettings();
     await saveProfileSettings({ ...settings, themePreference: next });
-  };
+  }, []);
 
   const colors = useMemo(() => (resolved === 'dark' ? darkPalette : lightPalette), [resolved]);
-
-  const value: ThemeContextValue = {
-    preference,
-    resolved,
-    colors,
-    setPreference,
-  };
+  const value = useMemo<ThemeContextValue>(
+    () => ({
+      preference,
+      resolved,
+      colors,
+      setPreference,
+    }),
+    [preference, resolved, colors, setPreference],
+  );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

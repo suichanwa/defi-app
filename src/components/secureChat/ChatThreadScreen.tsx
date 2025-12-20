@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Keyboard,
-  PanResponder,
   Platform,
   ScrollView,
   StyleSheet,
@@ -22,10 +21,12 @@ type Props = {
   messages: ChatMessage[];
   draft: string;
   serverInfo: ServerInfo | null;
+  participantCount?: number;
   onBack: () => void;
   onDraftChange: (value: string) => void;
   onSend: () => void;
   resolveAvatar: (message: ChatMessage) => ChatAvatarSource;
+  resolveAuthorName: (message: ChatMessage) => string;
 };
 
 export default function ChatThreadScreen({
@@ -33,32 +34,17 @@ export default function ChatThreadScreen({
   messages,
   draft,
   serverInfo,
+  participantCount = 0,
   onBack,
   onDraftChange,
   onSend,
   resolveAvatar,
+  resolveAuthorName,
 }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createChatStyles(colors), [colors]);
   const scrollRef = useRef<ScrollView | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const panResponder = useMemo(() => {
-    const edgeWidth = 28;
-    const minDistance = 72;
-    const minVelocity = 0.2;
-    return PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gesture) => {
-        const isFromEdge = gesture.x0 <= edgeWidth || gesture.moveX <= edgeWidth;
-        const isHorizontal = Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2;
-        return isFromEdge && isHorizontal && gesture.dx > 12;
-      },
-      onPanResponderRelease: (_, gesture) => {
-        if (gesture.dx > minDistance && gesture.vx > minVelocity) {
-          onBack();
-        }
-      },
-    });
-  }, [onBack]);
 
   const scrollToBottom = () => {
     requestAnimationFrame(() => {
@@ -103,6 +89,7 @@ export default function ChatThreadScreen({
       ? `Hosting on ${serverInfo.address}:${serverInfo.port}`
       : 'Starting server...'
     : 'Server offline';
+  const participantLabel = `${participantCount} online`;
 
   return (
     <KeyboardAvoidingView
@@ -110,7 +97,7 @@ export default function ChatThreadScreen({
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 96 : 0}
     >
-      <View style={styles.container} {...panResponder.panHandlers}>
+      <View style={styles.container}>
         <View style={styles.headerRow}>
           <View style={styles.headerMain}>
             <View style={styles.headerTitleRow}>
@@ -125,9 +112,12 @@ export default function ChatThreadScreen({
               </View>
             </View>
           </View>
-          <View style={styles.statusRow}>
-            <PulseBadge size={10} color={serverInfo ? colors.accent : '#f97316'} />
-            <Text style={styles.statusText}>{serverStatus}</Text>
+          <View style={styles.statusColumn}>
+            <View style={styles.statusRow}>
+              <PulseBadge size={10} color={serverInfo ? colors.accent : '#f97316'} />
+              <Text style={styles.statusText}>{serverStatus}</Text>
+            </View>
+            <Text style={styles.participantText}>{participantLabel}</Text>
           </View>
         </View>
 
@@ -159,13 +149,14 @@ export default function ChatThreadScreen({
             const timeStyle = msg.outgoing ? styles.messageTimeOutgoing : styles.messageTime;
             const isOutgoing = Boolean(msg.outgoing);
             const avatarSource = resolveAvatar(msg);
+            const authorLabel = resolveAuthorName(msg);
             return (
               <View key={msg.id} style={[styles.messageRow, isOutgoing ? styles.rowOutgoing : styles.rowIncoming]}>
                 {!isOutgoing && (
                   <ChatAvatar source={avatarSource} variant="incoming" style={styles.avatarSlotIncoming} />
                 )}
                 <View style={bubbleStyle}>
-                  <Text style={authorStyle}>{msg.author}</Text>
+                  <Text style={authorStyle}>{authorLabel}</Text>
                   <Text style={bodyStyle}>{msg.content}</Text>
                   <Text style={timeStyle}>{msg.timestamp}</Text>
                 </View>
@@ -263,10 +254,18 @@ const createChatStyles = (colors: { background: string; card: string; text: stri
       flexDirection: 'row',
       alignItems: 'center',
     },
+    statusColumn: {
+      alignItems: 'flex-end',
+    },
     statusText: {
       marginLeft: 6,
       fontSize: 12,
       fontWeight: '600',
+      color: colors.muted,
+    },
+    participantText: {
+      marginTop: 4,
+      fontSize: 12,
       color: colors.muted,
     },
     messageList: {

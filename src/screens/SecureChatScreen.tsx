@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, StyleSheet, View, useWindowDimensions } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, BackHandler, Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import ChatHeader from '../components/secureChat/ChatHeader';
 import ChatTabs from '../components/secureChat/ChatTabs';
@@ -13,11 +13,16 @@ import * as Location from 'expo-location';
 import { useTheme } from '../theme/ThemeProvider';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 import { getAuthSession, onAuthStateChange, type AuthSession } from '../services/auth';
-import { getAnonymousId } from '../services/identity';
+import { getAnonymousId, toAnonymousProfileId } from '../services/identity';
 import { loadProfileSettings } from '../services/profileStore';
 import { useChatAvatar } from '../hooks/useChatAvatar';
+import { useChatProfiles } from '../hooks/useChatProfiles';
 
-export default function SecureChatScreen() {
+type Props = {
+  isActive?: boolean;
+};
+
+export default function SecureChatScreen({ isActive = false }: Props) {
   const { colors } = useTheme();
   const [secureTab, setSecureTab] = useState<'chats' | 'connect'>('chats');
   const [chatView, setChatView] = useState<'list' | 'thread'>('list');
@@ -41,7 +46,9 @@ export default function SecureChatScreen() {
   const [timeLabel, setTimeLabel] = useState('');
   const [locationLabel, setLocationLabel] = useState('Location: requesting...');
   const [session, setSession] = useState<AuthSession>(null);
-  const [userLabel, setUserLabel] = useState<string>('Anonymous');
+  const [anonId, setAnonId] = useState<string>('');
+  const [authLabel, setAuthLabel] = useState<string>('');
+  const [profileAlias, setProfileAlias] = useState<string>('');
   const [roomId, setRoomId] = useState<string>('global');
   const channelRef = useRef<RealtimeChannel | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -49,39 +56,86 @@ export default function SecureChatScreen() {
   const [userAvatarType, setUserAvatarType] = useState<AvatarType>('identicon');
   const [userAvatarSeed, setUserAvatarSeed] = useState<string | undefined>(undefined);
   const [isChannelReady, setIsChannelReady] = useState(false);
+  const [participantCount, setParticipantCount] = useState(0);
   const { width } = useWindowDimensions();
   const isCompact = width < 720;
+  const authorId = useMemo(
+    () => session?.user?.id ?? (anonId ? toAnonymousProfileId(anonId) : undefined),
+    [anonId, session],
+  );
+  const displayLabel = profileAlias || authLabel || 'Anonymous';
 
   const selectedChat = useMemo(
     () => chats.find((chat) => chat.id === selectedChatId) ?? null,
     [chats, selectedChatId],
   );
 
-  const devicePublicKey = useMemo(() => `user:${userLabel}`, [userLabel]);
-
-  const resolveAvatar = useChatAvatar({
-    currentUserLabel: userLabel,
-    currentAvatarType: userAvatarType,
-    currentAvatarUri: userAvatarUri,
-    currentAvatarSeed: userAvatarSeed,
-  });
+  const devicePublicKey = useMemo(() => `user:${displayLabel}`, [displayLabel]);
 
   const selectedMessages = useMemo(
     () => messagesByChat[selectedChatId] ?? [],
     [messagesByChat, selectedChatId],
   );
 
-  const mapRowToMessage = (row: { id: string; room_id: string; author: string; content: string; created_at?: string }) => {
+  const authorIds = useMemo(() => {
+    const ids = new Set<string>();
+    selectedMessages.forEach((message) => {
+      if (message.authorId) ids.add(message.authorId);
+    });
+    if (authorId) ids.add(authorId);
+    return Array.from(ids).sort();
+  }, [authorId, selectedMessages]);
+
+  const { profilesById } = useChatProfiles({ authorIds, enabled: authorIds.length > 0 });
+
+  const resolveAvatar = useChatAvatar({
+    currentUserId: authorId,
+    currentUserLabel: displayLabel,
+    currentAvatarType: userAvatarType,
+    currentAvatarUri: userAvatarUri,
+    currentAvatarSeed: userAvatarSeed,
+    profilesById,
+  });
+
+  const resolveAuthorName = useCallback(
+    (message: ChatMessage) => {
+      const isCurrentUser =
+        typeof message.outgoing === 'boolean'
+          ? message.outgoing
+          : (authorId ? message.authorId === authorId : false) || message.author === displayLabel;
+      if (isCurrentUser) return displayLabel;
+      const profile = message.authorId ? profilesById[message.authorId] : undefined;
+      const alias = profile?.alias?.trim();
+      return alias || message.author || 'Anonymous';
+    },
+    [authorId, displayLabel, profilesById],
+  );
+
+  const resolveAuthorNameRef = useRef(resolveAuthorName);
+  useEffect(() => {
+    resolveAuthorNameRef.current = resolveAuthorName;
+  }, [resolveAuthorName]);
+
+  const mapRowToMessage = (row: {
+    id: string;
+    room_id: string;
+    author: string;
+    author_id?: string | null;
+    content: string;
+    created_at?: string;
+  }) => {
     const ts = row.created_at ? new Date(row.created_at) : new Date();
-    const outgoingAvatarUri = userAvatarType === 'custom' ? userAvatarUri : undefined;
+    const isOutgoing = authorId ? row.author_id === authorId : row.author === displayLabel;
+    const outgoingAvatarUri = isOutgoing && userAvatarType === 'custom' ? userAvatarUri : undefined;
     return {
       id: row.id,
       chatId: row.room_id,
+      authorId: row.author_id ?? undefined,
       author: row.author,
       content: row.content,
       timestamp: ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      outgoing: row.author === userLabel,
-      avatarUri: row.author === userLabel ? outgoingAvatarUri : undefined,
+      outgoing: isOutgoing,
+      avatarUri: isOutgoing ? outgoingAvatarUri : undefined,
       type: 'text' as const,
     };
   };
@@ -98,11 +152,18 @@ export default function SecureChatScreen() {
     getAuthSession().then(async (current) => {
       if (!active) return;
       setSession(current);
-      const anonId = await getAnonymousId();
-      const label = current?.user?.email ?? current?.user?.id ?? `anon-${anonId.slice(-6)}`;
-      setUserLabel(label);
+      const anonIdValue = await getAnonymousId();
+      setAnonId(anonIdValue);
+      const label = current?.user?.email ?? current?.user?.id ?? `anon-${anonIdValue.slice(-6)}`;
+      setAuthLabel(label);
     });
-    const sub = onAuthStateChange((next) => setSession(next));
+    const sub = onAuthStateChange(async (next) => {
+      setSession(next);
+      const anonIdValue = await getAnonymousId();
+      setAnonId(anonIdValue);
+      const label = next?.user?.email ?? next?.user?.id ?? `anon-${anonIdValue.slice(-6)}`;
+      setAuthLabel(label);
+    });
     return () => {
       active = false;
       sub?.unsubscribe();
@@ -110,11 +171,14 @@ export default function SecureChatScreen() {
   }, []);
 
   useEffect(() => {
+    if (!isActive) return;
     let mounted = true;
     loadProfileSettings().then((settings) => {
       if (!mounted) return;
       if (settings.alias) {
-        setUserLabel(settings.alias);
+        setProfileAlias(settings.alias);
+      } else {
+        setProfileAlias('');
       }
       setUserAvatarUri(settings.avatarUri);
       setUserAvatarType(settings.avatarType ?? 'identicon');
@@ -123,7 +187,7 @@ export default function SecureChatScreen() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [isActive]);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -150,6 +214,7 @@ export default function SecureChatScreen() {
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
     setIsChannelReady(false);
+    setParticipantCount(0);
 
     // Tear down previous channel.
     if (channelRef.current) {
@@ -160,7 +225,7 @@ export default function SecureChatScreen() {
     const channel = supabase.channel(`chat:${roomId}`, {
       config: {
         broadcast: { self: true },
-        presence: { key: session?.user?.id ?? userLabel },
+        presence: { key: authorId ?? displayLabel },
       },
     });
 
@@ -176,7 +241,15 @@ export default function SecureChatScreen() {
         setChats((prev) =>
           prev.map((chat) =>
             chat.id === msg.chatId
-              ? { ...chat, lastMessage: { text: msg.content, ts: msg.timestamp, from: msg.author } }
+              ? {
+                  ...chat,
+                  lastMessage: {
+                    text: msg.content,
+                    ts: msg.timestamp,
+                    from: resolveAuthorNameRef.current(msg),
+                    authorId: msg.authorId,
+                  },
+                }
               : chat,
           ),
         );
@@ -184,6 +257,7 @@ export default function SecureChatScreen() {
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState();
         const keys = Object.keys(state);
+        setParticipantCount(keys.length);
         setChats((prev) =>
           prev.map((chat) => (chat.id === roomId ? { ...chat, isOnline: keys.length > 0 } : chat)),
         );
@@ -191,7 +265,7 @@ export default function SecureChatScreen() {
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           setIsChannelReady(true);
-          await channel.track({ user: userLabel, room: roomId });
+          await channel.track({ user: displayLabel, room: roomId, authorId });
           setConnectionLog((prev) => [`Joined room ${roomId}.`, ...prev]);
           setServerInfo({ address: 'supabase', port: 0, status: 'running' });
           setChats((prev) =>
@@ -208,21 +282,31 @@ export default function SecureChatScreen() {
     channelRef.current = channel;
     return () => {
       setIsChannelReady(false);
+      setParticipantCount(0);
       if (supabase) {
         supabase.removeChannel(channel);
       }
     };
-  }, [roomId, session, userLabel]);
+  }, [authorId, displayLabel, roomId]);
 
   const loadHistory = async (room: string) => {
     if (!isSupabaseConfigured || !supabase) return;
     setHistoryLoading(true);
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('messages')
-      .select('id, room_id, author, content, created_at')
+      .select('id, room_id, author, author_id, content, created_at')
       .eq('room_id', room)
       .order('created_at', { ascending: true })
       .limit(200);
+
+    if (error && error.message?.includes('author_id')) {
+      ({ data, error } = await supabase
+        .from('messages')
+        .select('id, room_id, author, content, created_at')
+        .eq('room_id', room)
+        .order('created_at', { ascending: true })
+        .limit(200));
+    }
 
     if (error) {
       setConnectionLog((prev) => [`History error: ${error.message}`, ...prev]);
@@ -236,7 +320,17 @@ export default function SecureChatScreen() {
       const last = mapped[mapped.length - 1];
       setChats((prev) =>
         prev.map((chat) =>
-          chat.id === room ? { ...chat, lastMessage: { text: last.content, ts: last.timestamp, from: last.author } } : chat,
+          chat.id === room
+            ? {
+                ...chat,
+                lastMessage: {
+                  text: last.content,
+                  ts: last.timestamp,
+                  from: resolveAuthorName(last),
+                  authorId: last.authorId,
+                },
+              }
+            : chat,
         ),
       );
     }
@@ -307,7 +401,8 @@ export default function SecureChatScreen() {
     const message: ChatMessage = {
       id: now.getTime().toString(),
       chatId: selectedChat.id,
-      author: userLabel,
+      authorId,
+      author: displayLabel,
       content: draft.trim(),
       timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       avatarUri: outgoingAvatarUri,
@@ -323,7 +418,10 @@ export default function SecureChatScreen() {
     setChats((prev) =>
       prev.map((chat) =>
         chat.id === selectedChat.id
-          ? { ...chat, lastMessage: { text: message.content, ts: message.timestamp, from: 'You' } }
+          ? {
+              ...chat,
+              lastMessage: { text: message.content, ts: message.timestamp, from: 'You', authorId },
+            }
           : chat,
       ),
     );
@@ -334,14 +432,26 @@ export default function SecureChatScreen() {
       .from('messages')
       .insert({
         room_id: selectedChat.id,
-        author: userLabel,
+        author: displayLabel,
+        author_id: authorId ?? null,
         content: message.content,
         created_at: new Date().toISOString(),
       })
-      .then(({ error }) => {
-        if (error) {
-          setConnectionLog((prev) => [`Save error: ${error.message}`, ...prev]);
+      .then(async ({ error }) => {
+        if (!error) return;
+        if (error.message?.includes('author_id')) {
+          const fallback = await supabase.from('messages').insert({
+            room_id: selectedChat.id,
+            author: displayLabel,
+            content: message.content,
+            created_at: new Date().toISOString(),
+          });
+          if (fallback.error) {
+            setConnectionLog((prev) => [`Save error: ${fallback.error.message}`, ...prev]);
+          }
+          return;
         }
+        setConnectionLog((prev) => [`Save error: ${error.message}`, ...prev]);
       });
 
     // Broadcast to room (ephemeral).
@@ -444,6 +554,19 @@ export default function SecureChatScreen() {
     }
   };
 
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !isActive) return;
+    const onBackPress = () => {
+      if (secureTab === 'chats' && chatView === 'thread') {
+        setChatView('list');
+        return true;
+      }
+      return false;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [chatView, isActive, secureTab]);
+
   return (
     <View
       style={[
@@ -478,10 +601,12 @@ export default function SecureChatScreen() {
             messages={selectedMessages}
             draft={draft}
             serverInfo={serverInfo}
+            participantCount={participantCount}
             onBack={() => setChatView('list')}
             onDraftChange={setDraft}
             onSend={handleSendMessage}
             resolveAvatar={resolveAvatar}
+            resolveAuthorName={resolveAuthorName}
           />
         </View>
       ) : (

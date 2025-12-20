@@ -69,7 +69,7 @@ function AppContent() {
         ]}
         pointerEvents={isWeb ? undefined : chatPointerEvents}
       >
-        <SecureChatScreen />
+        <SecureChatScreen isActive={activeTab === 'secureChat'} />
       </Animated.View>
 
         <View style={[styles.bottomNav, { backgroundColor: colors.nav }]}>

@@ -1,4 +1,5 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { BackHandler, Platform } from 'react-native';
 import {
   AboutAppTab,
   AuthTab,
@@ -47,7 +48,18 @@ export default function ProfileScreen() {
 
   const identiconSeed = security.state.walletKey?.id ?? profile.state.avatarSeed;
   const identicon = useMemo(() => buildIdenticon(identiconSeed || 'seed'), [identiconSeed]);
-  const handleBackToHome = useCallback(() => setView('home'), []);
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const onBackPress = () => {
+      if (view !== 'home') {
+        setView('home');
+        return true;
+      }
+      return false;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [view]);
 
   const setDeveloperFeedback = (next: { message: string | null; error: string | null }) => {
     setDeveloperStatus((prev) => ({ ...prev, loading: false, ...next }));
@@ -272,9 +284,5 @@ export default function ProfileScreen() {
       );
   }
 
-  return (
-    <ProfileTabTransition viewKey={view} onBackSwipe={view === 'home' ? undefined : handleBackToHome}>
-      {content}
-    </ProfileTabTransition>
-  );
+  return <ProfileTabTransition viewKey={view}>{content}</ProfileTabTransition>;
 }
