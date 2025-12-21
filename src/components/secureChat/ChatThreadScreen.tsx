@@ -9,7 +9,6 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -31,6 +30,9 @@ type Props = {
   resolveAuthorName: (message: ChatMessage) => string;
 };
 
+// Bottom navigation bar height - should match your App.tsx nav height
+const BOTTOM_NAV_HEIGHT = 70;
+
 export default function ChatThreadScreen({
   chat,
   messages,
@@ -48,6 +50,7 @@ export default function ChatThreadScreen({
   const flatListRef = useRef<FlatList>(null);
   const insets = useSafeAreaInsets();
   const isIOS = Platform.OS === 'ios';
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const scrollToBottom = () => {
     if (flatListRef.current && messages.length > 0) {
@@ -61,16 +64,27 @@ export default function ChatThreadScreen({
     scrollToBottom();
   }, [messages]);
 
-  // Scroll when keyboard appears
+  // Handle keyboard events for Android
   useEffect(() => {
-    const showListener = Keyboard.addListener(
-      isIOS ? 'keyboardWillShow' : 'keyboardDidShow',
-      () => {
-        scrollToBottom();
-      }
-    );
+    const showEvent = isIOS ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = isIOS ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showListener = Keyboard.addListener(showEvent, (e) => {
+      // On Android, we need to account for the bottom nav being pushed up
+      // Add extra padding to ensure input is visible above keyboard
+      const height = e.endCoordinates.height;
+      const extraPadding = -20; // Extra space above keyboard
+      setKeyboardHeight(isIOS ? 0 : height - BOTTOM_NAV_HEIGHT + extraPadding);
+      scrollToBottom();
+    });
+
+    const hideListener = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
     return () => {
       showListener.remove();
+      hideListener.remove();
     };
   }, [isIOS]);
 
@@ -83,13 +97,6 @@ export default function ChatThreadScreen({
       </View>
     );
   }
-
-  const serverStatus = serverInfo
-    ? serverInfo.status === 'running'
-      ? `Hosting on ${serverInfo.address}:${serverInfo.port}`
-      : 'Starting server...'
-    : 'Server offline';
-  const participantLabel = `${participantCount} online`;
 
   const renderMessage = ({ item: msg }: { item: ChatMessage }) => {
     if (msg.type === 'system') {
@@ -128,13 +135,16 @@ export default function ChatThreadScreen({
     );
   };
 
+  // Calculate keyboard offset for iOS
+  const keyboardVerticalOffset = isIOS ? BOTTOM_NAV_HEIGHT + insets.bottom : 0;
+
   return (
     <KeyboardAvoidingView
       style={styles.outerContainer}
       behavior={isIOS ? 'padding' : undefined}
-      keyboardVerticalOffset={isIOS ? 0 : 0}
+      keyboardVerticalOffset={keyboardVerticalOffset}
     >
-      <View style={styles.container}>
+      <View style={[styles.container, { marginBottom: keyboardHeight }]}>
         {/* Header */}
         <View style={styles.headerRow}>
           <View style={styles.headerMain}>
@@ -142,20 +152,13 @@ export default function ChatThreadScreen({
               <TouchableOpacity onPress={onBack} style={styles.backButton}>
                 <MaterialCommunityIcons name="arrow-left" size={18} color={colors.text} />
               </TouchableOpacity>
-              <View>
-                <Text style={styles.title}>{chat.name}</Text>
-                <Text style={styles.subtitle}>
-                  {chat.peerAddress ? `Peer: ${chat.peerAddress}` : 'Local secure store'}
-                </Text>
-              </View>
             </View>
           </View>
           <View style={styles.statusColumn}>
             <View style={styles.statusRow}>
               <PulseBadge size={10} color={serverInfo ? colors.accent : '#f97316'} />
-              <Text style={styles.statusText}>{serverStatus}</Text>
             </View>
-            <Text style={styles.participantText}>{participantLabel}</Text>
+            <Text style={styles.participantText}></Text>
           </View>
         </View>
 
@@ -372,7 +375,7 @@ const createChatStyles = (colors: {
       borderRadius: 12,
       backgroundColor: colors.card,
       paddingHorizontal: 12,
-      paddingVertical: Platform.OS === 'ios' ? 10 : 6,
+      paddingVertical: Platform.OS === 'ios' ? 10 : 8,
       marginTop: 8,
     },
     input: {
