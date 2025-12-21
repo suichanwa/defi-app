@@ -582,7 +582,7 @@ export default function SecureChatScreen({ isActive = false }: Props) {
   return (
     <View
       style={[
-        chatView === 'thread' ? styles.containerWithKeyboard : styles.container,
+        styles.container,
         isCompact && styles.containerCompact,
         { backgroundColor: colors.background },
       ]}
@@ -640,22 +640,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     paddingHorizontal: 20,
     paddingTop: 24,
-    paddingBottom: 112,
+    paddingBottom: 100,
   },
   containerCompact: {
     paddingHorizontal: 16,
     paddingTop: 20,
   },
-  // Add new style for when keyboard should be active
-  containerWithKeyboard: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 0, // Remove bottom padding when in chat thread
-  },
   threadWrapper: {
-    marginTop: 16,
     flex: 1,
+    marginBottom: 0,
   },
 });

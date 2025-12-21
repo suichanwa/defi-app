@@ -31,9 +31,6 @@ type Props = {
   resolveAuthorName: (message: ChatMessage) => string;
 };
 
-// Tab bar height constant - adjust this to match your actual tab bar
-const TAB_BAR_HEIGHT = 80;
-
 export default function ChatThreadScreen({
   chat,
   messages,
@@ -51,30 +48,6 @@ export default function ChatThreadScreen({
   const flatListRef = useRef<FlatList>(null);
   const insets = useSafeAreaInsets();
   const isIOS = Platform.OS === 'ios';
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-
-  // Listen for keyboard height changes
-  useEffect(() => {
-    const showListener = Keyboard.addListener(
-      isIOS ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => {
-        setKeyboardHeight(e.endCoordinates.height);
-        setIsKeyboardVisible(true);
-      }
-    );
-    const hideListener = Keyboard.addListener(
-      isIOS ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => {
-        setKeyboardHeight(0);
-        setIsKeyboardVisible(false);
-      }
-    );
-    return () => {
-      showListener.remove();
-      hideListener.remove();
-    };
-  }, [isIOS]);
 
   const scrollToBottom = () => {
     if (flatListRef.current && messages.length > 0) {
@@ -86,7 +59,20 @@ export default function ChatThreadScreen({
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isKeyboardVisible]);
+  }, [messages]);
+
+  // Scroll when keyboard appears
+  useEffect(() => {
+    const showListener = Keyboard.addListener(
+      isIOS ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        scrollToBottom();
+      }
+    );
+    return () => {
+      showListener.remove();
+    };
+  }, [isIOS]);
 
   if (!chat) {
     return (
@@ -142,14 +128,12 @@ export default function ChatThreadScreen({
     );
   };
 
-  // For Android, we need to manually handle the keyboard offset
-  // because KeyboardAvoidingView doesn't work well with nested navigators
-  const androidKeyboardOffset = isKeyboardVisible && !isIOS 
-    ? keyboardHeight - TAB_BAR_HEIGHT - insets.bottom
-    : 0;
-
   return (
-    <View style={styles.outerContainer}>
+    <KeyboardAvoidingView
+      style={styles.outerContainer}
+      behavior={isIOS ? 'padding' : undefined}
+      keyboardVerticalOffset={isIOS ? 0 : 0}
+    >
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.headerRow}>
@@ -190,14 +174,7 @@ export default function ChatThreadScreen({
         />
 
         {/* Input Bar */}
-        <View 
-          style={[
-            styles.inputBar,
-            !isIOS && isKeyboardVisible && {
-              marginBottom: androidKeyboardOffset > 0 ? androidKeyboardOffset : 0,
-            }
-          ]}
-        >
+        <View style={styles.inputBar}>
           <TextInput
             placeholder="Type a message..."
             placeholderTextColor="#9ca3af"
@@ -213,7 +190,7 @@ export default function ChatThreadScreen({
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

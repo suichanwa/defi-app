@@ -299,7 +299,7 @@ export default function ProfileScreen() {
           onOpenDeveloper={() => setView('developer')}
           onOpenAbout={() => setView('about')}
           onOpenChangelog={() => setView('changelog')}
-          buildLabel="dev build 0.12"
+          buildLabel="dev build 0.13"
         />
       );
   }
