@@ -9,10 +9,10 @@
         "../types/env.d.ts"
       ],
       "@components": [
-        "components"
+        "ui/components"
       ],
       "@components/*": [
-        "components/*"
+        "ui/components/*"
       ],
       "@screens": [
         "screens"
@@ -39,7 +39,7 @@
         "types/*"
       ],
       "@styles/*": [
-        "styles/*"
+        "ui/styles/*"
       ],
       "@context": [
         "context"

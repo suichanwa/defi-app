@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useTheme } from '../../theme/ThemeProvider';
-import ChatAvatar from './ChatAvatar';
-import type { ChatAvatarSource } from '../../types/secureChat';
+import { useTheme } from '@theme/ThemeProvider';
+import ChatAvatar from '@components/secureChat/ChatAvatar';
+import type { ChatAvatarSource } from '@app-types/secureChat';
 
 type ViewProfileCardProps = {
   name: string;

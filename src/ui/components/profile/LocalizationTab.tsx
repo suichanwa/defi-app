@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { createProfileStyles } from '../../styles/ProfileStyles';
-import type { LanguageCode } from '../../types/profile';
-import { useTheme } from '../../theme/ThemeProvider';
-import ProfileHeader from './ProfileHeader';
-import { availableLanguages, t } from '../../i18n';
+import { createProfileStyles } from '@styles/ProfileStyles';
+import type { LanguageCode } from '@app-types/profile';
+import { useTheme } from '@theme/ThemeProvider';
+import ProfileHeader from '@components/profile/ProfileHeader';
+import { availableLanguages, t } from '@i18n';
 
 type LocalizationTabProps = {
   scrollStyle: StyleProp<ViewStyle>;

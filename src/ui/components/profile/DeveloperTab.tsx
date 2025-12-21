@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
 import { Alert, ScrollView, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { createProfileStyles } from '../../styles/ProfileStyles';
-import { useTheme } from '../../theme/ThemeProvider';
-import ProfileHeader from './ProfileHeader';
+import { createProfileStyles } from '@styles/ProfileStyles';
+import { useTheme } from '@theme/ThemeProvider';
+import ProfileHeader from '@components/profile/ProfileHeader';
 
 type DeveloperTabProps = {
   scrollStyle: StyleProp<ViewStyle>;

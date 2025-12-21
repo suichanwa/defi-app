@@ -1,7 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, View, StyleSheet } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useTheme } from '../theme/ThemeProvider';
+import { useTheme } from '@theme/ThemeProvider';
 
 export type TabName = 'wallet' | 'secureChat' | 'profile';
 

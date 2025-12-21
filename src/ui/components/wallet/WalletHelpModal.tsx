@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { t } from '../../i18n';
+import { t } from '@i18n';
 
 type Props = {
   visible: boolean;

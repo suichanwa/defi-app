@@ -5,8 +5,8 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import WalletScreen from './src/screens/WalletScreen';
 import SecureChatScreen from './src/screens/SecureChatScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
-import BottomNavBar, { TabName } from './src/components/BottomNavBar';
-import { appShellStyles as styles } from './src/styles/AppShellStyles';
+import BottomNavBar, { TabName } from '@components/BottomNavBar';
+import { appShellStyles as styles } from '@styles/AppShellStyles';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme } from './src/theme/ThemeProvider';
 import { useWalletSession, WalletSessionProvider } from './src/context/WalletSessionProvider';

@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
 import { ScrollView, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { createProfileStyles } from '../../styles/ProfileStyles';
-import type { RewardActivity, RewardsSummary } from '../../types/rewards';
-import { useTheme } from '../../theme/ThemeProvider';
-import ProfileHeader from './ProfileHeader';
+import { createProfileStyles } from '@styles/ProfileStyles';
+import type { RewardActivity, RewardsSummary } from '@app-types/rewards';
+import { useTheme } from '@theme/ThemeProvider';
+import ProfileHeader from '@components/profile/ProfileHeader';
 
 type RewardsTabProps = {
   scrollStyle: StyleProp<ViewStyle>;

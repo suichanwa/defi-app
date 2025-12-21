@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, Modal, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { createWalletStyles } from '../../styles/WalletStyles';
+import { createWalletStyles } from '@styles/WalletStyles';
 import WalletHelpModal from './WalletHelpModal';
-import { useTheme } from '../../theme/ThemeProvider';
+import { useTheme } from '@theme/ThemeProvider';
 
 type Props = {
   flow: 'menu' | 'create-passcode' | 'create-recovery' | 'create-success' | 'unlock';

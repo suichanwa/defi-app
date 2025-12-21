@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import { Text, View } from 'react-native';
-import { CHAIN, getSolanaClusterLabel } from '../../config/chain';
-import { createWalletStyles } from '../../styles/WalletStyles';
-import { useTheme } from '../../theme/ThemeProvider';
+import { CHAIN, getSolanaClusterLabel } from '@config/chain';
+import { createWalletStyles } from '@styles/WalletStyles';
+import { useTheme } from '@theme/ThemeProvider';
 
 export default function NetworkBadge() {
   const { colors } = useTheme();

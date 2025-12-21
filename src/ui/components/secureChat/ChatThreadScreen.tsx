@@ -20,11 +20,11 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import PulseBadge from '../PulseBadge';
-import type { ChatAvatarSource, ChatMessage, ChatThread, ServerInfo } from '../../types/secureChat';
-import { useTheme } from '../../theme/ThemeProvider';
-import ChatAvatar from './ChatAvatar';
-import ViewProfileModal from './ViewProfileModal';
+import PulseBadge from '@components/PulseBadge';
+import type { ChatAvatarSource, ChatMessage, ChatThread, ServerInfo } from '@app-types/secureChat';
+import { useTheme } from '@theme/ThemeProvider';
+import ChatAvatar from '@components/secureChat/ChatAvatar';
+import ViewProfileModal from '@components/secureChat/ViewProfileModal';
 
 type Props = {
   chat: ChatThread | null;

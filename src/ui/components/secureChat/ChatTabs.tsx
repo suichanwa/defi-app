@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useTheme } from '../../theme/ThemeProvider';
+import { useTheme } from '@theme/ThemeProvider';
 
 type TabKey = 'chats' | 'connect';
 

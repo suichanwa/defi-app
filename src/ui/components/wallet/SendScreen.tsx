@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import { ActivityIndicator, Animated, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { createWalletStyles } from '../../styles/WalletStyles';
-import { useTheme } from '../../theme/ThemeProvider';
-import { useWalletCardAnimation } from '../../animations/walletAnimations';
+import { createWalletStyles } from '@styles/WalletStyles';
+import { useTheme } from '@theme/ThemeProvider';
+import { useWalletCardAnimation } from '../../../animations/walletAnimations';
 
 type Props = {
   chainName: string;

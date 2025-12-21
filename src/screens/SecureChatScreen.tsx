@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, BackHandler, Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import ChatHeader from '../components/secureChat/ChatHeader';
-import ChatTabs from '../components/secureChat/ChatTabs';
-import ChatListScreen from '../components/secureChat/ChatListScreen';
-import ChatThreadScreen from '../components/secureChat/ChatThreadScreen';
-import ConnectScreen from '../components/secureChat/ConnectScreen';
+import ChatHeader from '@components/secureChat/ChatHeader';
+import ChatTabs from '@components/secureChat/ChatTabs';
+import ChatListScreen from '@components/secureChat/ChatListScreen';
+import ChatThreadScreen from '@components/secureChat/ChatThreadScreen';
+import ConnectScreen from '@components/secureChat/ConnectScreen';
 import type { ChatMessage, ChatThread, ServerInfo } from '../types/secureChat';
 import type { AvatarType } from '../types/profile';
 import * as date from 'date-and-time';

@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react';
 import { Image, ScrollView, Text, TextInput, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { createProfileStyles } from '../../styles/ProfileStyles';
-import type { AvatarType, ThemePreference } from '../../types/profile';
-import { useTheme } from '../../theme/ThemeProvider';
-import ProfileHeader from './ProfileHeader';
+import { createProfileStyles } from '@styles/ProfileStyles';
+import type { AvatarType, ThemePreference } from '@app-types/profile';
+import { useTheme } from '@theme/ThemeProvider';
+import ProfileHeader from '@components/profile/ProfileHeader';
 
 type IdenticonData = {
   grid: boolean[];

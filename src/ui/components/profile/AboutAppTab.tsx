@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import { ScrollView, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { createProfileStyles } from '../../styles/ProfileStyles';
-import { useTheme } from '../../theme/ThemeProvider';
-import ProfileHeader from './ProfileHeader';
+import { createProfileStyles } from '@styles/ProfileStyles';
+import { useTheme } from '@theme/ThemeProvider';
+import ProfileHeader from '@components/profile/ProfileHeader';
 
 type AboutAppTabProps = {
   scrollStyle: StyleProp<ViewStyle>;

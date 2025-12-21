@@ -1,8 +1,8 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import PulseBadge from '../PulseBadge';
-import type { ServerInfo } from '../../types/secureChat';
+import PulseBadge from '@components/PulseBadge';
+import type { ServerInfo } from '@app-types/secureChat';
 
 type Props = {
   connectAddress: string;

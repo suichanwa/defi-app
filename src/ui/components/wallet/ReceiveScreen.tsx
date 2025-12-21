@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
 import { Animated, Text, TouchableOpacity, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
-import { createWalletStyles } from '../../styles/WalletStyles';
-import { useTheme } from '../../theme/ThemeProvider';
-import { useWalletCardAnimation } from '../../animations/walletAnimations';
+import { createWalletStyles } from '@styles/WalletStyles';
+import { useTheme } from '@theme/ThemeProvider';
+import { useWalletCardAnimation } from '../../../animations/walletAnimations';
 
 type Props = {
   chainName: string;

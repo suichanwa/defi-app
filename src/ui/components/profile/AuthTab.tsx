@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { createProfileStyles } from '../../styles/ProfileStyles';
-import type { AuthSession } from '../../services/auth';
-import type { LocalSession } from '../../hooks/useProfileAuth';
-import { isSupabaseConfigured } from '../../services/supabaseClient';
-import { useTheme } from '../../theme/ThemeProvider';
-import ProfileHeader from './ProfileHeader';
+import { createProfileStyles } from '@styles/ProfileStyles';
+import type { AuthSession } from '@services/auth';
+import type { LocalSession } from '@hooks/useProfileAuth';
+import { isSupabaseConfigured } from '@services/supabaseClient';
+import { useTheme } from '@theme/ThemeProvider';
+import ProfileHeader from '@components/profile/ProfileHeader';
 
 type AuthTabProps = {
   scrollStyle: StyleProp<ViewStyle>;

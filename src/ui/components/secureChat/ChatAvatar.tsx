@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
 import { Image, Platform, StyleSheet, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
-import { useTheme } from '../../theme/ThemeProvider';
-import { buildIdenticon } from '../../utils/identicon';
-import type { ChatAvatarSource } from '../../types/secureChat';
+import { useTheme } from '@theme/ThemeProvider';
+import { buildIdenticon } from '@utils/identicon';
+import type { ChatAvatarSource } from '@app-types/secureChat';
 
 type ChatAvatarProps = {
   source: ChatAvatarSource;

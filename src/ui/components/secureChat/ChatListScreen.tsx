@@ -1,8 +1,8 @@
 import React, { useMemo, useRef } from 'react';
 import { PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import PulseBadge from '../PulseBadge';
-import type { ChatThread } from '../../types/secureChat';
-import { useTheme } from '../../theme/ThemeProvider';
+import PulseBadge from '@components/PulseBadge';
+import type { ChatThread } from '@app-types/secureChat';
+import { useTheme } from '@theme/ThemeProvider';
 
 type Props = {
   chats: ChatThread[];
