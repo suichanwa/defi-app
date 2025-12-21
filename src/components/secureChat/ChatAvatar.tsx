@@ -1,90 +1,105 @@
 import React, { useMemo } from 'react';
-import { Image, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { Image, StyleSheet, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
+import Svg, { Rect } from 'react-native-svg';
 import { useTheme } from '../../theme/ThemeProvider';
 import { buildIdenticon } from '../../utils/identicon';
 import type { ChatAvatarSource } from '../../types/secureChat';
 
-type Props = {
+type ChatAvatarProps = {
   source: ChatAvatarSource;
-  variant?: 'incoming' | 'outgoing';
+  variant: 'incoming' | 'outgoing';
+  style?: StyleProp<ViewStyle>;
   size?: number;
-  style?: ViewStyle;
+  onPress?: () => void;
 };
 
-export default function ChatAvatar({ source, variant = 'incoming', size = 36, style }: Props) {
+export default function ChatAvatar({ source, variant, style, size = 32, onPress }: ChatAvatarProps) {
   const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors, size), [colors, size]);
-  const containerStyle = variant === 'outgoing' ? styles.avatarOutgoing : styles.avatarIncoming;
 
-  if (source.kind === 'image') {
+  const identiconData = useMemo(() => {
+    if (source.avatarType === 'identicon' && source.seed) {
+      return buildIdenticon(source.seed);
+    }
+    return null;
+  }, [source]);
+
+  const containerStyle = [
+    styles.container,
+    { width: size, height: size, borderRadius: size / 2 },
+    variant === 'outgoing' ? styles.outgoing : styles.incoming,
+    { backgroundColor: colors.border },
+    style,
+  ];
+
+  const imageSize = size - 4;
+  const cellSize = imageSize / 5;
+
+  const renderIdenticon = () => {
+    if (!identiconData) return null;
+    const { grid, color } = identiconData;
+    const rects: React.ReactNode[] = [];
+    for (let i = 0; i < 25; i++) {
+      if (grid[i]) {
+        const row = Math.floor(i / 5);
+        const col = i % 5;
+        rects.push(
+          <Rect
+            key={i}
+            x={col * cellSize}
+            y={row * cellSize}
+            width={cellSize}
+            height={cellSize}
+            fill={color}
+          />
+        );
+      }
+    }
     return (
-      <View style={[styles.avatarBase, containerStyle, style]}>
-        <Image source={{ uri: source.uri }} style={styles.avatarImage} />
-      </View>
+      <Svg width={imageSize} height={imageSize} style={{ borderRadius: imageSize / 2 }}>
+        <Rect x={0} y={0} width={imageSize} height={imageSize} fill={colors.card} />
+        {rects}
+      </Svg>
     );
-  }
+  };
 
-  if (source.kind === 'identicon') {
-    const identicon = buildIdenticon(source.seed);
-    return (
-      <View style={[styles.avatarBase, containerStyle, style]}>
-        <View style={styles.identiconGrid}>
-          {identicon.grid.map((filled, index) => (
-            <View
-              key={`${source.seed}-${index}`}
-              style={[styles.identiconCell, filled && { backgroundColor: identicon.color }]}
-            />
-          ))}
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={[styles.avatarBase, containerStyle, style]}>
-      <Text style={styles.avatarText}>{source.initials}</Text>
+  const content = (
+    <View style={containerStyle}>
+      {source.avatarType === 'custom' && source.uri ? (
+        <Image
+          source={{ uri: source.uri }}
+          style={{ width: imageSize, height: imageSize, borderRadius: imageSize / 2 }}
+        />
+      ) : identiconData ? (
+        renderIdenticon()
+      ) : (
+        <View
+          style={[
+            styles.placeholder,
+            { width: imageSize, height: imageSize, borderRadius: imageSize / 2, backgroundColor: colors.muted },
+          ]}
+        />
+      )}
     </View>
   );
+
+  if (onPress) {
+    return (
+      <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+        {content}
+      </TouchableOpacity>
+    );
+  }
+
+  return content;
 }
 
-const createStyles = (colors: ReturnType<typeof useTheme>['colors'], size: number) => {
-  const gridSize = Math.max(size - 8, 10);
-  const cellSize = gridSize / 5;
-  return StyleSheet.create({
-    avatarBase: {
-      width: size,
-      height: size,
-      borderRadius: size / 2,
-      alignItems: 'center',
-      justifyContent: 'center',
-      overflow: 'hidden',
-    },
-    avatarIncoming: {
-      backgroundColor: colors.border,
-    },
-    avatarOutgoing: {
-      backgroundColor: `${colors.accent}33`,
-    },
-    avatarImage: {
-      width: size,
-      height: size,
-      borderRadius: size / 2,
-    },
-    avatarText: {
-      color: colors.text,
-      fontWeight: '700',
-      fontSize: Math.max(12, Math.floor(size * 0.4)),
-    },
-    identiconGrid: {
-      width: gridSize,
-      height: gridSize,
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-    },
-    identiconCell: {
-      width: cellSize,
-      height: cellSize,
-      backgroundColor: 'transparent',
-    },
-  });
-};
+const styles = StyleSheet.create({
+  container: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  incoming: {},
+  outgoing: {},
+  placeholder: {},
+});

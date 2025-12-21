@@ -569,6 +569,7 @@ export default function SecureChatScreen({ isActive = false }: Props) {
             draft={draft}
             serverInfo={serverInfo}
             participantCount={participantCount}
+            currentUserId={authorId}
             onBack={() => setChatView('list')}
             onDraftChange={setDraft}
             onSend={handleSendMessage}

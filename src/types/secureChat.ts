@@ -21,10 +21,11 @@ export type ChatAuthorProfile = {
   updatedAt?: string;
 };
 
-export type ChatAvatarSource =
-  | { kind: 'image'; uri: string }
-  | { kind: 'identicon'; seed: string }
-  | { kind: 'initials'; initials: string };
+export type ChatAvatarSource = {
+  avatarType: 'identicon' | 'custom' | 'none';
+  uri?: string;
+  seed?: string;
+};
 
 export type ChatThread = {
   id: string;

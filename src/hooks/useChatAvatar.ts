@@ -22,55 +22,47 @@ const initialsForLabel = (value: string) => {
 export function useChatAvatar({
   currentUserId,
   currentUserLabel,
-  currentAvatarType = 'identicon',
+  currentAvatarType,
   currentAvatarUri,
   currentAvatarSeed,
-  profilesById,
+  profilesById = {},
 }: UseChatAvatarArgs) {
-  return useCallback(
+  const resolveAvatar = useCallback(
     (message: ChatMessage): ChatAvatarSource => {
+      // Check if this is the current user's message
       const isCurrentUser =
-        typeof message.outgoing === 'boolean'
-          ? message.outgoing
-          : (currentUserId ? message.authorId === currentUserId : false) || message.author === currentUserLabel;
+        message.outgoing === true ||
+        (currentUserId && message.authorId === currentUserId) ||
+        message.author === currentUserLabel;
+
       if (isCurrentUser) {
-        if (currentAvatarType === 'custom' && currentAvatarUri) {
-          return { kind: 'image', uri: currentAvatarUri };
-        }
-        if (currentAvatarType === 'identicon') {
-          const seed = currentAvatarSeed || currentUserId || currentUserLabel || message.author;
-          return { kind: 'identicon', seed };
-        }
-        return { kind: 'initials', initials: initialsForLabel(currentUserLabel || message.author) };
+        // Return current user's avatar settings
+        return {
+          avatarType: currentAvatarType ?? 'identicon',
+          uri: currentAvatarUri,
+          seed: currentAvatarSeed ?? currentUserId ?? currentUserLabel ?? 'default',
+        };
       }
 
-      const profile = message.authorId ? profilesById?.[message.authorId] : undefined;
-      if (profile) {
-        if (profile.avatarType === 'custom' && profile.avatarUri) {
-          return { kind: 'image', uri: profile.avatarUri };
-        }
-        if (profile.avatarType === 'identicon') {
-          const seed = profile.avatarSeed || message.authorId || message.author || 'anon';
-          return { kind: 'identicon', seed };
-        }
-        if (profile.avatarType === 'none') {
-          return {
-            kind: 'initials',
-            initials: initialsForLabel(profile.alias || message.author || 'Anonymous'),
-          };
-        }
-        if (profile.avatarUri) {
-          return { kind: 'image', uri: profile.avatarUri };
-        }
+      // For other users, check profilesById first
+      if (message.authorId && profilesById[message.authorId]) {
+        const profile = profilesById[message.authorId];
+        return {
+          avatarType: profile.avatarType ?? 'identicon',
+          uri: profile.avatarUri,
+          seed: profile.avatarSeed ?? message.authorId,
+        };
       }
 
-      if (message.avatarUri) {
-        return { kind: 'image', uri: message.avatarUri };
-      }
-
-      const seed = message.authorId || message.author || 'anon';
-      return { kind: 'identicon', seed };
+      // Fallback to message's avatar info or identicon
+      return {
+        avatarType: message.avatarUri ? 'custom' : 'identicon',
+        uri: message.avatarUri,
+        seed: message.authorId ?? message.author ?? 'anonymous',
+      };
     },
-    [currentAvatarSeed, currentAvatarType, currentAvatarUri, currentUserId, currentUserLabel, profilesById],
+    [currentUserId, currentUserLabel, currentAvatarType, currentAvatarUri, currentAvatarSeed, profilesById],
   );
+
+  return resolveAvatar;
 }

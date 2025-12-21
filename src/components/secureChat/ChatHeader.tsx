@@ -11,9 +11,9 @@ export default function ChatHeader({ isCompact }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    height: 28,
+    height: 36,
   },
   containerCompact: {
-    height: 20,
+    height: 28,
   },
 });

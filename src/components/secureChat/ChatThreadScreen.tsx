@@ -24,6 +24,7 @@ import PulseBadge from '../PulseBadge';
 import type { ChatAvatarSource, ChatMessage, ChatThread, ServerInfo } from '../../types/secureChat';
 import { useTheme } from '../../theme/ThemeProvider';
 import ChatAvatar from './ChatAvatar';
+import ViewProfileModal from './ViewProfileModal';
 
 type Props = {
   chat: ChatThread | null;
@@ -31,6 +32,7 @@ type Props = {
   draft: string;
   serverInfo: ServerInfo | null;
   participantCount?: number;
+  currentUserId?: string;
   onBack: () => void;
   onDraftChange: (value: string) => void;
   onSend: () => void;
@@ -48,12 +50,20 @@ const SPRING_CONFIG = {
   mass: 0.5,
 };
 
+type SelectedProfile = {
+  name: string;
+  userId?: string;
+  avatarSource: ChatAvatarSource;
+  isOnline: boolean;
+} | null;
+
 export default function ChatThreadScreen({
   chat,
   messages,
   draft,
   serverInfo,
   participantCount = 0,
+  currentUserId,
   onBack,
   onDraftChange,
   onSend,
@@ -71,6 +81,21 @@ export default function ChatThreadScreen({
   // Animated values
   const keyboardHeight = useSharedValue(0);
   const inputFocused = useSharedValue(0);
+
+  const [selectedProfile, setSelectedProfile] = useState<SelectedProfile>(null);
+
+  const handleAvatarPress = useCallback((msg: ChatMessage) => {
+    const isCurrentUser = msg.outgoing === true;
+    const avatarSource = resolveAvatar(msg);
+    const authorName = resolveAuthorName(msg);
+    
+    setSelectedProfile({
+      name: authorName,
+      userId: isCurrentUser ? currentUserId : msg.authorId,
+      avatarSource,
+      isOnline: true,
+    });
+  }, [resolveAvatar, resolveAuthorName, currentUserId]);
 
   const scrollToBottom = useCallback((animated = true) => {
     if (flatListRef.current && messages.length > 0) {
@@ -210,15 +235,27 @@ export default function ChatThreadScreen({
     return (
       <View style={[styles.messageRow, isOutgoing ? styles.rowOutgoing : styles.rowIncoming]}>
         {!isOutgoing && (
-          <ChatAvatar source={avatarSource} variant="incoming" style={styles.avatarSlotIncoming} />
+          <ChatAvatar
+            source={avatarSource}
+            variant="incoming"
+            style={styles.avatarSlotIncoming}
+            onPress={() => handleAvatarPress(msg)}
+          />
         )}
         <View style={bubbleStyle}>
-          <Text style={authorStyle}>{authorLabel}</Text>
+          <TouchableOpacity onPress={() => handleAvatarPress(msg)} activeOpacity={0.7}>
+            <Text style={authorStyle}>{authorLabel}</Text>
+          </TouchableOpacity>
           <Text style={bodyStyle}>{msg.content}</Text>
           <Text style={timeStyle}>{msg.timestamp}</Text>
         </View>
         {isOutgoing && (
-          <ChatAvatar source={avatarSource} variant="outgoing" style={styles.avatarSlotOutgoing} />
+          <ChatAvatar
+            source={avatarSource}
+            variant="outgoing"
+            style={styles.avatarSlotOutgoing}
+            onPress={() => handleAvatarPress(msg)}
+          />
         )}
       </View>
     );
@@ -317,6 +354,15 @@ export default function ChatThreadScreen({
           </TouchableOpacity>
         </Animated.View>
       </Animated.View>
+
+      <ViewProfileModal
+        visible={selectedProfile !== null}
+        name={selectedProfile?.name ?? ''}
+        userId={selectedProfile?.userId}
+        avatarSource={selectedProfile?.avatarSource ?? { avatarType: 'identicon', seed: 'default' }}
+        isOnline={selectedProfile?.isOnline ?? false}
+        onClose={() => setSelectedProfile(null)}
+      />
     </KeyboardAvoidingView>
   );
 }
