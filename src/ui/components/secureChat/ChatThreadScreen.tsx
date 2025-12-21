@@ -24,6 +24,7 @@ import PulseBadge from '@components/PulseBadge';
 import type { ChatAvatarSource, ChatMessage, ChatThread, ServerInfo } from '@app-types/secureChat';
 import { useTheme } from '@theme/ThemeProvider';
 import ChatAvatar from '@components/secureChat/ChatAvatar';
+import PrivateChatHeader from '@components/secureChat/PrivateChatHeader';
 import ViewProfileModal from '@components/secureChat/ViewProfileModal';
 
 type Props = {
@@ -283,6 +284,7 @@ export default function ChatThreadScreen({
               <TouchableOpacity onPress={onBack} style={styles.backButton}>
                 <MaterialCommunityIcons name="arrow-left" size={18} color={colors.text} />
               </TouchableOpacity>
+              <PrivateChatHeader chat={chat} />
             </View>
           </View>
           <View style={styles.statusColumn}>

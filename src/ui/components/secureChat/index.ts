@@ -1,3 +1,4 @@
 // ...existing exports...
 export { default as ViewProfileCard } from './ViewProfileCard';
 export { default as ViewProfileModal } from './ViewProfileModal';
+export { default as PrivateChatHeader } from './PrivateChatHeader';

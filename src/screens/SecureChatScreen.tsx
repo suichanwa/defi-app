@@ -44,6 +44,7 @@ export default function SecureChatScreen({ isActive = false }: Props) {
     },
   ]);
   const [messagesByChat, setMessagesByChat] = useState<Record<string, ChatMessage[]>>({});
+  const [dmChannels, setDmChannels] = useState<ChatThread[]>([]);
   const [selectedChatId, setSelectedChatId] = useState<string>('global');
   const [draft, setDraft] = useState('');
   const [connectAddress, setConnectAddress] = useState('');
@@ -71,10 +72,11 @@ export default function SecureChatScreen({ isActive = false }: Props) {
   );
   const displayLabel = profileAlias || authLabel || 'Anonymous';
 
-  const selectedChat = useMemo(
-    () => chats.find((chat) => chat.id === selectedChatId) ?? null,
-    [chats, selectedChatId],
-  );
+  const selectedChat = useMemo(() => {
+    const dmMatch = dmChannels.find((chat) => chat.id === selectedChatId);
+    if (dmMatch) return dmMatch;
+    return chats.find((chat) => chat.id === selectedChatId) ?? null;
+  }, [chats, dmChannels, selectedChatId]);
 
   const devicePublicKey = useMemo(() => `user:${displayLabel}`, [displayLabel]);
 
@@ -360,9 +362,6 @@ export default function SecureChatScreen({ isActive = false }: Props) {
     const interval = setInterval(tick, 1_000);
     return () => clearInterval(interval);
   }, []);
-
-  // DM state
-  const [dmChannels, setDmChannels] = useState<ChatThread[]>([]);
 
   // Generate a fallback ID for anonymous users
   const effectiveUserId = useMemo(() => {
