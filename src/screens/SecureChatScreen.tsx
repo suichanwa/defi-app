@@ -9,7 +9,6 @@ import ConnectScreen from '../components/secureChat/ConnectScreen';
 import type { ChatMessage, ChatThread, ServerInfo } from '../types/secureChat';
 import type { AvatarType } from '../types/profile';
 import * as date from 'date-and-time';
-import * as Location from 'expo-location';
 import { useTheme } from '../theme/ThemeProvider';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 import { getAuthSession, onAuthStateChange, type AuthSession } from '../services/auth';
@@ -44,7 +43,6 @@ export default function SecureChatScreen({ isActive = false }: Props) {
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
   const [connectionLog, setConnectionLog] = useState<string[]>(['No active peer connections yet.']);
   const [timeLabel, setTimeLabel] = useState('');
-  const [locationLabel, setLocationLabel] = useState('Location: requesting...');
   const [session, setSession] = useState<AuthSession>(null);
   const [anonId, setAnonId] = useState<string>('');
   const [authLabel, setAuthLabel] = useState<string>('');
@@ -355,45 +353,6 @@ export default function SecureChatScreen({ isActive = false }: Props) {
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    let active = true;
-    const requestLocation = async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          if (active) setLocationLabel('Location: permission denied');
-          return;
-        }
-
-        const current = await Location.getCurrentPositionAsync({});
-        const { latitude, longitude } = current.coords;
-        let label = `Lat ${latitude.toFixed(3)}, Lon ${longitude.toFixed(3)}`;
-
-        try {
-          const results = await Location.reverseGeocodeAsync({ latitude, longitude });
-          const place = results[0];
-          if (place) {
-            const parts = [place.city, place.region, place.country].filter(Boolean);
-            if (parts.length > 0) {
-              label = parts.join(', ');
-            }
-          }
-        } catch (error) {
-          // Keep coordinate fallback.
-        }
-
-        if (active) setLocationLabel(`Location: ${label}`);
-      } catch (error) {
-        if (active) setLocationLabel('Location: unavailable');
-      }
-    };
-
-    requestLocation();
-    return () => {
-      active = false;
-    };
-  }, []);
-
   const handleSelectChat = (chatId: string) => {
     setSelectedChatId(chatId);
     setRoomId(chatId);
@@ -587,12 +546,8 @@ export default function SecureChatScreen({ isActive = false }: Props) {
         { backgroundColor: colors.background },
       ]}
     >
-      <ChatHeader
-        isCompact={isCompact}
-        timeLabel={timeLabel}
-        locationLabel={locationLabel}
-      />
-      <ChatTabs activeTab={secureTab} onTabChange={handleTabChange} />
+      <ChatHeader isCompact={isCompact} />
+      <ChatTabs activeTab={secureTab} onTabChange={handleTabChange} timeLabel={timeLabel} />
 
       {secureTab === 'connect' ? (
         <ConnectScreen
