@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Keyboard,
@@ -10,6 +10,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+  interpolate,
+  Extrapolation,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import PulseBadge from '../PulseBadge';
@@ -33,6 +41,13 @@ type Props = {
 // Bottom navigation bar height - should match your App.tsx nav height
 const BOTTOM_NAV_HEIGHT = 70;
 
+// Spring config for smooth animations
+const SPRING_CONFIG = {
+  damping: 20,
+  stiffness: 200,
+  mass: 0.5,
+};
+
 export default function ChatThreadScreen({
   chat,
   messages,
@@ -50,43 +65,117 @@ export default function ChatThreadScreen({
   const flatListRef = useRef<FlatList>(null);
   const insets = useSafeAreaInsets();
   const isIOS = Platform.OS === 'ios';
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const isInitialMount = useRef(true);
+  const prevMessagesLength = useRef(messages.length);
 
-  const scrollToBottom = () => {
+  // Animated values
+  const keyboardHeight = useSharedValue(0);
+  const inputFocused = useSharedValue(0);
+
+  const scrollToBottom = useCallback((animated = true) => {
     if (flatListRef.current && messages.length > 0) {
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 150);
+      flatListRef.current.scrollToEnd({ animated });
     }
-  };
+  }, [messages.length]);
 
+  // Scroll to bottom on initial load (no animation)
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (isInitialMount.current && messages.length > 0) {
+      isInitialMount.current = false;
+      // Use requestAnimationFrame for more reliable timing
+      requestAnimationFrame(() => {
+        scrollToBottom(false);
+      });
+    }
+  }, [messages.length, scrollToBottom]);
 
-  // Handle keyboard events for Android
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (!isInitialMount.current && messages.length > prevMessagesLength.current) {
+      // New message added, scroll with animation
+      requestAnimationFrame(() => {
+        scrollToBottom(true);
+      });
+    }
+    prevMessagesLength.current = messages.length;
+  }, [messages.length, scrollToBottom]);
+
+  // Handle keyboard events with smooth animation
   useEffect(() => {
     const showEvent = isIOS ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = isIOS ? 'keyboardWillHide' : 'keyboardDidHide';
 
     const showListener = Keyboard.addListener(showEvent, (e) => {
-      // On Android, we need to account for the bottom nav being pushed up
-      // Add extra padding to ensure input is visible above keyboard
       const height = e.endCoordinates.height;
-      const extraPadding = -20; // Extra space above keyboard
-      setKeyboardHeight(isIOS ? 0 : height - BOTTOM_NAV_HEIGHT + extraPadding);
-      scrollToBottom();
+      const extraPadding = -20;
+      const targetHeight = isIOS ? 0 : height - BOTTOM_NAV_HEIGHT + extraPadding;
+
+      // Animate keyboard height change
+      keyboardHeight.value = withSpring(targetHeight, SPRING_CONFIG);
+      inputFocused.value = withTiming(1, { duration: 250 });
+
+      // Scroll after keyboard animation starts
+      requestAnimationFrame(() => {
+        scrollToBottom(true);
+      });
     });
 
     const hideListener = Keyboard.addListener(hideEvent, () => {
-      setKeyboardHeight(0);
+      keyboardHeight.value = withSpring(0, SPRING_CONFIG);
+      inputFocused.value = withTiming(0, { duration: 200 });
     });
 
     return () => {
       showListener.remove();
       hideListener.remove();
     };
-  }, [isIOS]);
+  }, [isIOS, keyboardHeight, inputFocused, scrollToBottom]);
+
+  // Animated style for container margin
+  const containerAnimatedStyle = useAnimatedStyle(() => ({
+    marginBottom: keyboardHeight.value,
+  }));
+
+  // Animated style for input bar glow effect
+  const inputBarAnimatedStyle = useAnimatedStyle(() => {
+    const borderWidth = interpolate(
+      inputFocused.value,
+      [0, 1],
+      [1, 2],
+      Extrapolation.CLAMP
+    );
+    const shadowOpacity = interpolate(
+      inputFocused.value,
+      [0, 1],
+      [0, 0.15],
+      Extrapolation.CLAMP
+    );
+
+    return {
+      borderWidth,
+      shadowOpacity,
+      transform: [
+        {
+          scale: interpolate(
+            inputFocused.value,
+            [0, 1],
+            [1, 1.01],
+            Extrapolation.CLAMP
+          ),
+        },
+      ],
+    };
+  });
+
+  // Animated style for messages list when keyboard opens
+  const messagesAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      inputFocused.value,
+      [0, 0.5, 1],
+      [1, 0.98, 1],
+      Extrapolation.CLAMP
+    ),
+  }));
 
   if (!chat) {
     return (
@@ -144,7 +233,7 @@ export default function ChatThreadScreen({
       behavior={isIOS ? 'padding' : undefined}
       keyboardVerticalOffset={keyboardVerticalOffset}
     >
-      <View style={[styles.container, { marginBottom: keyboardHeight }]}>
+      <Animated.View style={[styles.container, containerAnimatedStyle]}>
         {/* Header */}
         <View style={styles.headerRow}>
           <View style={styles.headerMain}>
@@ -163,21 +252,56 @@ export default function ChatThreadScreen({
         </View>
 
         {/* Messages */}
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          renderItem={renderMessage}
-          keyExtractor={(item) => item.id}
-          style={styles.messageList}
-          contentContainerStyle={styles.messageContent}
-          showsVerticalScrollIndicator={false}
-          onContentSizeChange={scrollToBottom}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
-        />
+        <Animated.View style={[styles.messageListWrapper, messagesAnimatedStyle]}>
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            renderItem={renderMessage}
+            keyExtractor={(item) => item.id}
+            style={styles.messageList}
+            contentContainerStyle={styles.messageContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            onLayout={() => {
+              // Scroll to bottom when layout completes
+              if (messages.length > 0) {
+                scrollToBottom(false);
+              }
+            }}
+            onContentSizeChange={() => {
+              // Scroll when content size changes (new messages)
+              if (messages.length > 0) {
+                scrollToBottom(true);
+              }
+            }}
+            maintainVisibleContentPosition={
+              isIOS
+                ? {
+                    minIndexForVisible: 0,
+                    autoscrollToTopThreshold: 100,
+                  }
+                : undefined
+            }
+            inverted={false}
+            removeClippedSubviews={false}
+          />
+        </Animated.View>
 
-        {/* Input Bar */}
-        <View style={styles.inputBar}>
+        {/* Input Bar with animation */}
+        <Animated.View
+          style={[
+            styles.inputBar,
+            {
+              borderColor: colors.accent,
+              shadowColor: colors.accent,
+              shadowOffset: { width: 0, height: 2 },
+              shadowRadius: 8,
+              elevation: 3,
+            },
+            inputBarAnimatedStyle,
+          ]}
+        >
           <TextInput
             placeholder="Type a message..."
             placeholderTextColor="#9ca3af"
@@ -191,8 +315,8 @@ export default function ChatThreadScreen({
           <TouchableOpacity onPress={onSend} style={styles.sendButton}>
             <MaterialCommunityIcons name="send" size={18} color={colors.accentText} />
           </TouchableOpacity>
-        </View>
-      </View>
+        </Animated.View>
+      </Animated.View>
     </KeyboardAvoidingView>
   );
 }
@@ -285,8 +409,11 @@ const createChatStyles = (colors: {
       fontSize: 12,
       color: colors.muted,
     },
-    messageList: {
+    messageListWrapper: {
+      flex: 1,
       marginTop: 16,
+    },
+    messageList: {
       flex: 1,
     },
     messageContent: {

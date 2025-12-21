@@ -1,18 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, TouchableOpacity, View } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Platform, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import WalletScreen from './src/screens/WalletScreen';
 import SecureChatScreen from './src/screens/SecureChatScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import BottomNavBar, { TabName } from './src/components/BottomNavBar';
 import { appShellStyles as styles } from './src/styles/AppShellStyles';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme } from './src/theme/ThemeProvider';
 import { useWalletSession, WalletSessionProvider } from './src/context/WalletSessionProvider';
 
 function AppContent() {
-  const [activeTab, setActiveTab] = useState<'wallet' | 'secureChat' | 'profile'>('wallet');
+  const [activeTab, setActiveTab] = useState<TabName>('wallet');
   const { status, backupCompleted } = useWalletSession();
   const secureTransition = useSharedValue(0);
   const insets = useSafeAreaInsets();
@@ -43,6 +43,16 @@ function AppContent() {
   const walletPointerEvents = activeTab === 'secureChat' ? 'none' : 'auto';
   const chatPointerEvents = activeTab === 'secureChat' ? 'auto' : 'none';
 
+  const renderWalletLayer = () => {
+    if (activeTab === 'profile') {
+      return <ProfileScreen />;
+    }
+    if (activeTab === 'wallet') {
+      return <WalletScreen />;
+    }
+    return null;
+  };
+
   return (
     <View style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <View
@@ -64,7 +74,7 @@ function AppContent() {
           ]}
           pointerEvents={isWeb ? undefined : walletPointerEvents}
         >
-          {activeTab === 'profile' ? <ProfileScreen /> : <WalletScreen />}
+          {renderWalletLayer()}
         </Animated.View>
 
         <Animated.View
@@ -81,50 +91,7 @@ function AppContent() {
         </Animated.View>
 
         {!isSetupMode && (
-          <View style={[styles.bottomNav, { backgroundColor: colors.nav }]}>
-            <TouchableOpacity
-              style={[
-                styles.navItem,
-                activeTab === 'wallet' && { backgroundColor: `${colors.accent}22` },
-              ]}
-              onPress={() => setActiveTab('wallet')}
-              activeOpacity={0.8}
-            >
-              <MaterialCommunityIcons
-                name="wallet-outline"
-                size={26}
-                color={activeTab === 'wallet' ? colors.accent : colors.text}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.navItem,
-                activeTab === 'secureChat' && { backgroundColor: `${colors.accent}22` },
-              ]}
-              onPress={() => setActiveTab('secureChat')}
-              activeOpacity={0.8}
-            >
-              <MaterialCommunityIcons
-                name="message-lock-outline"
-                size={26}
-                color={activeTab === 'secureChat' ? colors.accent : colors.text}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.navItem,
-                activeTab === 'profile' && { backgroundColor: `${colors.accent}22` },
-              ]}
-              onPress={() => setActiveTab('profile')}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name="person-circle-outline"
-                size={28}
-                color={activeTab === 'profile' ? colors.accent : colors.text}
-              />
-            </TouchableOpacity>
-          </View>
+          <BottomNavBar activeTab={activeTab} onTabChange={setActiveTab} />
         )}
       </View>
     </View>

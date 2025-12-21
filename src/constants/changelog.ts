@@ -9,6 +9,20 @@ export type ChangelogEntry = {
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    id: '0.14-2025-12-22',
+    version: '0.14',
+    date: '2025-12-22',
+    title: 'UI polish and chat improvements',
+    summary: 'Made the design way sexier with smooth animations and better keyboard handling.',
+    changes: [
+      'Added smooth spring animations when opening keyboard in chat.',
+      'Input bar now glows and scales subtly when focused.',
+      'Fixed keyboard overlapping the message input on Android.',
+      'Extracted bottom navigation into its own component.',
+      'Fixed PIN screen appearing when switching tabs.',
+    ],
+  },
+  {
     id: '0.13-2025-12-21',
     version: '0.13',
     date: '2025-12-21',
