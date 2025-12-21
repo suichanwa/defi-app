@@ -193,6 +193,40 @@ export default function WalletScreen() {
   }, [status]);
 
   useEffect(() => {
+    let cancelled = false;
+    
+    const tryBiometricUnlock = async () => {
+      if (status !== 'locked') return;
+      
+      // Check if biometrics are available on this device
+      const canUse = await canUseBiometrics();
+      if (!canUse || cancelled) return;
+      
+      // Check if there's a stored biometric password first
+      const stored = await getBiometricPassword();
+      if (!stored || cancelled) return; // No stored password, user needs to unlock manually first
+      
+      // Prompt for biometric authentication
+      const auth = await promptBiometric('Unlock wallet with fingerprint');
+      if (!auth.success || cancelled) return; // User canceled or failed, let them use PIN
+      
+      // Attempt to unlock with stored password
+      try {
+        await unlock(stored);
+        if (!cancelled) setFlow('menu');
+      } catch {
+        // Silent fail - user can still unlock manually with PIN
+      }
+    };
+
+    tryBiometricUnlock();
+    
+    return () => {
+      cancelled = true;
+    };
+  }, [status, unlock]);
+
+  useEffect(() => {
     if (status !== 'unlocked' || backupCompleted || backupMnemonic) return;
     if (!recoveryPhrase) return;
     startBackupConfirm(normalizeMnemonic(recoveryPhrase));
