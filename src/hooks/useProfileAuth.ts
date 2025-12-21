@@ -1,251 +1,223 @@
-import { useEffect, useReducer } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  signInWithEmail,
-  signOut,
-  signUpWithEmail,
-  updateAccountPassword,
   getAuthSession,
   onAuthStateChange,
-  isSupabaseConfigured,
+  signUp as authSignUp,
+  signIn as authSignIn,
+  signOut as authSignOut,
+  signInAnonymously as authSignInAnonymously,
+  updatePassword as authUpdatePassword,
   type AuthSession,
-} from '@services';
+} from '../services/auth';
 
-type AuthState = {
-  email: string;
-  password: string;
-  accountPassword: string;
-  accountConfirm: string;
-  loading: boolean;
-  message: string | null;
-  error: string | null;
-  session: AuthSession | LocalSession | null;
+export type LocalSession = {
+  user: { id: string; email?: string };
+  isLocal: true;
 };
 
-type AuthAction =
-  | { type: 'SET_FIELD'; key: keyof AuthState; value: string | boolean | AuthState['session'] | null }
-  | { type: 'START' }
-  | { type: 'SUCCESS'; message: string }
-  | { type: 'FAIL'; error: string }
-  | { type: 'SET_SESSION'; session: AuthState['session'] };
-
-const EMAIL_REGEX = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const PASSWORD_MIN = 8;
-
-type LocalSession = { user: { id: string; email?: string } };
-export type { LocalSession };
-
-const isSignupDisabledError = (error: unknown) => {
-  const msg = error instanceof Error ? error.message : String(error ?? '');
-  return msg.toLowerCase().includes('signups are disabled') || msg.toLowerCase().includes('signup is disabled');
-};
-
-const createLocalSession = (email: string): LocalSession => ({ user: { id: `local-${Date.now()}`, email } });
-
-const initialState: AuthState = {
-  email: '',
-  password: '',
-  accountPassword: '',
-  accountConfirm: '',
-  loading: false,
-  message: null,
-  error: null,
-  session: null,
-};
-
-function authReducer(state: AuthState, action: AuthAction): AuthState {
-  switch (action.type) {
-    case 'SET_FIELD':
-      return { ...state, [action.key]: action.value } as AuthState;
-    case 'START':
-      return { ...state, loading: true, message: null, error: null };
-    case 'SUCCESS':
-      return { ...state, loading: false, message: action.message, error: null };
-    case 'FAIL':
-      return { ...state, loading: false, error: action.error, message: null };
-    case 'SET_SESSION':
-      return { ...state, session: action.session };
-    default:
-      return state;
-  }
-}
-
-const validatePassword = (value: string) =>
-  value.length < PASSWORD_MIN ? `Password must be at least ${PASSWORD_MIN} characters.` : null;
-
-const normalizeAuthError = (error: unknown, fallback: string) => {
-  const message = error instanceof Error ? error.message : String(error ?? '');
-  const lower = message.toLowerCase();
-  if (!message) return fallback;
-  if (lower.includes('user already registered') || lower.includes('email already')) {
-    return 'Account already exists. Try signing in.';
-  }
-  if (lower.includes('invalid login credentials')) {
-    return 'Incorrect email or password.';
-  }
-  if (lower.includes('email not confirmed')) {
-    return 'Confirm your email before signing in.';
-  }
-  if (lower.includes('password') && lower.includes('least')) {
-    return message;
-  }
-  if (lower.includes('rate limit') || lower.includes('too many requests')) {
-    return 'Too many attempts. Please wait and try again.';
-  }
-  if (lower.includes('signup') && lower.includes('disabled')) {
-    return 'Signups are disabled right now.';
-  }
-  return message || fallback;
-};
+type AuthField = 'email' | 'password' | 'accountPassword' | 'accountConfirm';
 
 export function useProfileAuth() {
-  const [state, dispatch] = useReducer(authReducer, initialState);
+  const [session, setSession] = useState<AuthSession | LocalSession | null>(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [accountPassword, setAccountPassword] = useState('');
+  const [accountConfirm, setAccountConfirm] = useState('');
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
+  // Load session on mount and subscribe to changes
   useEffect(() => {
-    if (!isSupabaseConfigured) {
-      return;
-    }
-    let active = true;
-    getAuthSession().then((current) => {
-      if (active) {
-        dispatch({ type: 'SET_SESSION', session: current });
+    let mounted = true;
+
+    const loadSession = async () => {
+      try {
+        const currentSession = await getAuthSession();
+        if (mounted) {
+          setSession(currentSession);
+        }
+      } catch (err) {
+        console.warn('Error loading auth session:', err);
+      }
+    };
+
+    loadSession();
+
+    const subscription = onAuthStateChange((nextSession) => {
+      if (mounted) {
+        setSession(nextSession);
       }
     });
-    const subscription = onAuthStateChange((next) => {
-      dispatch({ type: 'SET_SESSION', session: next });
-    });
+
     return () => {
-      active = false;
+      mounted = false;
       subscription?.unsubscribe();
     };
   }, []);
 
-  const setField = (key: keyof AuthState, value: string) => dispatch({ type: 'SET_FIELD', key, value });
+  const setField = useCallback((field: AuthField, value: string) => {
+    switch (field) {
+      case 'email':
+        setEmail(value);
+        break;
+      case 'password':
+        setPassword(value);
+        break;
+      case 'accountPassword':
+        setAccountPassword(value);
+        break;
+      case 'accountConfirm':
+        setAccountConfirm(value);
+        break;
+    }
+  }, []);
 
-  const signUp = async () => {
-    dispatch({ type: 'START' });
-    const email = state.email.trim();
-    if (!EMAIL_REGEX.test(email)) {
-      dispatch({ type: 'FAIL', error: 'Enter a valid email address.' });
-      return;
-    }
-    const policyError = validatePassword(state.password);
-    if (policyError) {
-      dispatch({ type: 'FAIL', error: policyError });
-      return;
-    }
-    try {
-      if (!isSupabaseConfigured) {
-        const localSession: LocalSession = createLocalSession(email);
-        dispatch({ type: 'SET_SESSION', session: localSession });
-        dispatch({ type: 'SUCCESS', message: 'Account created (local auth).' });
-        return;
-      }
-      const result = await signUpWithEmail(email, state.password);
-      if (result.session) {
-        dispatch({ type: 'SUCCESS', message: 'Account created. You are signed in.' });
-        return;
-      }
-      // Try to sign in immediately to bypass email confirmation in dev-friendly setups.
-      try {
-        const session = await signInWithEmail(email, state.password);
-        dispatch({ type: 'SET_SESSION', session });
-        dispatch({ type: 'SUCCESS', message: 'Account created and signed in (no email confirmation needed).' });
-      } catch (signInErr) {
-        dispatch({
-          type: 'FAIL',
-          error:
-            signInErr instanceof Error
-              ? signInErr.message
-              : 'Account created, but sign-in requires email confirmation.',
-        });
-      }
-    } catch (error) {
-      if (isSignupDisabledError(error)) {
-        const localSession = createLocalSession(email);
-        dispatch({ type: 'SET_SESSION', session: localSession });
-        dispatch({ type: 'SUCCESS', message: 'Account created (local auth, Supabase signups disabled).' });
-        return;
-      }
-      dispatch({ type: 'FAIL', error: normalizeAuthError(error, 'Unable to create account.') });
-    }
-  };
+  const signUp = useCallback(async () => {
+    setError(null);
+    setMessage(null);
 
-  const signIn = async () => {
-    dispatch({ type: 'START' });
-    const email = state.email.trim();
-    if (!EMAIL_REGEX.test(email)) {
-      dispatch({ type: 'FAIL', error: 'Enter a valid email address.' });
+    if (!email.trim() || !password.trim()) {
+      setError('Email and password are required.');
       return;
     }
-    const policyError = validatePassword(state.password);
-    if (policyError) {
-      dispatch({ type: 'FAIL', error: policyError });
-      return;
-    }
-    try {
-      if (!isSupabaseConfigured) {
-        const localSession: LocalSession = createLocalSession(email);
-        dispatch({ type: 'SET_SESSION', session: localSession });
-        dispatch({ type: 'SUCCESS', message: 'Signed in (local auth).' });
-        return;
-      }
-      await signInWithEmail(email, state.password);
-      dispatch({ type: 'SUCCESS', message: 'Signed in.' });
-    } catch (error) {
-      dispatch({ type: 'FAIL', error: normalizeAuthError(error, 'Unable to sign in.') });
-    }
-  };
 
-  const signOutUser = async () => {
-    dispatch({ type: 'START' });
+    setLoading(true);
     try {
-      if (isSupabaseConfigured) {
-        await signOut();
+      const result = await authSignUp(email.trim(), password);
+      if (result.error) {
+        setError(result.error.message);
+      } else {
+        setMessage('Account created! Check your email to confirm.');
+        if (result.session) {
+          setSession(result.session);
+          setEmail('');
+          setPassword('');
+        }
       }
-      dispatch({ type: 'SUCCESS', message: 'Signed out.' });
-      dispatch({ type: 'SET_SESSION', session: null });
-    } catch (error) {
-      dispatch({ type: 'FAIL', error: error instanceof Error ? error.message : 'Unable to sign out.' });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sign up failed.');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [email, password]);
 
-  const updatePassword = async () => {
-    dispatch({ type: 'START' });
-    if (!state.session) {
-      dispatch({ type: 'FAIL', error: 'Sign in to update your account password.' });
+  const signIn = useCallback(async () => {
+    setError(null);
+    setMessage(null);
+
+    if (!email.trim() || !password.trim()) {
+      setError('Email and password are required.');
       return;
     }
-    if (!isSupabaseConfigured) {
-      dispatch({ type: 'FAIL', error: 'Password updates are disabled in local auth mode.' });
-      return;
-    }
-    const policyError = validatePassword(state.accountPassword);
-    if (policyError) {
-      dispatch({ type: 'FAIL', error: policyError });
-      return;
-    }
-    if (state.accountPassword !== state.accountConfirm) {
-      dispatch({ type: 'FAIL', error: 'Password entries do not match.' });
-      return;
-    }
+
+    setLoading(true);
     try {
-      await updateAccountPassword(state.accountPassword);
-      dispatch({ type: 'SET_FIELD', key: 'accountPassword', value: '' });
-      dispatch({ type: 'SET_FIELD', key: 'accountConfirm', value: '' });
-      dispatch({ type: 'SUCCESS', message: 'Account password updated.' });
-    } catch (error) {
-      dispatch({ type: 'FAIL', error: normalizeAuthError(error, 'Unable to update password.') });
+      const result = await authSignIn(email.trim(), password);
+      if (result.error) {
+        setError(result.error.message);
+      } else if (result.session) {
+        setSession(result.session);
+        setMessage('Signed in successfully.');
+        setEmail('');
+        setPassword('');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sign in failed.');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [email, password]);
+
+  const signOut = useCallback(async () => {
+    setError(null);
+    setMessage(null);
+    setLoading(true);
+
+    try {
+      await authSignOut();
+      setSession(null);
+      setMessage('Signed out.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sign out failed.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const updatePassword = useCallback(async () => {
+    setError(null);
+    setMessage(null);
+
+    if (!accountPassword.trim()) {
+      setError('New password is required.');
+      return;
+    }
+
+    if (accountPassword !== accountConfirm) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await authUpdatePassword(accountPassword);
+      if (result.error) {
+        setError(result.error.message);
+      } else {
+        setMessage('Password updated successfully.');
+        setAccountPassword('');
+        setAccountConfirm('');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Password update failed.');
+    } finally {
+      setLoading(false);
+    }
+  }, [accountPassword, accountConfirm]);
+
+  const signInAnonymously = useCallback(async () => {
+    setError(null);
+    setMessage(null);
+    setLoading(true);
+    
+    try {
+      const result = await authSignInAnonymously();
+      if (result.error) {
+        setError(result.error.message);
+      } else if (result.session) {
+        setSession(result.session);
+        const isLocal = result.session.user?.user_metadata?.is_local_anonymous;
+        setMessage(isLocal 
+          ? 'Local anonymous account created. Your data stays on this device.'
+          : 'Anonymous account created.'
+        );
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Anonymous sign in failed.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   return {
-    state,
+    state: {
+      session,
+      email,
+      password,
+      accountPassword,
+      accountConfirm,
+      message,
+      error,
+      loading,
+    },
     actions: {
-      setField,
       signUp,
       signIn,
-      signOut: signOutUser,
+      signOut,
+      signInAnonymously,
       updatePassword,
+      setField,
     },
   };
 }

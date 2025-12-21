@@ -205,16 +205,16 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
     }
   };
 
-  const save = async () => {
-    updateStatus({ loading: true, message: null, error: null });
+  const save = useCallback(async () => {
+    setStatus({ loading: true, message: null, error: null });
     const trimmed = state.alias.trim();
     const aliasError = validateAlias(trimmed);
     if (aliasError) {
-      updateStatus({ loading: false, message: null, error: aliasError });
+      setStatus({ loading: false, message: null, error: aliasError });
       return;
     }
     if (state.avatarType === 'custom' && !state.avatarUri) {
-      updateStatus({ loading: false, message: null, error: 'Pick a photo to use a custom avatar.' });
+      setStatus({ loading: false, message: null, error: 'Pick a photo to use a custom avatar.' });
       return;
     }
     try {
@@ -226,7 +226,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
           remoteAvatarUrl = await uploadAvatar(profileId, state.avatarUri);
           setState((prev) => ({ ...prev, avatarUri: remoteAvatarUrl }));
         } catch (uploadError) {
-          updateStatus({
+          setStatus({
             loading: false,
             message: null,
             error: normalizeProfileError(uploadError, 'Unable to upload avatar.'),
@@ -234,34 +234,53 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
           return;
         }
       }
-      const saved = await saveProfileSettings({
+      const settings = {
         alias: trimmed,
         avatarType: state.avatarType,
         avatarSeed: state.avatarType === 'identicon' ? state.avatarSeed : undefined,
         avatarUri: state.avatarType === 'custom' ? remoteAvatarUrl : undefined,
         themePreference: state.themePreference,
         language: state.language,
-      });
-      setI18nLanguage(state.language);
-      if (profileId) {
-        try {
-          await upsertRemoteProfile(profileId, saved);
-          setState((prev) => ({ ...prev, profileSource: 'supabase' }));
-        } catch (remoteError) {
-          updateStatus({
-            loading: false,
-            message: null,
-            error: normalizeProfileError(remoteError, 'Unable to sync profile to Supabase.'),
+        updatedAt: new Date().toISOString(),
+      };
+      // Always save locally first
+      await saveProfileSettings(settings);
+      setStatus({ loading: false, message: 'Profile saved locally.', error: null });
+
+      // If signed in with Supabase, also save remotely (non-blocking)
+      const userId = session?.user?.id;
+      if (userId && isSupabaseConfigured) {
+        // Run in background, don't block UI
+        upsertRemoteProfile(userId, settings)
+          .then(() => {
+            setState((prev) => ({ ...prev, profileSource: 'supabase' }));
+            setStatus({ loading: false, message: 'Profile saved.', error: null });
+          })
+          .catch((remoteError) => {
+            console.warn('Failed to sync profile to Supabase:', remoteError);
+            // Keep local success message, just note the source
+            setState((prev) => ({ ...prev, profileSource: 'local' }));
           });
-          return;
-        }
+      } else {
+        setState((prev) => ({ ...prev, profileSource: 'local' }));
       }
-      setState((prev) => ({ ...prev, alias: saved.alias }));
-      updateStatus({ loading: false, message: 'Profile preferences saved.', error: null });
+
+      setI18nLanguage(state.language);
+      setState((prev) => ({ ...prev, alias: settings.alias }));
     } catch (error) {
-      updateStatus({ loading: false, message: null, error: normalizeProfileError(error, 'Unable to save profile.') });
+      setStatus({ loading: false, message: null, error: normalizeProfileError(error, 'Unable to save profile.') });
     }
-  };
+  }, [state, session]);
+
+  useEffect(() => {
+    let mounted = true;
+    if (state.profileSource === 'local') {
+      loadProfile(() => mounted);
+    }
+    return () => {
+      mounted = false;
+    };
+  }, [save, state.profileSource]);
 
   const reset = async () => {
     updateStatus({ loading: true, message: null, error: null });

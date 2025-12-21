@@ -1,5 +1,5 @@
 import type { ProfileSettings } from '../types/profile';
-import { supabase } from './supabaseClient';
+import { supabase, isSupabaseConfigured } from './supabaseClient';
 
 type ProfileRow = {
   id: string;
@@ -14,38 +14,60 @@ type ProfileRow = {
 };
 
 export async function fetchRemoteProfile(userId: string): Promise<ProfileSettings | null> {
-  if (!supabase) return null;
-  const { data, error } = await supabase
-    .from('user_profiles')
-    .select('alias, avatar_type, avatar_url, avatar_seed, theme_preference, language, updated_at')
-    .eq('id', userId)
-    .maybeSingle<ProfileRow>();
+  if (!isSupabaseConfigured || !supabase) return null;
 
-  if (error || !data) return null;
+  try {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('alias, avatar_type, avatar_url, avatar_seed, theme_preference, language, updated_at')
+      .eq('id', userId)
+      .maybeSingle<ProfileRow>();
 
-  return {
-    alias: data.alias ?? '',
-    avatarType: (data.avatar_type as ProfileSettings['avatarType']) ?? 'identicon',
-    avatarUri: data.avatar_url ?? undefined,
-    avatarSeed: data.avatar_seed ?? undefined,
-    themePreference: (data.theme_preference as ProfileSettings['themePreference']) ?? 'system',
-    language: (data.language as ProfileSettings['language']) ?? 'en',
-    updatedAt: data.updated_at,
-  };
+    if (error) {
+      console.warn('Error fetching remote profile:', error.message);
+      return null;
+    }
+
+    if (!data) return null;
+
+    return {
+      alias: data.alias ?? '',
+      avatarType: (data.avatar_type as ProfileSettings['avatarType']) ?? 'identicon',
+      avatarUri: data.avatar_url ?? undefined,
+      avatarSeed: data.avatar_seed ?? undefined,
+      themePreference: (data.theme_preference as ProfileSettings['themePreference']) ?? 'system',
+      language: (data.language as ProfileSettings['language']) ?? 'en',
+      updatedAt: data.updated_at,
+    };
+  } catch (error) {
+    console.warn('Exception fetching remote profile:', error);
+    return null;
+  }
 }
 
 export async function upsertRemoteProfile(userId: string, settings: ProfileSettings): Promise<void> {
-  if (!supabase) return;
+  if (!isSupabaseConfigured || !supabase) {
+    console.warn('Supabase not configured, skipping remote profile save');
+    return;
+  }
+
   const payload = {
     id: userId,
-    alias: settings.alias,
-    avatar_type: settings.avatarType,
+    alias: settings.alias || null,
+    avatar_type: settings.avatarType || 'identicon',
     avatar_url: settings.avatarUri ?? null,
-    avatar_seed: settings.avatarSeed,
-    theme_preference: settings.themePreference,
-    language: settings.language,
-    updated_at: settings.updatedAt,
+    avatar_seed: settings.avatarSeed ?? null,
+    theme_preference: settings.themePreference || 'system',
+    language: settings.language || 'en',
+    updated_at: settings.updatedAt || new Date().toISOString(),
   };
-  const { error } = await supabase.from('user_profiles').upsert(payload);
-  if (error) throw error;
+
+  const { error } = await supabase.from('user_profiles').upsert(payload, {
+    onConflict: 'id',
+  });
+
+  if (error) {
+    console.error('Error upserting remote profile:', error.message);
+    throw new Error(`Failed to save profile: ${error.message}`);
+  }
 }

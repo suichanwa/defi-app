@@ -38,6 +38,7 @@ type Props = {
   onSend: () => void;
   resolveAvatar: (message: ChatMessage) => ChatAvatarSource;
   resolveAuthorName: (message: ChatMessage) => string;
+  onStartDM?: (userId: string, userName: string) => void;
 };
 
 // Bottom navigation bar height - should match your App.tsx nav height
@@ -69,6 +70,7 @@ export default function ChatThreadScreen({
   onSend,
   resolveAvatar,
   resolveAuthorName,
+  onStartDM,
 }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createChatStyles(colors), [colors]);
@@ -89,9 +91,12 @@ export default function ChatThreadScreen({
     const avatarSource = resolveAvatar(msg);
     const authorName = resolveAuthorName(msg);
     
+    // Generate userId for the message author
+    const messageUserId = msg.authorId ?? `anon-${msg.author?.replace(/[^a-zA-Z0-9]/g, '-') ?? 'unknown'}`;
+    
     setSelectedProfile({
       name: authorName,
-      userId: isCurrentUser ? currentUserId : msg.authorId,
+      userId: isCurrentUser ? currentUserId : messageUserId,
       avatarSource,
       isOnline: true,
     });
@@ -362,6 +367,7 @@ export default function ChatThreadScreen({
         avatarSource={selectedProfile?.avatarSource ?? { avatarType: 'identicon', seed: 'default' }}
         isOnline={selectedProfile?.isOnline ?? false}
         onClose={() => setSelectedProfile(null)}
+        onStartDM={onStartDM}
       />
     </KeyboardAvoidingView>
   );

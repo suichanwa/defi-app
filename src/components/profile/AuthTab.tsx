@@ -28,6 +28,7 @@ type AuthTabProps = {
   onSignIn: () => void;
   onSignOut: () => void;
   onUpdateAccountPassword: () => void;
+  onSignInAnonymously: () => void;
 };
 
 export default function AuthTab({
@@ -50,6 +51,7 @@ export default function AuthTab({
   onSignIn,
   onSignOut,
   onUpdateAccountPassword,
+  onSignInAnonymously,
 }: AuthTabProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createProfileStyles(colors), [colors]);
@@ -81,7 +83,9 @@ export default function AuthTab({
           <Text style={styles.cardSubtitle}>Supabase auth is not configured.</Text>
         ) : session ? (
           <>
-            <Text style={styles.cardSubtitle}>Signed in as {session.user.email ?? 'Unknown email'}.</Text>
+            <Text style={styles.cardSubtitle}>
+              Signed in as {session.user.email ?? `Anonymous (${session.user.id.slice(0, 8)}...)`}
+            </Text>
             <TouchableOpacity
               style={[styles.secondaryButton, authLoading && styles.buttonDisabled]}
               onPress={onSignOut}
@@ -119,7 +123,17 @@ export default function AuthTab({
           </>
         ) : (
           <>
-            <Text style={styles.cardSubtitle}>Create an account or sign in.</Text>
+            <Text style={styles.cardSubtitle}>Create an account or continue anonymously.</Text>
+            <TouchableOpacity
+              style={[styles.primaryButton, authLoading && styles.buttonDisabled]}
+              onPress={onSignInAnonymously}
+              activeOpacity={0.9}
+              disabled={authLoading}
+            >
+              <Text style={styles.primaryButtonText}>Continue without email</Text>
+            </TouchableOpacity>
+            <View style={styles.divider} />
+            <Text style={styles.cardSubtitle}>Or sign up with email:</Text>
             <TextInput
               value={authEmail}
               onChangeText={onChangeAuthEmail}
@@ -138,12 +152,12 @@ export default function AuthTab({
               secureTextEntry
             />
             <TouchableOpacity
-              style={[styles.primaryButton, authLoading && styles.buttonDisabled]}
+              style={[styles.secondaryButton, authLoading && styles.buttonDisabled]}
               onPress={onSignUp}
               activeOpacity={0.9}
               disabled={authLoading}
             >
-              <Text style={styles.primaryButtonText}>Create account</Text>
+              <Text style={styles.secondaryButtonText}>Create account with email</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.secondaryButton, authLoading && styles.buttonDisabled]}

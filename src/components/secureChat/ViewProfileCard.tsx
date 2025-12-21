@@ -12,6 +12,8 @@ type ViewProfileCardProps = {
   isOnline?: boolean;
   onClose: () => void;
   onCopyId?: () => void;
+  onMessage?: () => void;
+  canMessage?: boolean;
 };
 
 export default function ViewProfileCard({
@@ -21,6 +23,8 @@ export default function ViewProfileCard({
   isOnline = false,
   onClose,
   onCopyId,
+  onMessage,
+  canMessage = false,
 }: ViewProfileCardProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -52,9 +56,18 @@ export default function ViewProfileCard({
       )}
 
       <View style={styles.actionsRow}>
-        <TouchableOpacity style={styles.actionButton} activeOpacity={0.8}>
-          <MaterialCommunityIcons name="message-text-outline" size={20} color={colors.accentText} />
-          <Text style={styles.actionText}>Message</Text>
+        <TouchableOpacity
+          style={[styles.actionButton, !canMessage && styles.actionDisabled]}
+          activeOpacity={0.8}
+          onPress={onMessage}
+          disabled={!canMessage}
+        >
+          <MaterialCommunityIcons
+            name="message-text-outline"
+            size={20}
+            color={canMessage ? colors.accentText : colors.muted}
+          />
+          <Text style={[styles.actionText, !canMessage && styles.actionTextDisabled]}>Message</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.actionButton, styles.actionSecondary]} activeOpacity={0.8}>
           <MaterialCommunityIcons name="account-plus-outline" size={20} color={colors.text} />
@@ -172,10 +185,17 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     actionSecondary: {
       backgroundColor: colors.border,
     },
+    actionDisabled: {
+      backgroundColor: colors.border,
+      opacity: 0.6,
+    },
     actionText: {
       fontSize: 13,
       fontWeight: '600',
       color: colors.accentText,
+    },
+    actionTextDisabled: {
+      color: colors.muted,
     },
     actionTextSecondary: {
       color: colors.text,

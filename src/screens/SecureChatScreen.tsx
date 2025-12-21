@@ -16,6 +16,14 @@ import { getAnonymousId, toAnonymousProfileId } from '../services/identity';
 import { loadProfileSettings } from '../services/profileStore';
 import { useChatAvatar } from '../hooks/useChatAvatar';
 import { useChatProfiles } from '../hooks/useChatProfiles';
+import {
+  getOrCreateDMChannel,
+  getDMMessages,
+  sendDMMessage,
+  getUserDMChannels,
+  dmChannelToChatThread,
+  subscribeToDMMessages,
+} from '../services/directMessages';
 
 type Props = {
   isActive?: boolean;
@@ -353,15 +361,146 @@ export default function SecureChatScreen({ isActive = false }: Props) {
     return () => clearInterval(interval);
   }, []);
 
-  const handleSelectChat = (chatId: string) => {
+  // DM state
+  const [dmChannels, setDmChannels] = useState<ChatThread[]>([]);
+
+  // Generate a fallback ID for anonymous users
+  const effectiveUserId = useMemo(() => {
+    if (authorId) return authorId;
+    if (displayLabel && displayLabel !== 'Anonymous') {
+      return `anon-${displayLabel.replace(/[^a-zA-Z0-9]/g, '-')}`;
+    }
+    return `anon-${Date.now()}`;
+  }, [authorId, displayLabel]);
+
+  // Load DM channels when user is ready
+  useEffect(() => {
+    if (!effectiveUserId) return;
+    let mounted = true;
+    
+    getUserDMChannels(effectiveUserId).then((channels) => {
+      if (!mounted) return;
+      setDmChannels(channels.map((ch) => dmChannelToChatThread(ch, effectiveUserId)));
+    });
+    
+    return () => {
+      mounted = false;
+    };
+  }, [effectiveUserId]);
+
+  // Subscribe to DM messages
+  useEffect(() => {
+    if (!effectiveUserId) return;
+    
+    const unsubscribe = subscribeToDMMessages((channelId, message) => {
+      if (selectedChatId === channelId) {
+        setMessagesByChat((prev) => {
+          const existing = prev[channelId] ?? [];
+          const seen = existing.some((m) => m.id === message.id);
+          if (seen) return prev;
+          return { ...prev, [channelId]: [...existing, message] };
+        });
+      }
+      
+      getUserDMChannels(effectiveUserId).then((channels) => {
+        setDmChannels(channels.map((ch) => dmChannelToChatThread(ch, effectiveUserId)));
+      });
+    });
+    
+    return unsubscribe;
+  }, [effectiveUserId, selectedChatId]);
+
+  // Combine global chats with DM channels
+  const allChats = useMemo(() => {
+    const globalChats = chats.filter((c) => !c.id.startsWith('dm:'));
+    return [...globalChats, ...dmChannels];
+  }, [chats, dmChannels]);
+
+  // Handle starting a DM from profile view
+  const handleStartDM = useCallback(async (otherUserId: string, otherUserName: string) => {
+    if (!effectiveUserId) {
+      console.warn('No effective user ID available');
+      return;
+    }
+    
+    // Don't allow DM to yourself
+    if (otherUserId === effectiveUserId) {
+      console.warn('Cannot DM yourself');
+      return;
+    }
+    
+    try {
+      const channel = await getOrCreateDMChannel(
+        effectiveUserId,
+        displayLabel,
+        otherUserId,
+        otherUserName,
+      );
+      
+      const messages = await getDMMessages(channel.id);
+      setMessagesByChat((prev) => ({ ...prev, [channel.id]: messages }));
+      
+      const channels = await getUserDMChannels(effectiveUserId);
+      setDmChannels(channels.map((ch) => dmChannelToChatThread(ch, effectiveUserId)));
+      
+      // Navigate to the DM thread
+      setSelectedChatId(channel.id);
+      setRoomId(channel.id);
+      setChatView('thread');
+      setSecureTab('chats');
+    } catch (error) {
+      console.error('Failed to start DM:', error);
+    }
+  }, [effectiveUserId, displayLabel]);
+
+  // Update handleSelectChat to load DM messages
+  const handleSelectChat = useCallback(async (chatId: string) => {
     setSelectedChatId(chatId);
     setRoomId(chatId);
     setChatView('thread');
-    setMessagesByChat((prev) => (prev[chatId] ? prev : { ...prev, [chatId]: [] }));
-  };
+    
+    if (chatId.startsWith('dm:')) {
+      const messages = await getDMMessages(chatId);
+      setMessagesByChat((prev) => ({ ...prev, [chatId]: messages }));
+    } else {
+      setMessagesByChat((prev) => (prev[chatId] ? prev : { ...prev, [chatId]: [] }));
+    }
+  }, []);
 
+  // Update handleSendMessage to support DMs
   const handleSendMessage = async () => {
     if (!draft.trim() || !selectedChat) return;
+    
+    const isDM = selectedChat.id.startsWith('dm:');
+    
+    if (isDM) {
+      const outgoingAvatarUri = userAvatarType === 'custom' ? userAvatarUri : undefined;
+      const message = await sendDMMessage(selectedChat.id, {
+        chatId: selectedChat.id,
+        authorId: effectiveUserId,
+        author: displayLabel,
+        content: draft.trim(),
+        avatarUri: outgoingAvatarUri,
+        outgoing: true,
+        type: 'text',
+      });
+      
+      if (message) {
+        setMessagesByChat((prev) => {
+          const existing = prev[selectedChat.id] ?? [];
+          const seen = existing.some((m) => m.id === message.id);
+          if (seen) return prev;
+          return { ...prev, [selectedChat.id]: [...existing, message] };
+        });
+        
+        const channels = await getUserDMChannels(effectiveUserId);
+        setDmChannels(channels.map((ch) => dmChannelToChatThread(ch, effectiveUserId)));
+      }
+      
+      setDraft('');
+      return;
+    }
+    
     if (!isSupabaseConfigured || !supabase) {
       Alert.alert('Supabase not configured', 'Set SUPABASE_URL and SUPABASE_ANON_KEY to send messages.');
       return;
@@ -569,17 +708,18 @@ export default function SecureChatScreen({ isActive = false }: Props) {
             draft={draft}
             serverInfo={serverInfo}
             participantCount={participantCount}
-            currentUserId={authorId}
+            currentUserId={effectiveUserId}
             onBack={() => setChatView('list')}
             onDraftChange={setDraft}
             onSend={handleSendMessage}
             resolveAvatar={resolveAvatar}
             resolveAuthorName={resolveAuthorName}
+            onStartDM={handleStartDM}
           />
         </View>
       ) : (
         <ChatListScreen
-          chats={chats}
+          chats={allChats}
           selectedChatId={selectedChatId}
           onSelectChat={handleSelectChat}
           onOpenSelected={handleSelectChat}

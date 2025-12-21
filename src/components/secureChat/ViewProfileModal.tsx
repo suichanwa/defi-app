@@ -16,6 +16,7 @@ type ViewProfileModalProps = {
   isOnline?: boolean;
   onClose: () => void;
   onCopied?: () => void;
+  onStartDM?: (userId: string, userName: string) => void;
 };
 
 export default function ViewProfileModal({
@@ -26,11 +27,19 @@ export default function ViewProfileModal({
   isOnline = false,
   onClose,
   onCopied,
+  onStartDM,
 }: ViewProfileModalProps) {
   const handleCopyId = async () => {
     if (userId) {
       await Clipboard.setStringAsync(userId);
       onCopied?.();
+    }
+  };
+
+  const handleMessage = () => {
+    if (userId && onStartDM) {
+      onStartDM(userId, name);
+      onClose();
     }
   };
 
@@ -50,6 +59,8 @@ export default function ViewProfileModal({
             isOnline={isOnline}
             onClose={onClose}
             onCopyId={handleCopyId}
+            onMessage={handleMessage}
+            canMessage={Boolean(userId && onStartDM)}
           />
         </Pressable>
       </Pressable>

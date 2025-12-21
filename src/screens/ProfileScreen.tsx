@@ -180,6 +180,7 @@ export default function ProfileScreen() {
           onSignUp={auth.actions.signUp}
           onSignIn={auth.actions.signIn}
           onSignOut={auth.actions.signOut}
+          onSignInAnonymously={auth.actions.signInAnonymously}
           onUpdateAccountPassword={auth.actions.updatePassword}
         />
       );

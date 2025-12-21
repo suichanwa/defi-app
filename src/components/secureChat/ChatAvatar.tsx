@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Image, StyleSheet, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Image, Platform, StyleSheet, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
 import { useTheme } from '../../theme/ThemeProvider';
 import { buildIdenticon } from '../../utils/identicon';
@@ -16,12 +16,26 @@ type ChatAvatarProps = {
 export default function ChatAvatar({ source, variant, style, size = 32, onPress }: ChatAvatarProps) {
   const { colors } = useTheme();
 
+  // Check if custom URI is usable (not a local file on web)
+  const isCustomUriUsable = useMemo(() => {
+    if (source.avatarType !== 'custom' || !source.uri) return false;
+    // On web, file:// URIs cannot be displayed
+    if (Platform.OS === 'web') {
+      const uri = source.uri;
+      if (uri.startsWith('file://') || uri.startsWith('/data/')) {
+        return false;
+      }
+    }
+    return true;
+  }, [source]);
+
   const identiconData = useMemo(() => {
-    if (source.avatarType === 'identicon' && source.seed) {
+    // Use identicon if custom URI is not usable
+    if ((source.avatarType === 'identicon' || !isCustomUriUsable) && source.seed) {
       return buildIdenticon(source.seed);
     }
     return null;
-  }, [source]);
+  }, [source, isCustomUriUsable]);
 
   const containerStyle = [
     styles.container,
@@ -64,7 +78,7 @@ export default function ChatAvatar({ source, variant, style, size = 32, onPress 
 
   const content = (
     <View style={containerStyle}>
-      {source.avatarType === 'custom' && source.uri ? (
+      {isCustomUriUsable && source.uri ? (
         <Image
           source={{ uri: source.uri }}
           style={{ width: imageSize, height: imageSize, borderRadius: imageSize / 2 }}

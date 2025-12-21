@@ -31,9 +31,15 @@ export type ChatThread = {
   id: string;
   name: string;
   participants: string[];
-  peerAddress?: string;
-  isOnline?: boolean;
-  lastMessage?: { text: string; ts: string; from: string; authorId?: string };
+  peerAddress: string;
+  isOnline: boolean;
+  isDM?: boolean; // Optional flag to identify DM threads
+  lastMessage?: {
+    text: string;
+    ts: string;
+    from: string;
+    authorId?: string;
+  };
 };
 
 export type ServerInfo = {
