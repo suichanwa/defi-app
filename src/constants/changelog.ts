@@ -20,6 +20,8 @@ export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
       'ViewProfile modal for user avatars in chat.',
       'Anonymous authentication fallback for Supabase sign-in.',
       'UI polish and bug fixes.',
+      'Made DM work',
+      'made user headbaes'
     ],
   },
   {
