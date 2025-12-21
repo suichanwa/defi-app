@@ -9,6 +9,20 @@ export type ChangelogEntry = {
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    id: '0.15-2025-12-21',
+    version: '0.15',
+    date: '2025-12-21',
+    title: 'Biometric unlock & DM improvements',
+    summary: 'Suggests fingerprint unlock automatically if you already have a wallet. Direct messages and profile viewing are smoother.',
+    changes: [
+      'Automatic fingerprint/biometric unlock prompt when wallet is locked and device supports it.',
+      'Direct message (DM) system now persists channels and messages locally.',
+      'ViewProfile modal for user avatars in chat.',
+      'Anonymous authentication fallback for Supabase sign-in.',
+      'UI polish and bug fixes.',
+    ],
+  },
+  {
     id: '0.14-2025-12-22',
     version: '0.14',
     date: '2025-12-22',
