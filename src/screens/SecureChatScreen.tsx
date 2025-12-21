@@ -116,14 +116,16 @@ export default function SecureChatScreen({ isActive = false }: Props) {
     resolveAuthorNameRef.current = resolveAuthorName;
   }, [resolveAuthorName]);
 
-  const mapRowToMessage = (row: {
+  type MessageRow = {
     id: string;
     room_id: string;
     author: string;
     author_id?: string | null;
     content: string;
-    created_at?: string;
-  }) => {
+    created_at?: string | null;
+  };
+
+  const mapRowToMessage = (row: MessageRow) => {
     const ts = row.created_at ? new Date(row.created_at) : new Date();
     const isOutgoing = authorId ? row.author_id === authorId : row.author === displayLabel;
     const outgoingAvatarUri = isOutgoing && userAvatarType === 'custom' ? userAvatarUri : undefined;
@@ -291,21 +293,30 @@ export default function SecureChatScreen({ isActive = false }: Props) {
 
   const loadHistory = async (room: string) => {
     if (!isSupabaseConfigured || !supabase) return;
+    const supabaseClient = supabase;
     setHistoryLoading(true);
-    let { data, error } = await supabase
-      .from('messages')
-      .select('id, room_id, author, author_id, content, created_at')
-      .eq('room_id', room)
-      .order('created_at', { ascending: true })
-      .limit(200);
+    let data: MessageRow[] | null = null;
+    let error: { message?: string } | null = null;
+    {
+      const response = await supabaseClient
+        .from('messages')
+        .select('id, room_id, author, author_id, content, created_at')
+        .eq('room_id', room)
+        .order('created_at', { ascending: true })
+        .limit(200);
+      data = response.data as MessageRow[] | null;
+      error = response.error;
+    }
 
     if (error && error.message?.includes('author_id')) {
-      ({ data, error } = await supabase
+      const response = await supabaseClient
         .from('messages')
         .select('id, room_id, author, content, created_at')
         .eq('room_id', room)
         .order('created_at', { ascending: true })
-        .limit(200));
+        .limit(200);
+      data = response.data as MessageRow[] | null;
+      error = response.error;
     }
 
     if (error) {
@@ -396,6 +407,7 @@ export default function SecureChatScreen({ isActive = false }: Props) {
       Alert.alert('Supabase not configured', 'Set SUPABASE_URL and SUPABASE_ANON_KEY to send messages.');
       return;
     }
+    const supabaseClient = supabase;
     const now = new Date();
     const outgoingAvatarUri = userAvatarType === 'custom' ? userAvatarUri : undefined;
     const message: ChatMessage = {
@@ -428,7 +440,7 @@ export default function SecureChatScreen({ isActive = false }: Props) {
     setDraft('');
 
     // Persist to Supabase (best-effort).
-    supabase
+    supabaseClient
       .from('messages')
       .insert({
         room_id: selectedChat.id,
@@ -440,7 +452,7 @@ export default function SecureChatScreen({ isActive = false }: Props) {
       .then(async ({ error }) => {
         if (!error) return;
         if (error.message?.includes('author_id')) {
-          const fallback = await supabase.from('messages').insert({
+          const fallback = await supabaseClient.from('messages').insert({
             room_id: selectedChat.id,
             author: displayLabel,
             content: message.content,
@@ -570,7 +582,7 @@ export default function SecureChatScreen({ isActive = false }: Props) {
   return (
     <View
       style={[
-        styles.container,
+        chatView === 'thread' ? styles.containerWithKeyboard : styles.container,
         isCompact && styles.containerCompact,
         { backgroundColor: colors.background },
       ]}
@@ -619,6 +631,7 @@ export default function SecureChatScreen({ isActive = false }: Props) {
       )}
     </View>
   );
+
 }
 
 const styles = StyleSheet.create({
@@ -632,6 +645,14 @@ const styles = StyleSheet.create({
   containerCompact: {
     paddingHorizontal: 16,
     paddingTop: 20,
+  },
+  // Add new style for when keyboard should be active
+  containerWithKeyboard: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 0, // Remove bottom padding when in chat thread
   },
   threadWrapper: {
     marginTop: 16,

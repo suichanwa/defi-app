@@ -9,6 +9,19 @@ export type ChangelogEntry = {
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    id: '0.13-2025-12-21',
+    version: '0.13',
+    date: '2025-12-21',
+    title: 'Solana devnet wallet flow',
+    summary: 'Wallet creation and sending now run on Solana devnet with passcode-encrypted keys.',
+    changes: [
+      'Added Solana devnet as the active chain with a network badge.',
+      'Wallet keys are encrypted with passcode for Solana, including recovery phrase storage.',
+      'SOL balances and sends use the Solana RPC connection.',
+      'Kept Ethereum configuration for future multi-chain support.',
+    ],
+  },
+  {
     id: '0.12-2025-12-20',
     version: '0.12',
     date: '2025-12-20',

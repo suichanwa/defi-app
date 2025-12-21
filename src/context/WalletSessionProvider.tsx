@@ -1,23 +1,30 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { Wallet } from 'ethers';
+import type { Keypair } from '@solana/web3.js';
+import { CHAIN } from '../config/chain';
 import {
   createInitialWalletKey,
-  decryptWalletKey,
   encryptWalletKey,
   loadEncryptedWalletKey,
   markBackupCompleted,
   clearWallet as clearWalletStorage,
   saveEncryptedWalletKey,
+  createSolanaWalletRecord,
+  importSolanaWalletRecord,
+  unlockSolanaWallet,
 } from '../services/walletKeyStore';
 import { clearBiometricPassword } from '../services/biometrics';
 
 type Status = 'loading' | 'missing' | 'locked' | 'unlocked';
 
+type WalletInstance = Wallet | Keypair;
+
 type WalletSession = {
   status: Status;
   address: string | null;
-  wallet: Wallet | null;
+  wallet: WalletInstance | null;
+  recoveryPhrase: string | null;
   backupCompleted: boolean;
   unlock: (password: string) => Promise<void>;
   lock: () => void;
@@ -34,7 +41,8 @@ const AUTO_LOCK_MS = 2 * 60 * 1000;
 export function WalletSessionProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<Status>('loading');
   const [address, setAddress] = useState<string | null>(null);
-  const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [wallet, setWallet] = useState<WalletInstance | null>(null);
+  const [recoveryPhrase, setRecoveryPhrase] = useState<string | null>(null);
   const [backupCompletedState, setBackupCompletedState] = useState(false);
   const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -49,6 +57,7 @@ export function WalletSessionProvider({ children }: { children: React.ReactNode 
     clearLockTimer();
     lockTimer.current = setTimeout(() => {
       setWallet(null);
+      setRecoveryPhrase(null);
       setStatus((prev) => (prev === 'unlocked' ? 'locked' : prev));
     }, AUTO_LOCK_MS);
   };
@@ -57,6 +66,7 @@ export function WalletSessionProvider({ children }: { children: React.ReactNode 
     const sub = AppState.addEventListener('change', (state) => {
       if (state !== 'active') {
         setWallet(null);
+        setRecoveryPhrase(null);
         setStatus((prev) => (prev === 'unlocked' ? 'locked' : prev));
         clearLockTimer();
       }
@@ -68,6 +78,17 @@ export function WalletSessionProvider({ children }: { children: React.ReactNode 
     const init = async () => {
       const existing = await loadEncryptedWalletKey();
       if (!existing) {
+        setStatus('missing');
+        return;
+      }
+      if (existing.backupCompleted === false) {
+        const walletType = existing.walletType ?? (CHAIN.kind === 'solana' ? 'solana' : 'ethereum');
+        await clearWalletStorage(walletType);
+        await clearBiometricPassword();
+        setWallet(null);
+        setAddress(null);
+        setRecoveryPhrase(null);
+        setBackupCompletedState(false);
         setStatus('missing');
         return;
       }
@@ -84,17 +105,29 @@ export function WalletSessionProvider({ children }: { children: React.ReactNode 
       setStatus('missing');
       return;
     }
-    const pk = await decryptWalletKey(existing.encryptedJson, password);
-    const w = new Wallet(pk);
-    setWallet(w);
-    setAddress(w.address);
+    if (CHAIN.kind === 'solana') {
+      const { keypair, mnemonic } = await unlockSolanaWallet(existing.encryptedJson, password);
+      setWallet(keypair);
+      setAddress(keypair.publicKey.toBase58());
+      setBackupCompletedState(Boolean(existing.backupCompleted));
+      setRecoveryPhrase(existing.backupCompleted ? null : mnemonic ?? null);
+      setStatus('unlocked');
+      scheduleLock();
+      return;
+    }
+
+    const walletInstance = await Wallet.fromEncryptedJson(existing.encryptedJson, password);
+    setWallet(walletInstance);
+    setAddress(walletInstance.address);
     setBackupCompletedState(Boolean(existing.backupCompleted));
+    setRecoveryPhrase(existing.backupCompleted ? null : walletInstance.mnemonic?.phrase ?? null);
     setStatus('unlocked');
     scheduleLock();
   };
 
   const lock = () => {
     setWallet(null);
+    setRecoveryPhrase(null);
     setStatus((prev) => (prev === 'unlocked' ? 'locked' : prev));
     clearLockTimer();
   };
@@ -105,16 +138,29 @@ export function WalletSessionProvider({ children }: { children: React.ReactNode 
     await clearBiometricPassword();
     setWallet(null);
     setAddress(null);
+    setRecoveryPhrase(null);
     setBackupCompletedState(false);
     setStatus('missing');
   };
 
   const createWallet = async (password: string) => {
+    if (CHAIN.kind === 'solana') {
+      const { record, keypair, mnemonic } = await createSolanaWalletRecord(password);
+      setAddress(record.id);
+      setBackupCompletedState(false);
+      setWallet(keypair);
+      setRecoveryPhrase(mnemonic);
+      setStatus('unlocked');
+      scheduleLock();
+      return { mnemonic, address: record.id };
+    }
+
     const record = await createInitialWalletKey(password);
     setAddress(record.id);
     setBackupCompletedState(false);
     const walletInstance = await Wallet.fromEncryptedJson(record.encryptedJson, password);
     setWallet(walletInstance);
+    setRecoveryPhrase(walletInstance.mnemonic?.phrase ?? null);
     setStatus('unlocked');
     scheduleLock();
     const mnemonic = walletInstance.mnemonic?.phrase ?? '';
@@ -122,6 +168,17 @@ export function WalletSessionProvider({ children }: { children: React.ReactNode 
   };
 
   const importWallet = async (mnemonic: string, password: string) => {
+    if (CHAIN.kind === 'solana') {
+      const { record, keypair } = await importSolanaWalletRecord(mnemonic.trim(), password);
+      setAddress(record.id);
+      setBackupCompletedState(false);
+      setWallet(keypair);
+      setRecoveryPhrase(null);
+      setStatus('unlocked');
+      scheduleLock();
+      return { address: record.id };
+    }
+
     const walletInstance = Wallet.fromMnemonic(mnemonic.trim());
     const record = await encryptWalletKey(walletInstance.privateKey, password);
     record.backupCompleted = false;
@@ -129,6 +186,7 @@ export function WalletSessionProvider({ children }: { children: React.ReactNode 
     setAddress(record.id);
     setBackupCompletedState(false);
     setWallet(walletInstance);
+    setRecoveryPhrase(null);
     setStatus('unlocked');
     scheduleLock();
     return { address: walletInstance.address };
@@ -137,6 +195,7 @@ export function WalletSessionProvider({ children }: { children: React.ReactNode 
   const confirmBackup = async () => {
     await markBackupCompleted();
     setBackupCompletedState(true);
+    setRecoveryPhrase(null);
   };
 
   const value = useMemo(
@@ -144,6 +203,7 @@ export function WalletSessionProvider({ children }: { children: React.ReactNode 
       status,
       address,
       wallet,
+      recoveryPhrase,
       backupCompleted: backupCompletedState,
       unlock,
       lock,
@@ -152,7 +212,7 @@ export function WalletSessionProvider({ children }: { children: React.ReactNode 
       confirmBackup,
       forgetWallet,
     }),
-    [status, address, wallet, backupCompletedState],
+    [status, address, wallet, recoveryPhrase, backupCompletedState],
   );
 
   return <WalletSessionContext.Provider value={value}>{children}</WalletSessionContext.Provider>;

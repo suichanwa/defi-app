@@ -1,15 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  KeyboardAvoidingView,
+  FlatList,
   Keyboard,
+  KeyboardAvoidingView,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  Dimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import PulseBadge from '../PulseBadge';
 import type { ChatAvatarSource, ChatMessage, ChatThread, ServerInfo } from '../../types/secureChat';
@@ -29,6 +31,9 @@ type Props = {
   resolveAuthorName: (message: ChatMessage) => string;
 };
 
+// Tab bar height constant - adjust this to match your actual tab bar
+const TAB_BAR_HEIGHT = 80;
+
 export default function ChatThreadScreen({
   chat,
   messages,
@@ -43,44 +48,53 @@ export default function ChatThreadScreen({
 }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createChatStyles(colors), [colors]);
-  const scrollRef = useRef<ScrollView | null>(null);
+  const flatListRef = useRef<FlatList>(null);
+  const insets = useSafeAreaInsets();
+  const isIOS = Platform.OS === 'ios';
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  // Listen for keyboard height changes
+  useEffect(() => {
+    const showListener = Keyboard.addListener(
+      isIOS ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+        setIsKeyboardVisible(true);
+      }
+    );
+    const hideListener = Keyboard.addListener(
+      isIOS ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+        setIsKeyboardVisible(false);
+      }
+    );
+    return () => {
+      showListener.remove();
+      hideListener.remove();
+    };
+  }, [isIOS]);
 
   const scrollToBottom = () => {
-    requestAnimationFrame(() => {
-      scrollRef.current?.scrollToEnd({ animated: true });
-    });
+    if (flatListRef.current && messages.length > 0) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 150);
+    }
   };
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
-
-  useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', (e) => {
-      setKeyboardHeight(e.endCoordinates.height);
-      scrollToBottom();
-    });
-    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
+  }, [messages, isKeyboardVisible]);
 
   if (!chat) {
     return (
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoid}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={80}
-      >
-        <View style={styles.emptyState}>
-          <MaterialCommunityIcons name="message-text-lock-outline" size={48} color="#9ca3af" />
-          <Text style={styles.emptyTitle}>No chat selected</Text>
-          <Text style={styles.emptySubtitle}>Choose a chat or start a secure connection.</Text>
-        </View>
-      </KeyboardAvoidingView>
+      <View style={styles.emptyState}>
+        <MaterialCommunityIcons name="message-text-lock-outline" size={48} color="#9ca3af" />
+        <Text style={styles.emptyTitle}>No chat selected</Text>
+        <Text style={styles.emptySubtitle}>Choose a chat or start a secure connection.</Text>
+      </View>
     );
   }
 
@@ -91,13 +105,53 @@ export default function ChatThreadScreen({
     : 'Server offline';
   const participantLabel = `${participantCount} online`;
 
+  const renderMessage = ({ item: msg }: { item: ChatMessage }) => {
+    if (msg.type === 'system') {
+      return (
+        <View style={[styles.messageBubble, styles.messageSystem]}>
+          <Text style={styles.messageText}>{msg.content}</Text>
+          <Text style={styles.messageTime}>{msg.timestamp}</Text>
+        </View>
+      );
+    }
+    const bubbleStyle = [
+      styles.messageBubble,
+      msg.outgoing ? styles.messageOutgoing : styles.messageIncoming,
+    ];
+    const authorStyle = msg.outgoing ? styles.messageTextOutgoing : styles.messageText;
+    const bodyStyle = msg.outgoing ? styles.messageBodyOutgoing : styles.messageBody;
+    const timeStyle = msg.outgoing ? styles.messageTimeOutgoing : styles.messageTime;
+    const isOutgoing = Boolean(msg.outgoing);
+    const avatarSource = resolveAvatar(msg);
+    const authorLabel = resolveAuthorName(msg);
+
+    return (
+      <View style={[styles.messageRow, isOutgoing ? styles.rowOutgoing : styles.rowIncoming]}>
+        {!isOutgoing && (
+          <ChatAvatar source={avatarSource} variant="incoming" style={styles.avatarSlotIncoming} />
+        )}
+        <View style={bubbleStyle}>
+          <Text style={authorStyle}>{authorLabel}</Text>
+          <Text style={bodyStyle}>{msg.content}</Text>
+          <Text style={timeStyle}>{msg.timestamp}</Text>
+        </View>
+        {isOutgoing && (
+          <ChatAvatar source={avatarSource} variant="outgoing" style={styles.avatarSlotOutgoing} />
+        )}
+      </View>
+    );
+  };
+
+  // For Android, we need to manually handle the keyboard offset
+  // because KeyboardAvoidingView doesn't work well with nested navigators
+  const androidKeyboardOffset = isKeyboardVisible && !isIOS 
+    ? keyboardHeight - TAB_BAR_HEIGHT - insets.bottom
+    : 0;
+
   return (
-    <KeyboardAvoidingView
-      style={styles.keyboardAvoid}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 96 : 0}
-    >
+    <View style={styles.outerContainer}>
       <View style={styles.container}>
+        {/* Header */}
         <View style={styles.headerRow}>
           <View style={styles.headerMain}>
             <View style={styles.headerTitleRow}>
@@ -121,77 +175,60 @@ export default function ChatThreadScreen({
           </View>
         </View>
 
-        <ScrollView
-          ref={scrollRef}
+        {/* Messages */}
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={(item) => item.id}
           style={styles.messageList}
-          contentContainerStyle={[
-            styles.messageContent,
-            { paddingBottom: styles.messageContent.paddingBottom + keyboardHeight + 80 },
-          ]}
+          contentContainerStyle={styles.messageContent}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={scrollToBottom}
-        >
-          {messages.map((msg) => {
-            if (msg.type === 'system') {
-              return (
-                <View key={msg.id} style={[styles.messageBubble, styles.messageSystem]}>
-                  <Text style={styles.messageText}>{msg.content}</Text>
-                  <Text style={styles.messageTime}>{msg.timestamp}</Text>
-                </View>
-              );
-            }
-            const bubbleStyle = [
-              styles.messageBubble,
-              msg.outgoing ? styles.messageOutgoing : styles.messageIncoming,
-            ];
-            const authorStyle = msg.outgoing ? styles.messageTextOutgoing : styles.messageText;
-            const bodyStyle = msg.outgoing ? styles.messageBodyOutgoing : styles.messageBody;
-            const timeStyle = msg.outgoing ? styles.messageTimeOutgoing : styles.messageTime;
-            const isOutgoing = Boolean(msg.outgoing);
-            const avatarSource = resolveAvatar(msg);
-            const authorLabel = resolveAuthorName(msg);
-            return (
-              <View key={msg.id} style={[styles.messageRow, isOutgoing ? styles.rowOutgoing : styles.rowIncoming]}>
-                {!isOutgoing && (
-                  <ChatAvatar source={avatarSource} variant="incoming" style={styles.avatarSlotIncoming} />
-                )}
-                <View style={bubbleStyle}>
-                  <Text style={authorStyle}>{authorLabel}</Text>
-                  <Text style={bodyStyle}>{msg.content}</Text>
-                  <Text style={timeStyle}>{msg.timestamp}</Text>
-                </View>
-                {isOutgoing && (
-                  <ChatAvatar source={avatarSource} variant="outgoing" style={styles.avatarSlotOutgoing} />
-                )}
-              </View>
-            );
-          })}
-        </ScrollView>
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+        />
 
-        <View style={styles.inputBar}>
+        {/* Input Bar */}
+        <View 
+          style={[
+            styles.inputBar,
+            !isIOS && isKeyboardVisible && {
+              marginBottom: androidKeyboardOffset > 0 ? androidKeyboardOffset : 0,
+            }
+          ]}
+        >
           <TextInput
-            placeholder="Type a secure message..."
+            placeholder="Type a message..."
             placeholderTextColor="#9ca3af"
             style={styles.input}
             value={draft}
             onChangeText={onDraftChange}
             onSubmitEditing={onSend}
             returnKeyType="send"
+            blurOnSubmit={false}
           />
           <TouchableOpacity onPress={onSend} style={styles.sendButton}>
             <MaterialCommunityIcons name="send" size={18} color={colors.accentText} />
           </TouchableOpacity>
         </View>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
-const createChatStyles = (colors: { background: string; card: string; text: string; muted: string; border: string; accent: string; accentText: string }) =>
+const createChatStyles = (colors: {
+  background: string;
+  card: string;
+  text: string;
+  muted: string;
+  border: string;
+  accent: string;
+  accentText: string;
+}) =>
   StyleSheet.create({
-    keyboardAvoid: {
+    outerContainer: {
       flex: 1,
-      backgroundColor: colors.background,
     },
     emptyState: {
       flex: 1,
@@ -273,7 +310,8 @@ const createChatStyles = (colors: { background: string; card: string; text: stri
       flex: 1,
     },
     messageContent: {
-      paddingBottom: 12,
+      paddingBottom: 8,
+      flexGrow: 1,
     },
     messageRow: {
       flexDirection: 'row',
@@ -357,11 +395,14 @@ const createChatStyles = (colors: { background: string; card: string; text: stri
       borderRadius: 12,
       backgroundColor: colors.card,
       paddingHorizontal: 12,
-      paddingVertical: 8,
+      paddingVertical: Platform.OS === 'ios' ? 10 : 6,
+      marginTop: 8,
     },
     input: {
       flex: 1,
       color: colors.text,
+      minHeight: 40,
+      fontSize: 16,
     },
     sendButton: {
       marginLeft: 8,

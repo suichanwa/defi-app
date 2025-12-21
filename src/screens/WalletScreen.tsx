@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated as RNAnimated, ScrollView, Share, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { ethers } from 'ethers';
+import { Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
+import { ethers, Wallet } from 'ethers';
 import PulseBadge from '../components/PulseBadge';
 import { createWalletStyles } from '../styles/WalletStyles';
 import { useTheme } from '../theme/ThemeProvider';
@@ -14,8 +15,11 @@ import { getProvider } from '../services/provider';
 import WalletSetupScreen from '../components/wallet/WalletSetupScreen';
 import ReceiveScreen from '../components/wallet/ReceiveScreen';
 import SendScreen from '../components/wallet/SendScreen';
-import { walletErrorMessage } from '../utils/walletErrors';
+import NetworkBadge from '../components/wallet/NetworkBadge';
+import { rpcErrorMessage, walletErrorMessage } from '../utils/walletErrors';
 import ErrorDialog from '../components/common/ErrorDialog';
+import { fetchSolBalance } from '../services/solanaBalances';
+import { getSolanaConnection } from '../services/solanaProvider';
 import {
   canUseBiometrics,
   getBiometricPassword,
@@ -43,34 +47,55 @@ const actions: Action[] = [
 ];
 
 const defaultTokens: TokenBalance[] = [
-  { name: 'Ethereum', symbol: 'ETH', amount: 0, pair: 'ETHUSDT', color: '#6b8cef' },
-  ...ERC20_TOKENS.map<TokenBalance>((t) => ({
-    name: t.name,
-    symbol: t.symbol,
+  {
+    name: CHAIN.nativeToken.name,
+    symbol: CHAIN.nativeToken.symbol,
     amount: 0,
-    pair: t.priceSymbol,
-    color: t.symbol === 'USDC' ? '#0ea5e9' : '#f59e0b',
-  })),
+    pair: CHAIN.nativeToken.priceSymbol,
+    color: CHAIN.nativeToken.color,
+  },
+  ...(CHAIN.kind === 'ethereum'
+    ? ERC20_TOKENS.map<TokenBalance>((t) => ({
+        name: t.name,
+        symbol: t.symbol,
+        amount: 0,
+        pair: t.priceSymbol,
+        color: t.symbol === 'USDC' ? '#0ea5e9' : '#f59e0b',
+      }))
+    : []),
 ];
 
 export default function WalletScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
-  const { status, address, wallet, unlock, createWallet, importWallet, backupCompleted, confirmBackup, lock } =
-    useWalletSession();
+  const {
+    status,
+    address,
+    wallet,
+    recoveryPhrase,
+    backupCompleted,
+    unlock,
+    createWallet,
+    importWallet,
+    confirmBackup,
+  } = useWalletSession();
 
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rpcError, setRpcError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [chainTokens, setChainTokens] = useState<TokenBalance[]>(defaultTokens);
-  const [flow, setFlow] = useState<'menu' | 'create' | 'import' | 'unlock' | 'backup' | 'receive' | 'send'>('menu');
+  const [flow, setFlow] = useState<
+    'menu' | 'create-passcode' | 'create-recovery' | 'create-success' | 'unlock' | 'receive' | 'send'
+  >('menu');
   const [walletPassword, setWalletPassword] = useState('');
   const [walletPasswordConfirm, setWalletPasswordConfirm] = useState('');
   const [unlockPassword, setUnlockPassword] = useState('');
   const [mnemonicInput, setMnemonicInput] = useState('');
   const [backupMnemonic, setBackupMnemonic] = useState<string | null>(null);
   const [backupAcknowledged, setBackupAcknowledged] = useState(false);
+  const [backupSkipped, setBackupSkipped] = useState(false);
   const [confirmWord1, setConfirmWord1] = useState('');
   const [confirmWord2, setConfirmWord2] = useState('');
   const [confirmIndices, setConfirmIndices] = useState<[number, number]>([1, 5]);
@@ -81,7 +106,7 @@ export default function WalletScreen() {
   const [sendTo, setSendTo] = useState('');
   const [sendAmount, setSendAmount] = useState('');
   const [sendStep, setSendStep] = useState<'form' | 'confirm' | 'pending'>('form');
-  const [sendFeeEth, setSendFeeEth] = useState<string | null>(null);
+  const [sendFeeNative, setSendFeeNative] = useState<string | null>(null);
   const [sendTxHash, setSendTxHash] = useState<string | null>(null);
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [biometricsAvailable, setBiometricsAvailable] = useState(false);
@@ -133,10 +158,6 @@ export default function WalletScreen() {
           ? prices[token.pair]
           : token.fixedPrice !== undefined
           ? token.fixedPrice
-          : token.symbol === 'ETH'
-          ? typeof prices['ETHUSDT'] === 'number'
-            ? prices['ETHUSDT']
-            : undefined
           : undefined;
       if (typeof livePrice !== 'number') return sum;
       return sum + livePrice * token.amount;
@@ -168,30 +189,44 @@ export default function WalletScreen() {
       setFlow('menu');
     } else if (status === 'locked') {
       setFlow('unlock');
-    } else if (status === 'unlocked' && !backupCompleted && !backupMnemonic) {
-      setFlow((prev) => (prev === 'backup' ? prev : 'menu'));
     }
-  }, [status, backupCompleted, backupMnemonic]);
+  }, [status]);
+
+  useEffect(() => {
+    if (status !== 'unlocked' || backupCompleted || backupMnemonic) return;
+    if (!recoveryPhrase) return;
+    startBackupConfirm(normalizeMnemonic(recoveryPhrase));
+  }, [status, backupCompleted, backupMnemonic, recoveryPhrase]);
 
   useEffect(() => {
     const loadOnChain = async () => {
       if (status !== 'unlocked' || !address) return;
       setFetchingChain(true);
       try {
-        const [native, erc20] = await Promise.all([
-          fetchNativeBalance(address),
-          fetchTokenBalances(address, ERC20_TOKENS),
-        ]);
-        const nextTokens: TokenBalance[] = defaultTokens.map((token) => {
-          if (token.symbol === 'ETH') {
-            return { ...token, amount: Number(native) };
-          }
-          const match = erc20[token.symbol];
-          return { ...token, amount: match ? Number(match) : 0 };
-        });
-        setChainTokens(nextTokens);
-      } catch {
-        setFlowError('Unable to load on-chain balances.');
+        if (CHAIN.kind === 'solana') {
+          const native = await fetchSolBalance(address);
+          const nextTokens: TokenBalance[] = defaultTokens.map((token) =>
+            token.symbol === CHAIN.nativeToken.symbol ? { ...token, amount: Number(native) } : token,
+          );
+          setChainTokens(nextTokens);
+        } else {
+          const [native, erc20] = await Promise.all([
+            fetchNativeBalance(address),
+            fetchTokenBalances(address, ERC20_TOKENS),
+          ]);
+          const nextTokens: TokenBalance[] = defaultTokens.map((token) => {
+            if (token.symbol === CHAIN.nativeToken.symbol) {
+              return { ...token, amount: Number(native) };
+            }
+            const match = erc20[token.symbol];
+            return { ...token, amount: match ? Number(match) : 0 };
+          });
+          setChainTokens(nextTokens);
+        }
+        setRpcError(null);
+      } catch (error) {
+        const rpcMessage = rpcErrorMessage(error);
+        setRpcError(rpcMessage ?? 'Unable to load on-chain balances.');
       } finally {
         setFetchingChain(false);
       }
@@ -204,6 +239,19 @@ export default function WalletScreen() {
     setFlowMessage(null);
   };
 
+  const resetSetupState = () => {
+    setWalletPassword('');
+    setWalletPasswordConfirm('');
+    setUnlockPassword('');
+    setMnemonicInput('');
+    setBackupMnemonic(null);
+    setBackupAcknowledged(false);
+    setBackupSkipped(false);
+    setConfirmWord1('');
+    setConfirmWord2('');
+    setConfirmIndices([1, 5]);
+  };
+
   const normalizeMnemonic = (phrase: string) =>
     phrase
       .trim()
@@ -211,8 +259,21 @@ export default function WalletScreen() {
       .split(/\s+/)
       .join(' ');
 
-  const passwordPolicy = (value: string) => {
-    if (!value || value.length < 8) return 'Password must be at least 8 characters.';
+  const parseAmountToLamports = (value: string) => {
+    const trimmed = value.trim();
+    if (!/^\d+(\.\d+)?$/.test(trimmed)) return null;
+    const [whole, fraction = ''] = trimmed.split('.');
+    if (fraction.length > 9) return null;
+    const wholeLamports = BigInt(whole) * BigInt(LAMPORTS_PER_SOL);
+    const fractionLamports = BigInt(fraction.padEnd(9, '0'));
+    const lamports = wholeLamports + fractionLamports;
+    if (lamports <= 0n) return null;
+    if (lamports > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+    return Number(lamports);
+  };
+
+  const passcodePolicy = (value: string) => {
+    if (!/^\d{6}$/.test(value)) return 'Passcode must be 6 digits.';
     return null;
   };
 
@@ -230,35 +291,38 @@ export default function WalletScreen() {
     setConfirmIndices([idx1, idx2]);
     setBackupMnemonic(mnemonic);
     setBackupAcknowledged(false);
+    setBackupSkipped(false);
     setConfirmWord1('');
     setConfirmWord2('');
-    setFlow('backup');
+    setFlow('create-recovery');
   };
 
   const handleCreate = async () => {
     resetFlowMessages();
-    const policy = passwordPolicy(walletPassword);
+    const policy = passcodePolicy(walletPassword);
     if (policy) {
       setFlowError(policy);
       setShowErrorDialog(true);
       return;
     }
     if (walletPassword !== walletPasswordConfirm) {
-      setFlowError('Passwords do not match.');
+      setFlowError('Passcodes do not match.');
       setShowErrorDialog(true);
       return;
     }
     setIsSubmitting(true);
     startSlowMessage('Yeah, this might take a moment...');
     try {
-      const { mnemonic } = await createWallet(walletPassword);
+      const passcode = walletPassword;
+      const { mnemonic } = await createWallet(passcode);
       const normalized = normalizeMnemonic(mnemonic);
+      setBackupSkipped(false);
       startBackupConfirm(normalized);
       setWalletPassword('');
       setWalletPasswordConfirm('');
-      setFlowMessage('Wallet created. Back up your seed phrase.');
+      setFlowMessage('Wallet created. Back up your recovery phrase.');
       if (biometricsAvailable) {
-        await saveBiometricPassword(walletPassword);
+        await saveBiometricPassword(passcode);
       }
     } catch (error) {
       setFlowError(walletErrorMessage(error, 'create'));
@@ -283,28 +347,32 @@ export default function WalletScreen() {
       setShowErrorDialog(true);
       return;
     }
-    const policy = passwordPolicy(walletPassword);
+    const policy = passcodePolicy(walletPassword);
     if (policy) {
       setFlowError(policy);
       setShowErrorDialog(true);
       return;
     }
     if (walletPassword !== walletPasswordConfirm) {
-      setFlowError('Passwords do not match.');
+      setFlowError('Passcodes do not match.');
       setShowErrorDialog(true);
       return;
     }
     setIsSubmitting(true);
     startSlowMessage('Yeah, this might take a moment...');
     try {
-      await importWallet(phrase, walletPassword);
-      startBackupConfirm(phrase);
+      const passcode = walletPassword;
+      await importWallet(phrase, passcode);
+      await confirmBackup();
+      setBackupMnemonic(null);
+      setBackupSkipped(false);
       setMnemonicInput('');
       setWalletPassword('');
       setWalletPasswordConfirm('');
-      setFlowMessage('Wallet imported. Back up your seed phrase.');
+      setFlowMessage('Wallet imported.');
+      setFlow('create-success');
       if (biometricsAvailable) {
-        await saveBiometricPassword(walletPassword);
+        await saveBiometricPassword(passcode);
       }
     } catch (error) {
       setFlowError(walletErrorMessage(error, 'import'));
@@ -317,10 +385,17 @@ export default function WalletScreen() {
 
   const handleUnlock = async () => {
     resetFlowMessages();
+    const policy = passcodePolicy(unlockPassword);
+    if (policy) {
+      setFlowError(policy);
+      setShowErrorDialog(true);
+      return;
+    }
     setIsSubmitting(true);
     startSlowMessage('Yeah, this might take a moment...');
     try {
       await unlock(unlockPassword);
+      setFlow('menu');
       setFlowMessage('Wallet unlocked.');
       if (biometricsAvailable) {
         await saveBiometricPassword(unlockPassword);
@@ -350,7 +425,7 @@ export default function WalletScreen() {
     }
     const stored = await getBiometricPassword();
     if (!stored) {
-      setFlowError('No biometric password stored yet. Unlock once with your password first.');
+      setFlowError('No biometric passcode stored yet. Unlock once with your passcode first.');
       setShowErrorDialog(true);
       return;
     }
@@ -358,6 +433,7 @@ export default function WalletScreen() {
     startSlowMessage('Yeah, this might take a moment...');
     try {
       await unlock(stored);
+      setFlow('menu');
       setFlowMessage('Wallet unlocked.');
     } catch (error) {
       setFlowError(walletErrorMessage(error, 'unlock'));
@@ -386,9 +462,39 @@ export default function WalletScreen() {
     setIsSubmitting(true);
     await confirmBackup();
     setBackupMnemonic(null);
-    setFlowMessage('Seed phrase confirmed.');
-    setFlow('menu');
+    setBackupSkipped(false);
+    setFlowMessage('Recovery phrase confirmed.');
+    setFlow('create-success');
     setIsSubmitting(false);
+  };
+
+  const handleSkipBackup = async () => {
+    if (isSubmitting) return;
+    resetFlowMessages();
+    if (!backupMnemonic) {
+      setFlow('menu');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await confirmBackup();
+      setBackupMnemonic(null);
+      setBackupSkipped(true);
+      setFlowMessage('Recovery phrase skipped.');
+      setFlow('create-success');
+    } catch (error) {
+      setFlowError(error instanceof Error ? error.message : 'Unable to skip recovery phrase.');
+      setShowErrorDialog(true);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleFinishSetup = () => {
+    resetFlowMessages();
+    setBackupMnemonic(null);
+    setBackupSkipped(false);
+    setFlow('menu');
   };
 
   const handleCopyAddress = async () => {
@@ -424,13 +530,52 @@ export default function WalletScreen() {
 
   const handlePrepareSend = async () => {
     resetFlowMessages();
-    setSendFeeEth(null);
+    setSendFeeNative(null);
     setSendTxHash(null);
     if (!wallet || !address) {
       setFlowError('Unlock your wallet first.');
       setShowErrorDialog(true);
       return;
     }
+    if (CHAIN.kind === 'solana') {
+      let toPubkey: PublicKey;
+      try {
+        toPubkey = new PublicKey(sendTo.trim());
+      } catch (error) {
+        setFlowError('Enter a valid recipient address.');
+        setShowErrorDialog(true);
+        return;
+      }
+      const lamports = parseAmountToLamports(sendAmount);
+      if (!lamports) {
+        setFlowError('Enter a valid amount.');
+        setShowErrorDialog(true);
+        return;
+      }
+      setIsSubmitting(true);
+      try {
+        const keypair = wallet as Keypair;
+        const connection = getSolanaConnection();
+        const { blockhash } = await connection.getLatestBlockhash('finalized');
+        const tx = new Transaction({ feePayer: keypair.publicKey, recentBlockhash: blockhash }).add(
+          SystemProgram.transfer({ fromPubkey: keypair.publicKey, toPubkey, lamports }),
+        );
+        const fee = await connection.getFeeForMessage(tx.compileMessage());
+        if (fee.value === null) {
+          setFlowError('Unable to estimate network fee.');
+          return;
+        }
+        setSendFeeNative((fee.value / LAMPORTS_PER_SOL).toFixed(6));
+        setSendStep('confirm');
+      } catch (error) {
+        setFlowError(walletErrorMessage(error, 'send'));
+        setShowErrorDialog(true);
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
     if (!ethers.utils.isAddress(sendTo.trim())) {
       setFlowError('Enter a valid recipient address.');
       setShowErrorDialog(true);
@@ -453,7 +598,7 @@ export default function WalletScreen() {
         return;
       }
       const fee = gasLimit.mul(feePerGas);
-      setSendFeeEth(ethers.utils.formatEther(fee));
+      setSendFeeNative(ethers.utils.formatEther(fee));
       setSendStep('confirm');
     } catch (error) {
       setFlowError(walletErrorMessage(error, 'send'));
@@ -472,6 +617,32 @@ export default function WalletScreen() {
     setIsSubmitting(true);
     setSendStep('pending');
     try {
+      if (CHAIN.kind === 'solana') {
+        const lamports = parseAmountToLamports(sendAmount);
+        if (!lamports) {
+          setFlowError('Enter a valid amount.');
+          setSendStep('form');
+          return;
+        }
+        const toPubkey = new PublicKey(sendTo.trim());
+        const keypair = wallet as Keypair;
+        const connection = getSolanaConnection();
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
+        const tx = new Transaction({ feePayer: keypair.publicKey, recentBlockhash: blockhash }).add(
+          SystemProgram.transfer({ fromPubkey: keypair.publicKey, toPubkey, lamports }),
+        );
+        const signature = await connection.sendTransaction(tx, [keypair]);
+        setSendTxHash(signature);
+        setFlowMessage('Transaction sent. Waiting for confirmation...');
+        await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed');
+        setFlowMessage('Transaction confirmed.');
+        setSendStep('form');
+        setSendTo('');
+        setSendAmount('');
+        setFlow('menu');
+        return;
+      }
+
       const provider = getProvider();
       const value = ethers.utils.parseEther(sendAmount);
       const feeData = await provider.getFeeData();
@@ -482,7 +653,7 @@ export default function WalletScreen() {
         maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ?? undefined,
         gasPrice: feeData.maxFeePerGas ? undefined : feeData.gasPrice ?? undefined,
       };
-      const signed = await wallet.connect(provider).sendTransaction(tx);
+      const signed = await (wallet as Wallet).connect(provider).sendTransaction(tx);
       setSendTxHash(signed.hash);
       setFlowMessage('Transaction sent. Waiting for confirmation...');
       await provider.waitForTransaction(signed.hash);
@@ -500,7 +671,7 @@ export default function WalletScreen() {
     }
   };
 
-  if (status !== 'unlocked' || backupMnemonic || flow === 'receive' || flow === 'send') {
+  if (status !== 'unlocked' || backupMnemonic || flow !== 'menu') {
     return (
       <ScrollView contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}>
         <ErrorDialog
@@ -524,9 +695,10 @@ export default function WalletScreen() {
         ) : flow === 'send' ? (
           <SendScreen
             chainName={CHAIN.name}
+            nativeSymbol={CHAIN.nativeToken.symbol}
             sendTo={sendTo}
             sendAmount={sendAmount}
-            sendFeeEth={sendFeeEth}
+            sendFeeNative={sendFeeNative}
             sendStep={sendStep}
             isSubmitting={isSubmitting}
             flowError={flowError}
@@ -548,6 +720,7 @@ export default function WalletScreen() {
             mnemonicInput={mnemonicInput}
             backupMnemonic={backupMnemonic}
             backupAcknowledged={backupAcknowledged}
+            backupSkipped={backupSkipped}
             confirmWord1={confirmWord1}
             confirmWord2={confirmWord2}
             confirmIndices={confirmIndices}
@@ -565,16 +738,19 @@ export default function WalletScreen() {
             onImport={handleImport}
             onUnlock={handleUnlock}
             onConfirmBackup={handleConfirmBackup}
-            onBackToMenu={() => setFlow('menu')}
+            onBackToMenu={() => {
+              resetFlowMessages();
+              setFlow('menu');
+            }}
             onGoCreate={() => {
               resetFlowMessages();
-              setFlow('create');
+              setFlow('create-passcode');
             }}
             onGoImport={() => {
               resetFlowMessages();
-              setFlow('import');
             }}
-            onLock={lock}
+            onFinishSetup={handleFinishSetup}
+            onSkipBackup={handleSkipBackup}
             onBiometricUnlock={handleBiometricUnlock}
             biometricsAvailable={biometricsAvailable}
           />
@@ -590,14 +766,16 @@ export default function WalletScreen() {
           <Text style={styles.headerTitle}>Wallet</Text>
           <Text style={styles.headerSubtitle}>On-chain balances with live pricing.</Text>
         </View>
-        <View style={styles.statusPill}>
-          <PulseBadge size={8} color={fetchingChain ? '#f97316' : '#22c55e'} durationMs={1400} />
-          <Text style={styles.statusText}>{fetchingChain ? 'Syncing' : 'Live'}</Text>
+        <View style={styles.headerPills}>
+          <NetworkBadge />
+          <View style={styles.statusPill}>
+            <PulseBadge size={8} color={fetchingChain ? '#f97316' : '#22c55e'} durationMs={1400} />
+            <Text style={styles.statusText}>{fetchingChain ? 'Syncing' : 'Live'}</Text>
+          </View>
         </View>
       </View>
 
       <View style={styles.cardWrapper}>
-        <View style={styles.sideAccentLeft} />
         <View style={styles.walletCard}>
           <View style={styles.walletHeader}>
             <Text style={styles.pill}>Primary</Text>
@@ -633,7 +811,6 @@ export default function WalletScreen() {
             ))}
           </View>
         </View>
-        <View style={styles.sideAccentRight} />
       </View>
 
       <View style={styles.searchContainer}>
@@ -649,6 +826,7 @@ export default function WalletScreen() {
           <Text style={styles.metaText}>Prices: {lastUpdated ? `Updated ${lastUpdated}` : 'Loading...'}</Text>
         </View>
       )}
+      {rpcError && <Text style={styles.errorText}>{rpcError}</Text>}
 
       <View style={styles.tabRow}>
         <TouchableOpacity style={[styles.tabBase, styles.tabActive, styles.tabSpacing]}>
@@ -683,8 +861,6 @@ export default function WalletScreen() {
                       ? prices[token.pair]
                       : token.fixedPrice !== undefined
                       ? token.fixedPrice
-                      : token.symbol === 'ETH' && typeof prices['ETHUSDT'] === 'number'
-                      ? prices['ETHUSDT']
                       : undefined;
                   if (typeof livePrice !== 'number') return loading ? 'Updating prices...' : '-';
                   return formatCurrency(livePrice * token.amount);

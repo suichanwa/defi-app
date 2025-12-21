@@ -8,6 +8,15 @@ export type WalletPalette = {
   border: string;
   accent: string;
   accentText: string;
+  success: string;
+  successText: string;
+  successBackground: string;
+  successBorder: string;
+  successCardBackground: string;
+  warning: string;
+  warningText: string;
+  warningBackground: string;
+  warningBorder: string;
 };
 
 const cardShadow = Platform.select({
@@ -67,6 +76,26 @@ export const createWalletStyles = (colors: WalletPalette) =>
       marginTop: 6,
       color: colors.muted,
     },
+    progressContainer: {
+      marginTop: 12,
+    },
+    progressLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.muted,
+      marginBottom: 8,
+    },
+    progressTrack: {
+      height: 6,
+      borderRadius: 999,
+      backgroundColor: colors.border,
+      overflow: 'hidden',
+    },
+    progressFill: {
+      height: '100%',
+      borderRadius: 999,
+      backgroundColor: colors.accent,
+    },
     loadingRow: {
       marginTop: 12,
       flexDirection: 'row',
@@ -101,13 +130,16 @@ export const createWalletStyles = (colors: WalletPalette) =>
       backgroundColor: colors.card,
     },
     checkboxRowChecked: {
-      borderColor: '#16a34a',
-      backgroundColor: '#ecfdf3',
+      borderColor: colors.accent,
+      backgroundColor: `${colors.accent}1A`,
     },
     checkboxLabel: {
       marginLeft: 8,
       color: colors.text,
       fontWeight: '600',
+    },
+    checkboxLabelChecked: {
+      color: colors.accent,
     },
     mnemonicGrid: {
       marginTop: 12,
@@ -132,6 +164,61 @@ export const createWalletStyles = (colors: WalletPalette) =>
     mnemonicText: {
       color: colors.text,
       fontWeight: '600',
+    },
+    successIconWrap: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: 78,
+      height: 78,
+      borderRadius: 39,
+      backgroundColor: colors.successBackground,
+      borderWidth: 1,
+      borderColor: colors.successBorder,
+      alignSelf: 'center',
+      marginBottom: 10,
+      marginTop: 14,
+    },
+    successCard: {
+      borderColor: colors.successBorder,
+      backgroundColor: colors.successCardBackground,
+    },
+    successHero: {
+      alignItems: 'center',
+      marginBottom: 6,
+    },
+    successTitle: {
+      fontSize: 22,
+      fontWeight: '700',
+      color: colors.text,
+      textAlign: 'center',
+    },
+    successSubtitle: {
+      marginTop: 6,
+      color: colors.muted,
+      textAlign: 'center',
+    },
+    successInfoRow: {
+      marginTop: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.successBorder,
+      backgroundColor: colors.successBackground,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      gap: 8,
+    },
+    successInfoRowSkipped: {
+      borderColor: colors.warningBorder,
+      backgroundColor: colors.warningBackground,
+    },
+    successInfoText: {
+      color: colors.successText,
+      fontWeight: '600',
+    },
+    successInfoTextSkipped: {
+      color: colors.warningText,
     },
     qrWrap: {
       marginTop: 16,
@@ -164,6 +251,11 @@ export const createWalletStyles = (colors: WalletPalette) =>
       alignItems: 'center',
       justifyContent: 'space-between',
     },
+    headerPills: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
     headerTitle: {
       fontSize: 24,
       fontWeight: '700',
@@ -181,6 +273,19 @@ export const createWalletStyles = (colors: WalletPalette) =>
       paddingHorizontal: 10,
       paddingVertical: 6,
     },
+    networkBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.border,
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
+    networkBadgeText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.text,
+    },
     statusText: {
       marginLeft: 6,
       fontSize: 12,
@@ -188,30 +293,14 @@ export const createWalletStyles = (colors: WalletPalette) =>
       color: colors.text,
     },
     cardWrapper: {
-      flexDirection: 'row',
-      alignItems: 'center',
       marginTop: 16,
-    },
-    sideAccentLeft: {
-      width: 18,
-      height: 160,
-      backgroundColor: '#22c55e',
-      borderTopLeftRadius: 12,
-      borderBottomLeftRadius: 12,
-      marginRight: 8,
-    },
-    sideAccentRight: {
-      width: 18,
-      height: 160,
-      backgroundColor: '#f59e0b',
-      borderTopRightRadius: 12,
-      borderBottomRightRadius: 12,
-      marginLeft: 8,
     },
     walletCard: {
       flex: 1,
-      backgroundColor: colors.text,
+      backgroundColor: colors.card,
       borderRadius: 22,
+      borderWidth: 1,
+      borderColor: colors.border,
       padding: 20,
       ...(cardShadow ?? {}),
     },
@@ -221,8 +310,8 @@ export const createWalletStyles = (colors: WalletPalette) =>
       marginBottom: 12,
     },
     pill: {
-      backgroundColor: '#1e293b',
-      color: '#e2e8f0',
+      backgroundColor: `${colors.accent}1A`,
+      color: colors.accent,
       paddingHorizontal: 12,
       paddingVertical: 6,
       borderRadius: 999,
@@ -231,24 +320,24 @@ export const createWalletStyles = (colors: WalletPalette) =>
       marginRight: 12,
     },
     walletTitle: {
-      color: '#e2e8f0',
+      color: colors.text,
       fontSize: 14,
     },
     balanceLabel: {
-      color: '#94a3b8',
+      color: colors.muted,
       fontSize: 12,
       textTransform: 'uppercase',
       letterSpacing: 1.1,
     },
     balance: {
-      color: '#ffffff',
+      color: colors.text,
       fontSize: 32,
       fontWeight: '700',
       marginTop: 6,
       marginBottom: 12,
     },
     addressText: {
-      color: '#cbd5f5',
+      color: colors.muted,
       fontSize: 12,
       marginBottom: 16,
     },
@@ -262,13 +351,15 @@ export const createWalletStyles = (colors: WalletPalette) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.border,
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
       borderRadius: 14,
       paddingVertical: 10,
       gap: 6,
     },
     actionIcon: {
-      backgroundColor: colors.card,
+      backgroundColor: `${colors.accent}1A`,
       borderRadius: 12,
       padding: 6,
     },
@@ -391,6 +482,62 @@ export const createWalletStyles = (colors: WalletPalette) =>
       color: colors.text,
       backgroundColor: colors.card,
     },
+    passcodeField: {
+      marginTop: 12,
+    },
+    passcodeLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      color: colors.muted,
+      marginBottom: 8,
+    },
+    passcodeRow: {
+      flexDirection: 'row',
+      alignSelf: 'center',
+    },
+    passcodeCell: {
+      width: 44,
+      height: 52,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    passcodeCellSpacing: {
+      marginRight: 8,
+    },
+    passcodeCellActive: {
+      borderColor: colors.accent,
+      backgroundColor: `${colors.accent}12`,
+    },
+    passcodeDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: colors.text,
+    },
+    passcodeDotFilled: {
+      opacity: 1,
+    },
+    passcodeDotEmpty: {
+      opacity: 0.15,
+    },
+    passcodeHiddenInput: {
+      position: 'absolute',
+      opacity: 0,
+      width: 1,
+      height: 1,
+      left: 0,
+      top: 0,
+    },
+    modalInput: {
+      minHeight: 88,
+      textAlignVertical: 'top',
+    },
     primaryButton: {
       marginTop: 12,
       borderRadius: 12,
@@ -416,5 +563,42 @@ export const createWalletStyles = (colors: WalletPalette) =>
     buttonDisabled: {
       opacity: 0.7,
     },
+    fingerprintButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    fingerprintIcon: {
+      marginRight: 8,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.4)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 20,
+    },
+    modalCard: {
+      width: '100%',
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.card,
+      padding: 18,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    modalSubtitle: {
+      color: colors.muted,
+      marginBottom: 6,
+    },
   });
-

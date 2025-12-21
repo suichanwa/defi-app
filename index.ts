@@ -11,6 +11,14 @@ import { registerRootComponent } from 'expo';
 ).SHIMS_DISABLE_LOGS = true;
 require('@ethersproject/shims');
 
+const cryptoObj = globalThis.crypto as {
+  getRandomValues?: (array: ArrayBufferView) => ArrayBufferView | void;
+};
+if (cryptoObj?.getRandomValues) {
+  const originalGetRandomValues = cryptoObj.getRandomValues.bind(cryptoObj);
+  cryptoObj.getRandomValues = (array: ArrayBufferView) => originalGetRandomValues(array) ?? array;
+}
+
 LogBox.ignoreLogs(["SafeAreaView has been deprecated"]);
 import App from './App';
 

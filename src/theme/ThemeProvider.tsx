@@ -12,6 +12,15 @@ type Palette = {
   accent: string;
   accentText: string;
   border: string;
+  success: string;
+  successText: string;
+  successBackground: string;
+  successBorder: string;
+  successCardBackground: string;
+  warning: string;
+  warningText: string;
+  warningBackground: string;
+  warningBorder: string;
 };
 
 type ThemeContextValue = {
@@ -32,6 +41,15 @@ const lightPalette: Palette = {
   accent: '#4f46e5',
   accentText: '#ffffff',
   border: '#cbd5e1',
+  success: '#16a34a',
+  successText: '#166534',
+  successBackground: '#dcfce7',
+  successBorder: '#bbf7d0',
+  successCardBackground: '#f0fdf4',
+  warning: '#d97706',
+  warningText: '#b45309',
+  warningBackground: '#fffbeb',
+  warningBorder: '#fcd34d',
 };
 
 const darkPalette: Palette = {
@@ -43,6 +61,15 @@ const darkPalette: Palette = {
   accent: '#8b7bff',
   accentText: '#0b1220',
   border: '#1f2937',
+  success: '#22c55e',
+  successText: '#86efac',
+  successBackground: '#13251a',
+  successBorder: '#166534',
+  successCardBackground: '#0f1e16',
+  warning: '#f59e0b',
+  warningText: '#fcd34d',
+  warningBackground: '#2b1e0a',
+  warningBorder: '#92400e',
 };
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {

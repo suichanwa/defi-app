@@ -6,9 +6,10 @@ import { useWalletCardAnimation } from '../../animations/walletAnimations';
 
 type Props = {
   chainName: string;
+  nativeSymbol: string;
   sendTo: string;
   sendAmount: string;
-  sendFeeEth: string | null;
+  sendFeeNative: string | null;
   sendStep: 'form' | 'confirm' | 'pending';
   isSubmitting: boolean;
   flowError: string | null;
@@ -23,9 +24,10 @@ type Props = {
 
 export default function SendScreen({
   chainName,
+  nativeSymbol,
   sendTo,
   sendAmount,
-  sendFeeEth,
+  sendFeeNative,
   sendStep,
   isSubmitting,
   flowError,
@@ -58,7 +60,7 @@ export default function SendScreen({
           <TextInput
             value={sendAmount}
             onChangeText={onChangeAmount}
-            placeholder="Amount (ETH)"
+            placeholder={`Amount (${nativeSymbol})`}
             placeholderTextColor="#94a3b8"
             style={styles.input}
             keyboardType="decimal-pad"
@@ -97,11 +99,15 @@ export default function SendScreen({
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Amount</Text>
-            <Text style={styles.summaryValue}>{sendAmount} ETH</Text>
+            <Text style={styles.summaryValue}>
+              {sendAmount} {nativeSymbol}
+            </Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Estimated fee</Text>
-            <Text style={styles.summaryValue}>{sendFeeEth ? `${Number(sendFeeEth).toFixed(6)} ETH` : '-'}</Text>
+            <Text style={styles.summaryValue}>
+              {sendFeeNative ? `${Number(sendFeeNative).toFixed(6)} ${nativeSymbol}` : '-'}
+            </Text>
           </View>
           {flowError && <Text style={styles.errorText}>{flowError}</Text>}
           {isSubmitting && (

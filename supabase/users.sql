@@ -1,6 +1,3 @@
--- User profile table aligned with Supabase Auth users + anonymous profiles.
--- Run this in the Supabase SQL editor.
-
 create table if not exists public.user_profiles (
   id text primary key, -- auth.users.id (uuid as text) or anon_* id
   email text,

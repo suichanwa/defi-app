@@ -2,7 +2,7 @@
   "expo": {
     "name": "DeFi AI Advisor",
     "slug": "defi-ai-app",
-    "version": "0.12.0",
+    "version": "0.13.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -18,7 +18,8 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Allow access to your location to show local time and nearby peers."
+        "NSLocationWhenInUseUsageDescription": "Allow access to your location to show local time and nearby peers.",
+        "NSPhotoLibraryUsageDescription": "Allow access to your photos to set a profile picture."
       }
     },
     "android": {
@@ -27,10 +28,13 @@
         "backgroundColor": "#0a0e27"
       },
       "package": "com.yourcompany.defiaiapp",
+      "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "INTERNET",
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE"
       ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
