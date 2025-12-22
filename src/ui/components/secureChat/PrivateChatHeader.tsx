@@ -1,17 +1,22 @@
-import React, { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import PulseBadge from '@components/PulseBadge';
 import type { ChatThread } from '@app-types/secureChat';
 import { useTheme } from '@theme/ThemeProvider';
+import PrivateChatSettingsMenu from '@components/secureChat/PrivateChatSettingsMenu';
 
 type PrivateChatHeaderProps = {
   chat: ChatThread;
+  isMuted?: boolean;
+  onToggleMute?: () => void;
 };
 
-export default function PrivateChatHeader({ chat }: PrivateChatHeaderProps) {
+export default function PrivateChatHeader({ chat, isMuted, onToggleMute }: PrivateChatHeaderProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const isPrivate = chat.isDM ?? chat.id.startsWith('dm:');
+  const [settingsVisible, setSettingsVisible] = useState(false);
 
   if (!isPrivate) return null;
 
@@ -20,21 +25,48 @@ export default function PrivateChatHeader({ chat }: PrivateChatHeaderProps) {
   const statusColor = isOnline ? '#22c55e' : '#9ca3af';
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.name} numberOfLines={1}>
-        {chat.name}
-      </Text>
-      <View style={styles.statusRow}>
-        <PulseBadge size={8} color={statusColor} />
-        <Text style={styles.statusText}>{statusLabel}</Text>
+    <>
+      <View style={styles.container}>
+        <View style={styles.textBlock}>
+          <Text style={styles.name} numberOfLines={1}>
+            {chat.name}
+          </Text>
+          <View style={styles.statusRow}>
+            <PulseBadge size={8} color={statusColor} />
+            <Text style={styles.statusText}>{statusLabel}</Text>
+          </View>
+        </View>
+        <TouchableOpacity
+          style={styles.settingsButton}
+          onPress={() => setSettingsVisible(true)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Open chat settings"
+        >
+          <MaterialCommunityIcons name="cog-outline" size={18} color={colors.text} />
+        </TouchableOpacity>
       </View>
-    </View>
+      <PrivateChatSettingsMenu
+        visible={settingsVisible}
+        chatName={chat.name}
+        isMuted={isMuted}
+        onToggleMute={onToggleMute}
+        onClose={() => setSettingsVisible(false)}
+      />
+    </>
   );
 }
 
 const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
   StyleSheet.create({
     container: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    textBlock: {
       flex: 1,
     },
     name: {
@@ -52,5 +84,10 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       fontSize: 12,
       color: colors.muted,
       fontWeight: '600',
+    },
+    settingsButton: {
+      padding: 6,
+      borderRadius: 16,
+      backgroundColor: colors.border,
     },
   });

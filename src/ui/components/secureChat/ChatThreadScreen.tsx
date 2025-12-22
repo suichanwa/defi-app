@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import Animated, {
+  FadeInDown,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -40,6 +41,8 @@ type Props = {
   resolveAvatar: (message: ChatMessage) => ChatAvatarSource;
   resolveAuthorName: (message: ChatMessage) => string;
   onStartDM?: (userId: string, userName: string) => void;
+  isMuted?: boolean;
+  onToggleMute?: () => void;
 };
 
 // Bottom navigation bar height - should match your App.tsx nav height
@@ -72,6 +75,8 @@ export default function ChatThreadScreen({
   resolveAvatar,
   resolveAuthorName,
   onStartDM,
+  isMuted,
+  onToggleMute,
 }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createChatStyles(colors), [colors]);
@@ -221,10 +226,10 @@ export default function ChatThreadScreen({
   const renderMessage = ({ item: msg }: { item: ChatMessage }) => {
     if (msg.type === 'system') {
       return (
-        <View style={[styles.messageBubble, styles.messageSystem]}>
+        <Animated.View entering={FadeInDown.duration(200)} style={[styles.messageBubble, styles.messageSystem]}>
           <Text style={styles.messageText}>{msg.content}</Text>
           <Text style={styles.messageTime}>{msg.timestamp}</Text>
-        </View>
+        </Animated.View>
       );
     }
     const bubbleStyle = [
@@ -239,7 +244,10 @@ export default function ChatThreadScreen({
     const authorLabel = resolveAuthorName(msg);
 
     return (
-      <View style={[styles.messageRow, isOutgoing ? styles.rowOutgoing : styles.rowIncoming]}>
+      <Animated.View
+        entering={FadeInDown.duration(220)}
+        style={[styles.messageRow, isOutgoing ? styles.rowOutgoing : styles.rowIncoming]}
+      >
         {!isOutgoing && (
           <ChatAvatar
             source={avatarSource}
@@ -263,7 +271,7 @@ export default function ChatThreadScreen({
             onPress={() => handleAvatarPress(msg)}
           />
         )}
-      </View>
+      </Animated.View>
     );
   };
 
@@ -284,7 +292,7 @@ export default function ChatThreadScreen({
               <TouchableOpacity onPress={onBack} style={styles.backButton}>
                 <MaterialCommunityIcons name="arrow-left" size={18} color={colors.text} />
               </TouchableOpacity>
-              <PrivateChatHeader chat={chat} />
+              <PrivateChatHeader chat={chat} isMuted={isMuted} onToggleMute={onToggleMute} />
             </View>
           </View>
           <View style={styles.statusColumn}>

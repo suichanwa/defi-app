@@ -7,6 +7,7 @@ export type ChatMessage = {
   author: string;
   content: string;
   timestamp: string;
+  createdAt?: string;
   avatarUri?: string;
   outgoing?: boolean;
   type?: 'text' | 'system';

@@ -1,30 +1,143 @@
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { ChatMessage, ChatThread } from '../types/secureChat';
+import { isSupabaseConfigured, supabase } from './supabaseClient';
 import { getJson, setJson } from './storage';
 
 const DM_STORAGE_KEY = 'dm.channels.v1';
 
-type DMChannel = {
+type StoredDMChannel = {
   id: string;
   participants: [string, string];
   participantNames: [string, string];
-  messages: ChatMessage[];
   createdAt: string;
   lastMessageAt: string;
+  lastMessageText?: string | null;
+  lastMessageAuthorId?: string | null;
+  lastMessageAuthorName?: string | null;
+  messages?: ChatMessage[];
 };
 
-type DMChannelStore = Map<string, DMChannel>;
+type LocalDMChannel = StoredDMChannel & {
+  messages: ChatMessage[];
+};
 
-let channelStore: DMChannelStore = new Map();
-let isLoaded = false;
+type DMChannelRow = {
+  id: string;
+  participant_ids: [string, string];
+  participant_labels: [string, string];
+  created_at: string;
+  updated_at: string;
+  last_message_text: string | null;
+  last_message_at: string | null;
+  last_message_author_id: string | null;
+  last_message_author_label: string | null;
+};
+
+type DMMessageRow = {
+  id: string;
+  channel_id: string;
+  author_id: string;
+  author_label: string;
+  content: string;
+  created_at: string;
+};
+
+type DMChannelHeadRow = {
+  id: string;
+  last_message_at: string | null;
+  updated_at: string;
+  created_at: string;
+};
+
+export type DMChannelHead = {
+  id: string;
+  lastMessageAt: string | null;
+  updatedAt: string;
+  createdAt: string;
+};
 
 type DMListener = (channelId: string, message: ChatMessage) => void;
+
+type SortedParticipants = {
+  ids: [string, string];
+  labels: [string, string];
+};
+
+let channelStore: Map<string, LocalDMChannel> = new Map();
+let isLoaded = false;
 const listeners: Set<DMListener> = new Set();
+let realtimeChannel: RealtimeChannel | null = null;
+let realtimeUserId: string | null = null;
+
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const isUuid = (value: string) => uuidRegex.test(value);
+
+const canUseSupabase = (currentUserId: string, otherUserId?: string) =>
+  Boolean(
+    isSupabaseConfigured &&
+      supabase &&
+      isUuid(currentUserId) &&
+      (!otherUserId || isUuid(otherUserId)),
+  );
+
+const sortParticipants = (
+  userId1: string,
+  userName1: string,
+  userId2: string,
+  userName2: string,
+): SortedParticipants => {
+  const pairs = [
+    { id: userId1, name: userName1 },
+    { id: userId2, name: userName2 },
+  ].sort((a, b) => a.id.localeCompare(b.id));
+  return {
+    ids: [pairs[0].id, pairs[1].id],
+    labels: [pairs[0].name, pairs[1].name],
+  };
+};
+
+const mapRemoteChannel = (row: DMChannelRow): StoredDMChannel => ({
+  id: row.id,
+  participants: [row.participant_ids[0], row.participant_ids[1]],
+  participantNames: [row.participant_labels[0], row.participant_labels[1]],
+  createdAt: row.created_at,
+  lastMessageAt: row.last_message_at ?? row.updated_at ?? row.created_at,
+  lastMessageText: row.last_message_text ?? null,
+  lastMessageAuthorId: row.last_message_author_id ?? null,
+  lastMessageAuthorName: row.last_message_author_label ?? null,
+});
+
+const mapRemoteMessage = (row: DMMessageRow, currentUserId?: string): ChatMessage => {
+  const ts = new Date(row.created_at);
+  const outgoing = currentUserId ? row.author_id === currentUserId : undefined;
+  return {
+    id: row.id,
+    chatId: row.channel_id,
+    authorId: row.author_id,
+    author: row.author_label,
+    content: row.content,
+    timestamp: ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    createdAt: row.created_at,
+    outgoing,
+    type: 'text',
+  };
+};
+
+const mapLocalChannel = (channel: LocalDMChannel): StoredDMChannel => ({
+  ...channel,
+});
+
+const createSupabaseError = (context: string, error?: { message?: string } | null) => {
+  const suffix = error?.message ? `: ${error.message}` : '';
+  return new Error(`${context}${suffix}`);
+};
 
 // Load channels from storage
 async function loadChannels(): Promise<void> {
   if (isLoaded) return;
   try {
-    const stored = await getJson<Record<string, DMChannel>>(DM_STORAGE_KEY);
+    const stored = await getJson<Record<string, LocalDMChannel>>(DM_STORAGE_KEY);
     if (stored) {
       channelStore = new Map(Object.entries(stored));
     }
@@ -37,7 +150,7 @@ async function loadChannels(): Promise<void> {
 // Save channels to storage
 async function saveChannels(): Promise<void> {
   try {
-    const obj: Record<string, DMChannel> = {};
+    const obj: Record<string, LocalDMChannel> = {};
     channelStore.forEach((channel, key) => {
       obj[key] = channel;
     });
@@ -57,10 +170,35 @@ export async function getOrCreateDMChannel(
   currentUserName: string,
   otherUserId: string,
   otherUserName: string,
-): Promise<DMChannel> {
+): Promise<StoredDMChannel> {
+  if (canUseSupabase(currentUserId, otherUserId) && supabase) {
+    const channelId = getDMChannelId(currentUserId, otherUserId);
+    const sorted = sortParticipants(currentUserId, currentUserName, otherUserId, otherUserName);
+    const { data, error } = await supabase
+      .from('dm_channels')
+      .upsert(
+        {
+          id: channelId,
+          participant_ids: sorted.ids,
+          participant_labels: sorted.labels,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' },
+      )
+      .select(
+        'id, participant_ids, participant_labels, created_at, updated_at, last_message_text, last_message_at, last_message_author_id, last_message_author_label',
+      )
+      .single();
+
+    if (data && !error) {
+      return mapRemoteChannel(data as DMChannelRow);
+    }
+
+    throw createSupabaseError('Supabase DM channel upsert failed', error);
+  }
+
   await loadChannels();
   const channelId = getDMChannelId(currentUserId, otherUserId);
-  
   let channel = channelStore.get(channelId);
   if (!channel) {
     const now = new Date().toISOString();
@@ -75,32 +213,114 @@ export async function getOrCreateDMChannel(
     channelStore.set(channelId, channel);
     await saveChannels();
   }
-  
-  return channel;
+  return mapLocalChannel(channel);
 }
 
-export async function getDMChannel(channelId: string): Promise<DMChannel | null> {
+export async function getDMChannel(channelId: string, currentUserId?: string): Promise<StoredDMChannel | null> {
+  if (currentUserId && canUseSupabase(currentUserId) && supabase) {
+    const { data, error } = await supabase
+      .from('dm_channels')
+      .select(
+        'id, participant_ids, participant_labels, created_at, updated_at, last_message_text, last_message_at, last_message_author_id, last_message_author_label',
+      )
+      .eq('id', channelId)
+      .single();
+    if (data && !error) return mapRemoteChannel(data as DMChannelRow);
+    throw createSupabaseError('Supabase DM channel fetch failed', error);
+  }
+
   await loadChannels();
   return channelStore.get(channelId) ?? null;
 }
 
-export async function getUserDMChannels(userId: string): Promise<DMChannel[]> {
+export async function getUserDMChannels(userId: string): Promise<StoredDMChannel[]> {
+  if (canUseSupabase(userId) && supabase) {
+    const { data, error } = await supabase
+      .from('dm_channels')
+      .select(
+        'id, participant_ids, participant_labels, created_at, updated_at, last_message_text, last_message_at, last_message_author_id, last_message_author_label',
+      )
+      .contains('participant_ids', [userId])
+      .order('last_message_at', { ascending: false, nullsFirst: false })
+      .order('updated_at', { ascending: false });
+
+    if (!error && data) {
+      return data.map((row) => mapRemoteChannel(row as DMChannelRow));
+    }
+
+    throw createSupabaseError('Supabase DM channel fetch failed', error);
+  }
+
   await loadChannels();
-  const channels: DMChannel[] = [];
+  const channels: LocalDMChannel[] = [];
   channelStore.forEach((channel) => {
     if (channel.participants.includes(userId)) {
       channels.push(channel);
     }
   });
-  return channels.sort((a, b) => 
-    new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
-  );
+  return channels
+    .sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime())
+    .map((channel) => mapLocalChannel(channel));
+}
+
+export async function getUserDMChannelHeads(userId: string): Promise<DMChannelHead[]> {
+  if (canUseSupabase(userId) && supabase) {
+    const { data, error } = await supabase
+      .from('dm_channels')
+      .select('id, last_message_at, updated_at, created_at')
+      .contains('participant_ids', [userId]);
+
+    if (!error && data) {
+      return (data as DMChannelHeadRow[]).map((row) => ({
+        id: row.id,
+        lastMessageAt: row.last_message_at ?? null,
+        updatedAt: row.updated_at,
+        createdAt: row.created_at,
+      }));
+    }
+
+    throw createSupabaseError('Supabase DM channel heads fetch failed', error);
+  }
+
+  await loadChannels();
+  const heads: DMChannelHead[] = [];
+  channelStore.forEach((channel) => {
+    if (channel.participants.includes(userId)) {
+      heads.push({
+        id: channel.id,
+        lastMessageAt: channel.lastMessageAt ?? null,
+        updatedAt: channel.lastMessageAt ?? channel.createdAt,
+        createdAt: channel.createdAt,
+      });
+    }
+  });
+  return heads;
 }
 
 export async function sendDMMessage(
   channelId: string,
   message: Omit<ChatMessage, 'id' | 'timestamp'>,
 ): Promise<ChatMessage | null> {
+  const authorId = message.authorId ?? '';
+  if (canUseSupabase(authorId) && supabase) {
+    const { data, error } = await supabase
+      .from('dm_messages')
+      .insert({
+        channel_id: channelId,
+        author_id: authorId,
+        author_label: message.author,
+        content: message.content,
+      })
+      .select('id, channel_id, author_id, author_label, content, created_at')
+      .single();
+
+    if (!error && data) {
+      return mapRemoteMessage(data as DMMessageRow, authorId);
+    }
+
+    throw createSupabaseError('Supabase DM message insert failed', error);
+  }
+
   await loadChannels();
   const channel = channelStore.get(channelId);
   if (!channel) return null;
@@ -110,33 +330,122 @@ export async function sendDMMessage(
     ...message,
     id: `${channelId}-${now.getTime()}`,
     timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    createdAt: now.toISOString(),
   };
 
   channel.messages.push(fullMessage);
   channel.lastMessageAt = now.toISOString();
-  
+  channel.lastMessageText = fullMessage.content;
+  channel.lastMessageAuthorId = fullMessage.authorId ?? null;
+  channel.lastMessageAuthorName = fullMessage.author;
+
   await saveChannels();
-  
+
   listeners.forEach((listener) => listener(channelId, fullMessage));
-  
+
   return fullMessage;
 }
 
-export async function getDMMessages(channelId: string): Promise<ChatMessage[]> {
+export async function getDMMessages(channelId: string, currentUserId?: string): Promise<ChatMessage[]> {
+  if (currentUserId && canUseSupabase(currentUserId) && supabase) {
+    const { data, error } = await supabase
+      .from('dm_messages')
+      .select('id, channel_id, author_id, author_label, content, created_at')
+      .eq('channel_id', channelId)
+      .order('created_at', { ascending: true });
+
+    if (!error && data) {
+      return data.map((row) => mapRemoteMessage(row as DMMessageRow, currentUserId));
+    }
+
+    throw createSupabaseError('Supabase DM messages fetch failed', error);
+  }
+
   await loadChannels();
   const channel = channelStore.get(channelId);
   return channel?.messages ?? [];
 }
 
-export function subscribeToDMMessages(listener: DMListener): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+export async function getDMMessagesSince(
+  channelId: string,
+  currentUserId: string | undefined,
+  sinceIso: string,
+): Promise<ChatMessage[]> {
+  if (currentUserId && canUseSupabase(currentUserId) && supabase) {
+    const { data, error } = await supabase
+      .from('dm_messages')
+      .select('id, channel_id, author_id, author_label, content, created_at')
+      .eq('channel_id', channelId)
+      .gt('created_at', sinceIso)
+      .order('created_at', { ascending: true });
+
+    if (!error && data) {
+      return data.map((row) => mapRemoteMessage(row as DMMessageRow, currentUserId));
+    }
+
+    throw createSupabaseError('Supabase DM messages fetch failed', error);
+  }
+
+  await loadChannels();
+  const channel = channelStore.get(channelId);
+  if (!channel?.messages) return [];
+  const sinceMs = Date.parse(sinceIso);
+  if (Number.isNaN(sinceMs)) return channel.messages;
+  return channel.messages.filter((message) => {
+    if (!message.createdAt) return true;
+    const messageMs = Date.parse(message.createdAt);
+    if (Number.isNaN(messageMs)) return true;
+    return messageMs > sinceMs;
+  });
 }
 
-export function dmChannelToChatThread(channel: DMChannel, currentUserId: string): ChatThread {
+export function subscribeToDMMessages(currentUserId: string, listener: DMListener): () => void {
+  listeners.add(listener);
+
+  if (canUseSupabase(currentUserId) && supabase) {
+    if (!realtimeChannel || realtimeUserId !== currentUserId) {
+      if (realtimeChannel) {
+        supabase.removeChannel(realtimeChannel);
+      }
+      realtimeUserId = currentUserId;
+      realtimeChannel = supabase.channel(`dm-messages:${currentUserId}`);
+      realtimeChannel
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'dm_messages' },
+          (payload) => {
+            const row = payload.new as DMMessageRow;
+            const message = mapRemoteMessage(row, currentUserId);
+            listeners.forEach((cb) => cb(row.channel_id, message));
+          },
+        )
+        .subscribe();
+    }
+  }
+
+  return () => {
+    listeners.delete(listener);
+    if (listeners.size === 0 && realtimeChannel && supabase) {
+      supabase.removeChannel(realtimeChannel);
+      realtimeChannel = null;
+      realtimeUserId = null;
+    }
+  };
+}
+
+export function dmChannelToChatThread(channel: StoredDMChannel, currentUserId: string): ChatThread {
   const otherUserIndex = channel.participants[0] === currentUserId ? 1 : 0;
   const otherUserName = channel.participantNames[otherUserIndex];
-  const lastMessage = channel.messages[channel.messages.length - 1];
+  const messageFromStore = channel.messages?.[channel.messages.length - 1];
+  const lastText = channel.lastMessageText ?? messageFromStore?.content ?? 'Start a conversation';
+  const lastTs =
+    channel.lastMessageAt ??
+    channel.createdAt ??
+    new Date().toISOString();
+  const lastAuthor =
+    channel.lastMessageAuthorName ??
+    messageFromStore?.author ??
+    'System';
 
   return {
     id: channel.id,
@@ -144,18 +453,13 @@ export function dmChannelToChatThread(channel: DMChannel, currentUserId: string)
     participants: [...channel.participantNames],
     peerAddress: `dm:${channel.participants[otherUserIndex]}`,
     isOnline: true,
-    lastMessage: lastMessage
-      ? {
-          text: lastMessage.content,
-          ts: lastMessage.timestamp,
-          from: lastMessage.author,
-          authorId: lastMessage.authorId,
-        }
-      : {
-          text: 'Start a conversation',
-          ts: new Date(channel.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          from: 'System',
-        },
+    isDM: true,
+    lastMessage: {
+      text: lastText,
+      ts: new Date(lastTs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      from: lastAuthor,
+      authorId: channel.lastMessageAuthorId ?? messageFromStore?.authorId,
+    },
   };
 }
 

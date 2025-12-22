@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Toast, { BaseToast, type ToastConfigParams } from 'react-native-toast-message';
 import WalletScreen from './src/screens/WalletScreen';
 import SecureChatScreen from './src/screens/SecureChatScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
@@ -18,6 +19,33 @@ function AppContent() {
   const insets = useSafeAreaInsets();
   const { colors, resolved } = useTheme();
   const isSetupMode = status === 'missing' || status === 'loading' || (status === 'unlocked' && !backupCompleted);
+
+  const toastConfig = useMemo(
+    () => ({
+      chat: ({ text1, text2, onPress }: ToastConfigParams<unknown>) => (
+        <BaseToast
+          onPress={onPress}
+          text1={text1}
+          text2={text2}
+          style={[
+            toastStyles.toast,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              borderLeftColor: colors.accent,
+              shadowColor: colors.accent,
+            },
+          ]}
+          contentContainerStyle={toastStyles.toastContent}
+          text1Style={[toastStyles.toastTitle, { color: colors.text }]}
+          text2Style={[toastStyles.toastMessage, { color: colors.muted }]}
+          text1NumberOfLines={1}
+          text2NumberOfLines={2}
+        />
+      ),
+    }),
+    [colors],
+  );
 
   useEffect(() => {
     if (isSetupMode && activeTab !== 'wallet') {
@@ -93,6 +121,8 @@ function AppContent() {
         {!isSetupMode && (
           <BottomNavBar activeTab={activeTab} onTabChange={setActiveTab} />
         )}
+
+        <Toast config={toastConfig} topOffset={insets.top + 12} />
       </View>
     </View>
   );
@@ -109,3 +139,20 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
+
+const toastStyles = StyleSheet.create({
+  toast: {
+    borderWidth: 1,
+    borderLeftWidth: 4,
+  },
+  toastContent: {
+    paddingHorizontal: 12,
+  },
+  toastTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  toastMessage: {
+    fontSize: 12,
+  },
+});
