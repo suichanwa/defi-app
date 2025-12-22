@@ -23,7 +23,6 @@ import { getSolanaConnection } from '../services/solanaProvider';
 import {
   canUseBiometrics,
   getBiometricPassword,
-  promptBiometric,
   saveBiometricPassword,
 } from '../services/biometrics';
 
@@ -114,6 +113,7 @@ export default function WalletScreen() {
   const totalValueAnimated = useRef(new RNAnimated.Value(0)).current;
   const [displayTotal, setDisplayTotal] = useState(0);
   const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const biometricInFlightRef = useRef(false);
 
   const trackedPairs = useMemo(() => chainTokens.filter((t) => t.pair).map((t) => t.pair as string), [chainTokens]);
 
@@ -197,25 +197,21 @@ export default function WalletScreen() {
     
     const tryBiometricUnlock = async () => {
       if (status !== 'locked') return;
-      
-      // Check if biometrics are available on this device
-      const canUse = await canUseBiometrics();
-      if (!canUse || cancelled) return;
-      
-      // Check if there's a stored biometric password first
-      const stored = await getBiometricPassword();
-      if (!stored || cancelled) return; // No stored password, user needs to unlock manually first
-      
-      // Prompt for biometric authentication
-      const auth = await promptBiometric('Unlock wallet with fingerprint');
-      if (!auth.success || cancelled) return; // User canceled or failed, let them use PIN
-      
-      // Attempt to unlock with stored password
+      if (biometricInFlightRef.current) return;
+
+      biometricInFlightRef.current = true;
       try {
+        // Check if biometrics are available on this device
+        const canUse = await canUseBiometrics();
+        if (!canUse || cancelled) return;
+        const stored = await getBiometricPassword();
+        if (!stored || cancelled) return;
         await unlock(stored);
         if (!cancelled) setFlow('menu');
       } catch {
         // Silent fail - user can still unlock manually with PIN
+      } finally {
+        biometricInFlightRef.current = false;
       }
     };
 
@@ -451,21 +447,17 @@ export default function WalletScreen() {
       setShowErrorDialog(true);
       return;
     }
-    const auth = await promptBiometric('Unlock wallet');
-    if (!auth.success) {
-      setFlowError(auth.error ?? 'Biometric unlock canceled.');
-      setShowErrorDialog(true);
-      return;
-    }
-    const stored = await getBiometricPassword();
-    if (!stored) {
-      setFlowError('No biometric passcode stored yet. Unlock once with your passcode first.');
-      setShowErrorDialog(true);
-      return;
-    }
+    if (biometricInFlightRef.current) return;
     setIsSubmitting(true);
     startSlowMessage('Yeah, this might take a moment...');
     try {
+      biometricInFlightRef.current = true;
+      const stored = await getBiometricPassword();
+      if (!stored) {
+        setFlowError('No biometric passcode stored yet. Unlock once with your passcode first.');
+        setShowErrorDialog(true);
+        return;
+      }
       await unlock(stored);
       setFlow('menu');
       setFlowMessage('Wallet unlocked.');
@@ -473,6 +465,7 @@ export default function WalletScreen() {
       setFlowError(walletErrorMessage(error, 'unlock'));
       setShowErrorDialog(true);
     } finally {
+      biometricInFlightRef.current = false;
       clearSlowMessage();
       setIsSubmitting(false);
     }

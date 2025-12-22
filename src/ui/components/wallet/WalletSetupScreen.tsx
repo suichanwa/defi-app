@@ -1,8 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Easing, Modal, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Animated,
+  Easing,
+  Modal,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createWalletStyles } from '@styles/WalletStyles';
 import WalletHelpModal from './WalletHelpModal';
+import NumericKeyboard from './NumericKeyboard';
 import { useTheme } from '@theme/ThemeProvider';
 
 type Props = {
@@ -43,25 +54,46 @@ type Props = {
 
 const PASSCODE_LENGTH = 6;
 
+type PasscodeFieldId = 'primary' | 'confirm' | 'unlock';
+
 type PasscodeFieldProps = {
   label: string;
   value: string;
   onChange: (value: string) => void;
   autoFocus?: boolean;
+  isActive?: boolean;
+  onActivate?: () => void;
   styles: ReturnType<typeof createWalletStyles>;
 };
 
-function PasscodeField({ label, value, onChange, autoFocus, styles }: PasscodeFieldProps) {
+function PasscodeField({ label, value, onChange, autoFocus, isActive, onActivate, styles }: PasscodeFieldProps) {
   const inputRef = useRef<TextInput>(null);
   const digits = value.split('');
   const activeIndex = Math.min(value.length, PASSCODE_LENGTH - 1);
+
+  useEffect(() => {
+    if (!autoFocus) return;
+    onActivate?.();
+    const id = setTimeout(() => inputRef.current?.focus(), 0);
+    return () => clearTimeout(id);
+  }, [autoFocus, onActivate]);
+
+  const handleActivate = () => {
+    onActivate?.();
+    inputRef.current?.focus();
+  };
+
+  const handleChangeText = (nextValue: string) => {
+    const sanitized = nextValue.replace(/\D/g, '').slice(0, PASSCODE_LENGTH);
+    onChange(sanitized);
+  };
 
   return (
     <View style={styles.passcodeField}>
       <Text style={styles.passcodeLabel}>{label}</Text>
       <TouchableOpacity
-        style={styles.passcodeRow}
-        onPress={() => inputRef.current?.focus()}
+        style={[styles.passcodeRow, isActive && styles.passcodeRowActive]}
+        onPress={handleActivate}
         activeOpacity={0.9}
       >
         {Array.from({ length: PASSCODE_LENGTH }).map((_, index) => {
@@ -83,13 +115,17 @@ function PasscodeField({ label, value, onChange, autoFocus, styles }: PasscodeFi
       <TextInput
         ref={inputRef}
         value={value}
-        onChangeText={onChange}
+        onChangeText={handleChangeText}
         keyboardType="number-pad"
         textContentType="oneTimeCode"
         maxLength={PASSCODE_LENGTH}
         autoFocus={autoFocus}
         secureTextEntry
         style={styles.passcodeHiddenInput}
+        showSoftInputOnFocus={false}
+        caretHidden
+        contextMenuHidden
+        autoCorrect={false}
       />
     </View>
   );
@@ -123,34 +159,6 @@ function ScreenTransition({ children, triggerKey }: ScreenTransitionProps) {
   }, [opacity, translateY, triggerKey]);
 
   return <Animated.View style={{ opacity, transform: [{ translateY }] }}>{children}</Animated.View>;
-}
-
-type BiometricUnlockButtonProps = {
-  onPress: () => void;
-  disabled?: boolean;
-  label?: string;
-  styles: ReturnType<typeof createWalletStyles>;
-  iconColor: string;
-};
-
-function BiometricUnlockButton({
-  onPress,
-  disabled = false,
-  label = 'Use fingerprint',
-  styles,
-  iconColor,
-}: BiometricUnlockButtonProps) {
-  return (
-    <TouchableOpacity
-      style={[styles.secondaryButton, styles.fingerprintButton, disabled && styles.buttonDisabled]}
-      onPress={onPress}
-      activeOpacity={0.9}
-      disabled={disabled}
-    >
-      <Ionicons name="finger-print" size={18} color={iconColor} style={styles.fingerprintIcon} />
-      <Text style={styles.secondaryButtonText}>{label}</Text>
-    </TouchableOpacity>
-  );
 }
 
 export default function WalletSetupScreen({
@@ -193,11 +201,24 @@ export default function WalletSetupScreen({
   const [showHelp, setShowHelp] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const lastAutoUnlock = useRef('');
+  const [activePasscodeField, setActivePasscodeField] = useState<PasscodeFieldId | null>(null);
 
   const sanitizePasscode = (value: string) => value.replace(/\D/g, '').slice(0, PASSCODE_LENGTH);
-  const handlePasscodeChange = (value: string) => onChangeWalletPassword(sanitizePasscode(value));
-  const handlePasscodeConfirmChange = (value: string) => onChangeWalletPasswordConfirm(sanitizePasscode(value));
-  const handleUnlockChange = (value: string) => onChangeUnlockPassword(sanitizePasscode(value));
+  const handlePasscodeChange = (value: string) => {
+    const next = sanitizePasscode(value);
+    onChangeWalletPassword(next);
+    if (next.length === PASSCODE_LENGTH && (flow === 'create-passcode' || showImportModal)) {
+      setActivePasscodeField('confirm');
+    }
+  };
+  const handlePasscodeConfirmChange = (value: string) => {
+    const next = sanitizePasscode(value);
+    onChangeWalletPasswordConfirm(next);
+  };
+  const handleUnlockChange = (value: string) => {
+    const next = sanitizePasscode(value);
+    onChangeUnlockPassword(next);
+  };
 
   const openImportModal = () => {
     onGoImport();
@@ -212,6 +233,22 @@ export default function WalletSetupScreen({
   };
 
   useEffect(() => {
+    if (flow === 'create-passcode') {
+      setActivePasscodeField('primary');
+      return;
+    }
+    if (flow === 'unlock' || status === 'locked') {
+      setActivePasscodeField('unlock');
+      return;
+    }
+    if (showImportModal) {
+      setActivePasscodeField('primary');
+      return;
+    }
+    setActivePasscodeField(null);
+  }, [flow, showImportModal, status]);
+
+  useEffect(() => {
     const canAutoUnlock = status === 'locked' || flow === 'unlock';
     if (!canAutoUnlock || isSubmitting) return;
     if (unlockPassword.length < PASSCODE_LENGTH) {
@@ -223,6 +260,60 @@ export default function WalletSetupScreen({
       onUnlock();
     }
   }, [flow, isSubmitting, onUnlock, status, unlockPassword]);
+
+  const effectivePasscodeField =
+    activePasscodeField ??
+    (flow === 'unlock' || status === 'locked'
+      ? 'unlock'
+      : flow === 'create-passcode' || showImportModal
+      ? 'primary'
+      : null);
+
+  const activePasscodeValue = (() => {
+    switch (effectivePasscodeField) {
+      case 'confirm':
+        return walletPasswordConfirm;
+      case 'unlock':
+        return unlockPassword;
+      case 'primary':
+      default:
+        return walletPassword;
+    }
+  })();
+
+  const applyPasscodeValue = (next: string) => {
+    if (!effectivePasscodeField) return;
+    if (!activePasscodeField) {
+      setActivePasscodeField(effectivePasscodeField);
+    }
+    if (effectivePasscodeField === 'confirm') {
+      handlePasscodeConfirmChange(next);
+      return;
+    }
+    if (effectivePasscodeField === 'unlock') {
+      handleUnlockChange(next);
+      return;
+    }
+    handlePasscodeChange(next);
+  };
+
+  const handleKeypadDigit = (digit: string) => {
+    if (!effectivePasscodeField) return;
+    if (activePasscodeValue.length >= PASSCODE_LENGTH) return;
+    applyPasscodeValue(`${activePasscodeValue}${digit}`);
+  };
+
+  const handleKeypadDelete = () => {
+    if (!effectivePasscodeField) return;
+    if (activePasscodeValue.length === 0) return;
+    applyPasscodeValue(activePasscodeValue.slice(0, -1));
+  };
+
+  const handleKeypadClear = () => {
+    if (!effectivePasscodeField) return;
+    if (activePasscodeValue.length === 0) return;
+    applyPasscodeValue('');
+  };
 
   const renderProgress = (step: number) => {
     const percent = Math.round((step / 3) * 100);
@@ -338,13 +429,24 @@ export default function WalletSetupScreen({
             value={walletPassword}
             onChange={handlePasscodeChange}
             autoFocus
+            isActive={effectivePasscodeField === 'primary'}
+            onActivate={() => setActivePasscodeField('primary')}
             styles={styles}
           />
           <PasscodeField
             label="Confirm passcode"
             value={walletPasswordConfirm}
             onChange={handlePasscodeConfirmChange}
+            isActive={effectivePasscodeField === 'confirm'}
+            onActivate={() => setActivePasscodeField('confirm')}
             styles={styles}
+          />
+          <NumericKeyboard
+            styles={styles}
+            iconColor={colors.text}
+            onDigit={handleKeypadDigit}
+            onDelete={handleKeypadDelete}
+            onClear={handleKeypadClear}
           />
           {flowError && <Text style={styles.errorText}>{flowError}</Text>}
           {flowMessage && <Text style={styles.successText}>{flowMessage}</Text>}
@@ -419,7 +521,18 @@ export default function WalletSetupScreen({
             value={unlockPassword}
             onChange={handleUnlockChange}
             autoFocus
+            isActive={effectivePasscodeField === 'unlock'}
+            onActivate={() => setActivePasscodeField('unlock')}
             styles={styles}
+          />
+          <NumericKeyboard
+            styles={styles}
+            iconColor={colors.text}
+            onDigit={handleKeypadDigit}
+            onDelete={handleKeypadDelete}
+            onClear={handleKeypadClear}
+            onBiometric={onBiometricUnlock}
+            biometricsAvailable={biometricsAvailable}
           />
           {flowError && <Text style={styles.errorText}>{flowError}</Text>}
           {flowMessage && <Text style={styles.successText}>{flowMessage}</Text>}
@@ -437,14 +550,6 @@ export default function WalletSetupScreen({
           >
             <Text style={styles.primaryButtonText}>Log in</Text>
           </TouchableOpacity>
-          {biometricsAvailable && (
-            <BiometricUnlockButton
-              onPress={onBiometricUnlock}
-              disabled={isSubmitting}
-              styles={styles}
-              iconColor={colors.text}
-            />
-          )}
         </View>
       </ScreenTransition>
     );
@@ -484,7 +589,11 @@ export default function WalletSetupScreen({
           <WalletHelpModal visible={showHelp} onClose={() => setShowHelp(false)} />
           <Modal visible={showImportModal} transparent animationType="fade" onRequestClose={closeImportModal}>
             <View style={styles.modalOverlay}>
-              <View style={styles.modalCard}>
+              <ScrollView
+                style={styles.modalScroll}
+                contentContainerStyle={styles.modalCard}
+                showsVerticalScrollIndicator={false}
+              >
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>Import wallet</Text>
                   <TouchableOpacity onPress={closeImportModal} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -505,13 +614,24 @@ export default function WalletSetupScreen({
                   label="Passcode"
                   value={walletPassword}
                   onChange={handlePasscodeChange}
+                  isActive={effectivePasscodeField === 'primary'}
+                  onActivate={() => setActivePasscodeField('primary')}
                   styles={styles}
                 />
                 <PasscodeField
                   label="Confirm passcode"
                   value={walletPasswordConfirm}
                   onChange={handlePasscodeConfirmChange}
+                  isActive={effectivePasscodeField === 'confirm'}
+                  onActivate={() => setActivePasscodeField('confirm')}
                   styles={styles}
+                />
+                <NumericKeyboard
+                  styles={styles}
+                  iconColor={colors.text}
+                  onDigit={handleKeypadDigit}
+                  onDelete={handleKeypadDelete}
+                  onClear={handleKeypadClear}
                 />
                 {flowError && <Text style={styles.errorText}>{flowError}</Text>}
                 {flowMessage && <Text style={styles.successText}>{flowMessage}</Text>}
@@ -537,7 +657,7 @@ export default function WalletSetupScreen({
                 >
                   <Text style={styles.secondaryButtonText}>Cancel</Text>
                 </TouchableOpacity>
-              </View>
+              </ScrollView>
             </View>
           </Modal>
         </View>

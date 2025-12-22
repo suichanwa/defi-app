@@ -496,6 +496,14 @@ export const createWalletStyles = (colors: WalletPalette) =>
     passcodeRow: {
       flexDirection: 'row',
       alignSelf: 'center',
+      padding: 4,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: 'transparent',
+    },
+    passcodeRowActive: {
+      borderColor: colors.accent,
+      backgroundColor: `${colors.accent}12`,
     },
     passcodeCell: {
       width: 44,
@@ -533,6 +541,46 @@ export const createWalletStyles = (colors: WalletPalette) =>
       height: 1,
       left: 0,
       top: 0,
+    },
+    keypad: {
+      marginTop: 16,
+    },
+    keypadRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 12,
+      marginBottom: 12,
+    },
+    keypadRowLast: {
+      marginBottom: 0,
+    },
+    keypadKey: {
+      flex: 1,
+      height: 56,
+      borderRadius: 16,
+      borderWidth: 1.5,
+      borderColor: colors.text,
+      backgroundColor: colors.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    keypadKeyAlt: {
+      borderRadius: 22,
+      borderColor: colors.accent,
+      backgroundColor: `${colors.accent}12`,
+    },
+    keypadKeyAction: {
+      borderColor: colors.border,
+      backgroundColor: colors.background,
+    },
+    keypadKeyText: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    keypadKeySpacer: {
+      borderColor: 'transparent',
+      backgroundColor: 'transparent',
     },
     modalInput: {
       minHeight: 88,
@@ -577,6 +625,10 @@ export const createWalletStyles = (colors: WalletPalette) =>
       alignItems: 'center',
       justifyContent: 'center',
       padding: 20,
+    },
+    modalScroll: {
+      width: '100%',
+      maxHeight: '90%',
     },
     modalCard: {
       width: '100%',
