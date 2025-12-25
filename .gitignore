@@ -8,7 +8,7 @@ node_modules/
 dist/
 web-build/
 expo-env.d.ts
-rust-api
+rust-api/target/
 
 # Native
 .kotlin/
