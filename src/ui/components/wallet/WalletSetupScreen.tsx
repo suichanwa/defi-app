@@ -1,19 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Animated,
-  Easing,
-  Modal,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Animated, Easing, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createWalletStyles } from '@styles/WalletStyles';
 import WalletHelpModal from './WalletHelpModal';
-import NumericKeyboard from './NumericKeyboard';
+import WalletLoadingCard from './WalletLoadingCard';
+import WalletCreatePasscodeCard from './WalletCreatePasscodeCard';
+import WalletUnlockCard from './WalletUnlockCard';
+import WalletRecoveryCard from './WalletRecoveryCard';
+import WalletSuccessCard from './WalletSuccessCard';
+import WalletImportModal from './WalletImportModal';
 import { useTheme } from '@theme/ThemeProvider';
 
 type Props = {
@@ -52,84 +47,7 @@ type Props = {
   biometricsAvailable: boolean;
 };
 
-const PASSCODE_LENGTH = 6;
-
 type PasscodeFieldId = 'primary' | 'confirm' | 'unlock';
-
-type PasscodeFieldProps = {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  autoFocus?: boolean;
-  isActive?: boolean;
-  onActivate?: () => void;
-  styles: ReturnType<typeof createWalletStyles>;
-};
-
-function PasscodeField({ label, value, onChange, autoFocus, isActive, onActivate, styles }: PasscodeFieldProps) {
-  const inputRef = useRef<TextInput>(null);
-  const digits = value.split('');
-  const activeIndex = Math.min(value.length, PASSCODE_LENGTH - 1);
-
-  useEffect(() => {
-    if (!autoFocus) return;
-    onActivate?.();
-    const id = setTimeout(() => inputRef.current?.focus(), 0);
-    return () => clearTimeout(id);
-  }, [autoFocus, onActivate]);
-
-  const handleActivate = () => {
-    onActivate?.();
-    inputRef.current?.focus();
-  };
-
-  const handleChangeText = (nextValue: string) => {
-    const sanitized = nextValue.replace(/\D/g, '').slice(0, PASSCODE_LENGTH);
-    onChange(sanitized);
-  };
-
-  return (
-    <View style={styles.passcodeField}>
-      <Text style={styles.passcodeLabel}>{label}</Text>
-      <TouchableOpacity
-        style={[styles.passcodeRow, isActive && styles.passcodeRowActive]}
-        onPress={handleActivate}
-        activeOpacity={0.9}
-      >
-        {Array.from({ length: PASSCODE_LENGTH }).map((_, index) => {
-          const isActive = value.length < PASSCODE_LENGTH && index === activeIndex;
-          return (
-            <View
-              key={`passcode-${index}`}
-              style={[
-                styles.passcodeCell,
-                index < PASSCODE_LENGTH - 1 && styles.passcodeCellSpacing,
-                isActive && styles.passcodeCellActive,
-              ]}
-            >
-              <View style={[styles.passcodeDot, digits[index] ? styles.passcodeDotFilled : styles.passcodeDotEmpty]} />
-            </View>
-          );
-        })}
-      </TouchableOpacity>
-      <TextInput
-        ref={inputRef}
-        value={value}
-        onChangeText={handleChangeText}
-        keyboardType="number-pad"
-        textContentType="oneTimeCode"
-        maxLength={PASSCODE_LENGTH}
-        autoFocus={autoFocus}
-        secureTextEntry
-        style={styles.passcodeHiddenInput}
-        showSoftInputOnFocus={false}
-        caretHidden
-        contextMenuHidden
-        autoCorrect={false}
-      />
-    </View>
-  );
-}
 
 type ScreenTransitionProps = {
   children: React.ReactNode;
@@ -201,7 +119,9 @@ export default function WalletSetupScreen({
   const [showHelp, setShowHelp] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const lastAutoUnlock = useRef('');
+  const lastAutoCreate = useRef('');
   const [activePasscodeField, setActivePasscodeField] = useState<PasscodeFieldId | null>(null);
+  const PASSCODE_LENGTH = 6;
 
   const sanitizePasscode = (value: string) => value.replace(/\D/g, '').slice(0, PASSCODE_LENGTH);
   const handlePasscodeChange = (value: string) => {
@@ -260,6 +180,21 @@ export default function WalletSetupScreen({
       onUnlock();
     }
   }, [flow, isSubmitting, onUnlock, status, unlockPassword]);
+
+  useEffect(() => {
+    if (flow !== 'create-passcode' || isSubmitting) return;
+    if (walletPassword.length < PASSCODE_LENGTH || walletPasswordConfirm.length < PASSCODE_LENGTH) {
+      lastAutoCreate.current = '';
+      return;
+    }
+    if (walletPassword !== walletPasswordConfirm) {
+      lastAutoCreate.current = '';
+      return;
+    }
+    if (lastAutoCreate.current === walletPasswordConfirm) return;
+    lastAutoCreate.current = walletPasswordConfirm;
+    onCreate();
+  }, [flow, isSubmitting, onCreate, walletPassword, walletPasswordConfirm]);
 
   const effectivePasscodeField =
     activePasscodeField ??
@@ -331,86 +266,33 @@ export default function WalletSetupScreen({
   if (status === 'loading') {
     return (
       <ScreenTransition triggerKey={`${status}-${flow}`}>
-        <View style={styles.setupCard}>
-          <Text style={styles.setupTitle}>Checking wallet...</Text>
-        </View>
+        <WalletLoadingCard styles={styles} />
       </ScreenTransition>
     );
   }
 
   if (flow === 'create-recovery' && backupMnemonic) {
     const words = backupMnemonic.split(' ');
-    const [i1, i2] = confirmIndices;
     return (
       <ScreenTransition triggerKey={`${status}-${flow}`}>
-        <View style={styles.setupCard}>
-          <Text style={styles.setupTitle}>Recovery phrase</Text>
-          <Text style={styles.setupSubtitle}>Write these words down in order. Do not screenshot.</Text>
-          {renderProgress(2)}
-          <View style={styles.mnemonicGrid}>
-            {words.map((w, idx) => (
-              <View key={`${w}-${idx}`} style={styles.mnemonicWord}>
-                <Text style={styles.mnemonicIndex}>{idx + 1}.</Text>
-                <Text style={styles.mnemonicText}>{w}</Text>
-              </View>
-            ))}
-          </View>
-          <TouchableOpacity
-            style={[styles.checkboxRow, backupAcknowledged && styles.checkboxRowChecked]}
-            onPress={onToggleBackup}
-            activeOpacity={0.8}
-          >
-            <Ionicons
-              name={backupAcknowledged ? 'checkbox-outline' : 'square-outline'}
-              size={20}
-              color={backupAcknowledged ? colors.accent : colors.text}
-            />
-            <Text style={[styles.checkboxLabel, backupAcknowledged && styles.checkboxLabelChecked]}>
-              I wrote it down safely.
-            </Text>
-          </TouchableOpacity>
-          <Text style={styles.setupSubtitle}>Confirm words #{i1 + 1} and #{i2 + 1}</Text>
-          <TextInput
-            value={confirmWord1}
-            onChangeText={onChangeConfirmWord1}
-            placeholder={`Word ${i1 + 1}`}
-            placeholderTextColor="#94a3b8"
-            style={styles.input}
-            autoCapitalize="none"
-          />
-          <TextInput
-            value={confirmWord2}
-            onChangeText={onChangeConfirmWord2}
-            placeholder={`Word ${i2 + 1}`}
-            placeholderTextColor="#94a3b8"
-            style={styles.input}
-            autoCapitalize="none"
-          />
-          {flowError && <Text style={styles.errorText}>{flowError}</Text>}
-          {flowMessage && <Text style={styles.successText}>{flowMessage}</Text>}
-          {isSubmitting && (
-            <View style={styles.loadingRow}>
-              <ActivityIndicator size="small" color="#4f46e5" />
-              <Text style={styles.loadingText}>Finalizing setup...</Text>
-            </View>
-          )}
-          <TouchableOpacity
-            style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}
-            onPress={onConfirmBackup}
-            activeOpacity={0.9}
-            disabled={isSubmitting}
-          >
-            <Text style={styles.primaryButtonText}>I've backed this up</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.secondaryButton, isSubmitting && styles.buttonDisabled]}
-            onPress={onSkipBackup}
-            activeOpacity={0.9}
-            disabled={isSubmitting}
-          >
-            <Text style={styles.secondaryButtonText}>Skip for now</Text>
-          </TouchableOpacity>
-        </View>
+        <WalletRecoveryCard
+          styles={styles}
+          colors={{ accent: colors.accent, text: colors.text }}
+          words={words}
+          confirmIndices={confirmIndices}
+          confirmWord1={confirmWord1}
+          confirmWord2={confirmWord2}
+          flowError={flowError}
+          flowMessage={flowMessage}
+          isSubmitting={isSubmitting}
+          backupAcknowledged={backupAcknowledged}
+          onToggleBackup={onToggleBackup}
+          onChangeConfirmWord1={onChangeConfirmWord1}
+          onChangeConfirmWord2={onChangeConfirmWord2}
+          onConfirmBackup={onConfirmBackup}
+          onSkipBackup={onSkipBackup}
+          renderProgress={() => renderProgress(2)}
+        />
       </ScreenTransition>
     );
   }
@@ -418,61 +300,27 @@ export default function WalletSetupScreen({
   if (flow === 'create-passcode') {
     return (
       <ScreenTransition triggerKey={`${status}-${flow}`}>
-        <View style={styles.setupCard}>
-          <Text style={styles.setupTitle}>Create a wallet</Text>
-          <Text style={styles.setupSubtitle}>
-            Set a 6-digit passcode. You'll use it to log in next time.
-          </Text>
-          {renderProgress(1)}
-          <PasscodeField
-            label="Passcode"
-            value={walletPassword}
-            onChange={handlePasscodeChange}
-            autoFocus
-            isActive={effectivePasscodeField === 'primary'}
-            onActivate={() => setActivePasscodeField('primary')}
-            styles={styles}
-          />
-          <PasscodeField
-            label="Confirm passcode"
-            value={walletPasswordConfirm}
-            onChange={handlePasscodeConfirmChange}
-            isActive={effectivePasscodeField === 'confirm'}
-            onActivate={() => setActivePasscodeField('confirm')}
-            styles={styles}
-          />
-          <NumericKeyboard
-            styles={styles}
-            iconColor={colors.text}
-            onDigit={handleKeypadDigit}
-            onDelete={handleKeypadDelete}
-            onClear={handleKeypadClear}
-          />
-          {flowError && <Text style={styles.errorText}>{flowError}</Text>}
-          {flowMessage && <Text style={styles.successText}>{flowMessage}</Text>}
-          {isSubmitting && (
-            <View style={styles.loadingRow}>
-              <ActivityIndicator size="small" color="#4f46e5" />
-              <Text style={styles.loadingText}>Creating wallet...</Text>
-            </View>
-          )}
-          <TouchableOpacity
-            style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}
-            onPress={onCreate}
-            activeOpacity={0.9}
-            disabled={isSubmitting}
-          >
-            <Text style={styles.primaryButtonText}>Create wallet</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.secondaryButton, isSubmitting && styles.buttonDisabled]}
-            onPress={onBackToMenu}
-            activeOpacity={0.9}
-            disabled={isSubmitting}
-          >
-            <Text style={styles.secondaryButtonText}>Back</Text>
-          </TouchableOpacity>
-        </View>
+        <WalletCreatePasscodeCard
+          styles={styles}
+          walletPassword={walletPassword}
+          walletPasswordConfirm={walletPasswordConfirm}
+          flowError={flowError}
+          flowMessage={flowMessage}
+          isSubmitting={isSubmitting}
+          renderProgress={() => renderProgress(1)}
+          onChangeWalletPassword={handlePasscodeChange}
+          onChangeWalletPasswordConfirm={handlePasscodeConfirmChange}
+          onCreate={onCreate}
+          onBackToMenu={onBackToMenu}
+          iconColor={colors.text}
+          onDigit={handleKeypadDigit}
+          onDelete={handleKeypadDelete}
+          onClear={handleKeypadClear}
+          isPrimaryActive={effectivePasscodeField === 'primary'}
+          isConfirmActive={effectivePasscodeField === 'confirm'}
+          onActivatePrimary={() => setActivePasscodeField('primary')}
+          onActivateConfirm={() => setActivePasscodeField('confirm')}
+        />
       </ScreenTransition>
     );
   }
@@ -480,32 +328,19 @@ export default function WalletSetupScreen({
   if (flow === 'create-success') {
     return (
       <ScreenTransition triggerKey={`${status}-${flow}`}>
-        <View style={[styles.setupCard, styles.successCard]}>
-          {renderProgress(3)}
-          <View style={styles.successHero}>
-            <View style={styles.successIconWrap}>
-              <Ionicons name="checkmark-circle" size={56} color={colors.success} />
-            </View>
-            <Text style={styles.successTitle}>Wallet ready</Text>
-            <Text style={styles.successSubtitle}>
-              You're all set. Your wallet is ready and secured with your passcode.
-            </Text>
-          </View>
-          <View style={[styles.successInfoRow, backupSkipped && styles.successInfoRowSkipped]}>
-            <Ionicons
-              name={backupSkipped ? 'alert-circle' : 'shield-checkmark'}
-              size={18}
-              color={backupSkipped ? colors.warning : colors.successText}
-            />
-            <Text style={[styles.successInfoText, backupSkipped && styles.successInfoTextSkipped]}>
-              {backupSkipped ? 'Recovery phrase skipped' : 'Recovery phrase confirmed'}
-            </Text>
-          </View>
-          {flowMessage && <Text style={styles.successText}>{flowMessage}</Text>}
-          <TouchableOpacity style={styles.primaryButton} onPress={onFinishSetup} activeOpacity={0.9}>
-            <Text style={styles.primaryButtonText}>Go to wallet</Text>
-          </TouchableOpacity>
-        </View>
+        <WalletSuccessCard
+          styles={styles}
+          colors={{
+            success: colors.success,
+            warning: colors.warning,
+            successText: colors.successText,
+            warningText: colors.warningText,
+          }}
+          backupSkipped={backupSkipped}
+          flowMessage={flowMessage}
+          onFinishSetup={onFinishSetup}
+          renderProgress={() => renderProgress(3)}
+        />
       </ScreenTransition>
     );
   }
@@ -513,44 +348,23 @@ export default function WalletSetupScreen({
   if (status === 'locked' || flow === 'unlock') {
     return (
       <ScreenTransition triggerKey={`${status}-${flow}`}>
-        <View style={styles.setupCard}>
-          <Text style={styles.setupTitle}>Log in</Text>
-          <Text style={styles.setupSubtitle}>Enter your 6-digit passcode.</Text>
-          <PasscodeField
-            label="Passcode"
-            value={unlockPassword}
-            onChange={handleUnlockChange}
-            autoFocus
-            isActive={effectivePasscodeField === 'unlock'}
-            onActivate={() => setActivePasscodeField('unlock')}
-            styles={styles}
-          />
-          <NumericKeyboard
-            styles={styles}
-            iconColor={colors.text}
-            onDigit={handleKeypadDigit}
-            onDelete={handleKeypadDelete}
-            onClear={handleKeypadClear}
-            onBiometric={onBiometricUnlock}
-            biometricsAvailable={biometricsAvailable}
-          />
-          {flowError && <Text style={styles.errorText}>{flowError}</Text>}
-          {flowMessage && <Text style={styles.successText}>{flowMessage}</Text>}
-          {isSubmitting && (
-            <View style={styles.loadingRow}>
-              <ActivityIndicator size="small" color="#4f46e5" />
-              <Text style={styles.loadingText}>Logging in...</Text>
-            </View>
-          )}
-          <TouchableOpacity
-            style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}
-            onPress={onUnlock}
-            activeOpacity={0.9}
-            disabled={isSubmitting}
-          >
-            <Text style={styles.primaryButtonText}>Log in</Text>
-          </TouchableOpacity>
-        </View>
+        <WalletUnlockCard
+          styles={styles}
+          unlockPassword={unlockPassword}
+          flowError={flowError}
+          flowMessage={flowMessage}
+          isSubmitting={isSubmitting}
+          onChangeUnlockPassword={handleUnlockChange}
+          onUnlock={onUnlock}
+          iconColor={colors.text}
+          onDigit={handleKeypadDigit}
+          onDelete={handleKeypadDelete}
+          onClear={handleKeypadClear}
+          onBiometricUnlock={onBiometricUnlock}
+          biometricsAvailable={biometricsAvailable}
+          isUnlockActive={effectivePasscodeField === 'unlock'}
+          onActivateUnlock={() => setActivePasscodeField('unlock')}
+        />
       </ScreenTransition>
     );
   }
@@ -587,79 +401,30 @@ export default function WalletSetupScreen({
             <Text style={styles.secondaryButtonText}>Import existing wallet</Text>
           </TouchableOpacity>
           <WalletHelpModal visible={showHelp} onClose={() => setShowHelp(false)} />
-          <Modal visible={showImportModal} transparent animationType="fade" onRequestClose={closeImportModal}>
-            <View style={styles.modalOverlay}>
-              <ScrollView
-                style={styles.modalScroll}
-                contentContainerStyle={styles.modalCard}
-                showsVerticalScrollIndicator={false}
-              >
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Import wallet</Text>
-                  <TouchableOpacity onPress={closeImportModal} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="close" size={20} color={colors.text} />
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.modalSubtitle}>Paste your 12 or 24 word recovery phrase.</Text>
-                <TextInput
-                  value={mnemonicInput}
-                  onChangeText={onChangeMnemonic}
-                  placeholder="Recovery phrase"
-                  placeholderTextColor="#94a3b8"
-                  style={[styles.input, styles.modalInput]}
-                  multiline
-                  autoCapitalize="none"
-                />
-                <PasscodeField
-                  label="Passcode"
-                  value={walletPassword}
-                  onChange={handlePasscodeChange}
-                  isActive={effectivePasscodeField === 'primary'}
-                  onActivate={() => setActivePasscodeField('primary')}
-                  styles={styles}
-                />
-                <PasscodeField
-                  label="Confirm passcode"
-                  value={walletPasswordConfirm}
-                  onChange={handlePasscodeConfirmChange}
-                  isActive={effectivePasscodeField === 'confirm'}
-                  onActivate={() => setActivePasscodeField('confirm')}
-                  styles={styles}
-                />
-                <NumericKeyboard
-                  styles={styles}
-                  iconColor={colors.text}
-                  onDigit={handleKeypadDigit}
-                  onDelete={handleKeypadDelete}
-                  onClear={handleKeypadClear}
-                />
-                {flowError && <Text style={styles.errorText}>{flowError}</Text>}
-                {flowMessage && <Text style={styles.successText}>{flowMessage}</Text>}
-                {isSubmitting && (
-                  <View style={styles.loadingRow}>
-                    <ActivityIndicator size="small" color="#4f46e5" />
-                    <Text style={styles.loadingText}>Importing wallet...</Text>
-                  </View>
-                )}
-                <TouchableOpacity
-                  style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}
-                  onPress={onImport}
-                  activeOpacity={0.9}
-                  disabled={isSubmitting}
-                >
-                  <Text style={styles.primaryButtonText}>Import wallet</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.secondaryButton, isSubmitting && styles.buttonDisabled]}
-                  onPress={closeImportModal}
-                  activeOpacity={0.9}
-                  disabled={isSubmitting}
-                >
-                  <Text style={styles.secondaryButtonText}>Cancel</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            </View>
-          </Modal>
+          <WalletImportModal
+            visible={showImportModal}
+            styles={styles}
+            colors={{ text: colors.text }}
+            mnemonicInput={mnemonicInput}
+            walletPassword={walletPassword}
+            walletPasswordConfirm={walletPasswordConfirm}
+            flowError={flowError}
+            flowMessage={flowMessage}
+            isSubmitting={isSubmitting}
+            onChangeMnemonic={onChangeMnemonic}
+            onChangeWalletPassword={handlePasscodeChange}
+            onChangeWalletPasswordConfirm={handlePasscodeConfirmChange}
+            onImport={onImport}
+            onClose={closeImportModal}
+            iconColor={colors.text}
+            onDigit={handleKeypadDigit}
+            onDelete={handleKeypadDelete}
+            onClear={handleKeypadClear}
+            isPrimaryActive={effectivePasscodeField === 'primary'}
+            isConfirmActive={effectivePasscodeField === 'confirm'}
+            onActivatePrimary={() => setActivePasscodeField('primary')}
+            onActivateConfirm={() => setActivePasscodeField('confirm')}
+          />
         </View>
       </ScreenTransition>
     );
