@@ -29,14 +29,12 @@ export function useChatAvatar({
 }: UseChatAvatarArgs) {
   const resolveAvatar = useCallback(
     (message: ChatMessage): ChatAvatarSource => {
-      // Check if this is the current user's message
       const isCurrentUser =
         message.outgoing === true ||
         (currentUserId && message.authorId === currentUserId) ||
         message.author === currentUserLabel;
 
       if (isCurrentUser) {
-        // Return current user's avatar settings
         return {
           avatarType: currentAvatarType ?? 'identicon',
           uri: currentAvatarUri,
@@ -44,7 +42,6 @@ export function useChatAvatar({
         };
       }
 
-      // For other users, check profilesById first
       if (message.authorId && profilesById[message.authorId]) {
         const profile = profilesById[message.authorId];
         return {
@@ -54,7 +51,6 @@ export function useChatAvatar({
         };
       }
 
-      // Fallback to message's avatar info or identicon
       return {
         avatarType: message.avatarUri ? 'custom' : 'identicon',
         uri: message.avatarUri,

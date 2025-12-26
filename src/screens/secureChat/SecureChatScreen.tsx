@@ -3,11 +3,13 @@ import { Alert, BackHandler, Platform, useWindowDimensions } from 'react-native'
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { ChatMessage, ChatThread, ServerInfo } from '@app-types/secureChat';
 import type { AvatarType } from '@app-types/profile';
+import type { SecureChatMessageRow, SecureChatScreenProps } from '@app-types/secureChatScreen';
 import * as date from 'date-and-time';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
 import SecureChatContent from './components/SecureChatContent';
 import SecureChatLayout from './components/SecureChatLayout';
+import { DM_POLL_INTERVAL_ACTIVE_MS, DM_POLL_INTERVAL_IDLE_MS, UUID_REGEX } from '@constants/secureChatScreen';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import { getAuthSession, onAuthStateChange, type AuthSession } from '../../services/auth';
 import { getAnonymousId, toAnonymousProfileId } from '../../services/identity';
@@ -25,16 +27,9 @@ import {
   subscribeToDMMessages,
 } from '../../services/directMessages';
 
-type Props = {
-  isActive?: boolean;
-};
+const isUuid = (value: string) => UUID_REGEX.test(value);
 
-const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const isUuid = (value: string) => uuidRegex.test(value);
-const DM_POLL_INTERVAL_ACTIVE_MS = 1200;
-const DM_POLL_INTERVAL_IDLE_MS = 3000;
-
-export default function SecureChatScreen({ isActive = false }: Props) {
+export default function SecureChatScreen({ isActive = false }: SecureChatScreenProps) {
   const [secureTab, setSecureTab] = useState<'chats' | 'connect'>('chats');
   const [chatView, setChatView] = useState<'list' | 'thread'>('list');
   const [chats, setChats] = useState<ChatThread[]>([
@@ -195,16 +190,7 @@ export default function SecureChatScreen({ isActive = false }: Props) {
     notifyIncomingMessageRef.current = notifyIncomingMessage;
   }, [notifyIncomingMessage]);
 
-  type MessageRow = {
-    id: string;
-    room_id: string;
-    author: string;
-    author_id?: string | null;
-    content: string;
-    created_at?: string | null;
-  };
-
-  const mapRowToMessage = (row: MessageRow) => {
+  const mapRowToMessage = (row: SecureChatMessageRow) => {
     const ts = row.created_at ? new Date(row.created_at) : new Date();
     const isOutgoing = authorId ? row.author_id === authorId : row.author === displayLabel;
     const outgoingAvatarUri = isOutgoing && userAvatarType === 'custom' ? userAvatarUri : undefined;
@@ -376,7 +362,7 @@ export default function SecureChatScreen({ isActive = false }: Props) {
     if (!isSupabaseConfigured || !supabase) return;
     const supabaseClient = supabase;
     setHistoryLoading(true);
-    let data: MessageRow[] | null = null;
+    let data: SecureChatMessageRow[] | null = null;
     let error: { message?: string } | null = null;
     {
       const response = await supabaseClient
@@ -385,7 +371,7 @@ export default function SecureChatScreen({ isActive = false }: Props) {
         .eq('room_id', room)
         .order('created_at', { ascending: true })
         .limit(200);
-      data = response.data as MessageRow[] | null;
+      data = response.data as SecureChatMessageRow[] | null;
       error = response.error;
     }
 
@@ -396,7 +382,7 @@ export default function SecureChatScreen({ isActive = false }: Props) {
         .eq('room_id', room)
         .order('created_at', { ascending: true })
         .limit(200);
-      data = response.data as MessageRow[] | null;
+      data = response.data as SecureChatMessageRow[] | null;
       error = response.error;
     }
 

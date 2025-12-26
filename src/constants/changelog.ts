@@ -9,6 +9,17 @@ export type ChangelogEntry = {
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    id: '0.16-2025-12-26',
+    version: '0.16',
+    date: '2025-12-26',
+    title: 'dev build 0.16 with chat images',
+    summary: 'code refactoring and images in chat messages',
+    changes: [
+      "code refactoring and cleanup",
+      "added images to chat messages",
+    ],
+  },
+  {
     id: '0.15-2025-12-21',
     version: '0.15',
     date: '2025-12-21',
