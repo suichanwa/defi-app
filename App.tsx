@@ -4,7 +4,7 @@ import { Platform, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Toast, { BaseToast, type ToastConfigParams } from 'react-native-toast-message';
 import WalletScreen from './src/screens/WalletScreen';
-import SecureChatScreen from './src/screens/SecureChatScreen';
+import SecureChatScreen from './src/screens/secureChat/SecureChatScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import BottomNavBar, { TabName } from '@components/BottomNavBar';
 import { appShellStyles as styles } from '@styles/AppShellStyles';

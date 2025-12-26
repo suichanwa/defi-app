@@ -1,23 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, BackHandler, Platform, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Alert, BackHandler, Platform, useWindowDimensions } from 'react-native';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import ChatHeader from '@components/secureChat/ChatHeader';
-import ChatTabs from '@components/secureChat/ChatTabs';
-import ChatListScreen from '@components/secureChat/ChatListScreen';
-import ChatThreadScreen from '@components/secureChat/ChatThreadScreen';
-import ConnectScreen from '@components/secureChat/ConnectScreen';
-import type { ChatMessage, ChatThread, ServerInfo } from '../types/secureChat';
-import type { AvatarType } from '../types/profile';
+import type { ChatMessage, ChatThread, ServerInfo } from '@app-types/secureChat';
+import type { AvatarType } from '@app-types/profile';
 import * as date from 'date-and-time';
 import Toast from 'react-native-toast-message';
 import * as ImagePicker from 'expo-image-picker';
-import { useTheme } from '../theme/ThemeProvider';
-import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
-import { getAuthSession, onAuthStateChange, type AuthSession } from '../services/auth';
-import { getAnonymousId, toAnonymousProfileId } from '../services/identity';
-import { loadProfileSettings } from '../services/profileStore';
-import { useChatAvatar } from '../hooks/useChatAvatar';
-import { useChatProfiles } from '../hooks/useChatProfiles';
+import SecureChatContent from './components/SecureChatContent';
+import SecureChatLayout from './components/SecureChatLayout';
+import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
+import { getAuthSession, onAuthStateChange, type AuthSession } from '../../services/auth';
+import { getAnonymousId, toAnonymousProfileId } from '../../services/identity';
+import { loadProfileSettings } from '../../services/profileStore';
+import { useChatAvatar } from '../../hooks/useChatAvatar';
+import { useChatProfiles } from '../../hooks/useChatProfiles';
 import {
   getOrCreateDMChannel,
   getDMMessages,
@@ -27,7 +23,7 @@ import {
   getUserDMChannelHeads,
   dmChannelToChatThread,
   subscribeToDMMessages,
-} from '../services/directMessages';
+} from '../../services/directMessages';
 
 type Props = {
   isActive?: boolean;
@@ -39,7 +35,6 @@ const DM_POLL_INTERVAL_ACTIVE_MS = 1200;
 const DM_POLL_INTERVAL_IDLE_MS = 3000;
 
 export default function SecureChatScreen({ isActive = false }: Props) {
-  const { colors } = useTheme();
   const [secureTab, setSecureTab] = useState<'chats' | 'connect'>('chats');
   const [chatView, setChatView] = useState<'list' | 'thread'>('list');
   const [chats, setChats] = useState<ChatThread[]>([
@@ -966,77 +961,52 @@ export default function SecureChatScreen({ isActive = false }: Props) {
   }, [chatView, isActive, secureTab]);
 
   return (
-    <View
-      style={[
-        styles.container,
-        isCompact && styles.containerCompact,
-        { backgroundColor: colors.background },
-      ]}
+    <SecureChatLayout
+      isCompact={isCompact}
+      secureTab={secureTab}
+      timeLabel={timeLabel}
+      onTabChange={handleTabChange}
     >
-      <ChatHeader isCompact={isCompact} />
-      <ChatTabs activeTab={secureTab} onTabChange={handleTabChange} timeLabel={timeLabel} />
-
-      {secureTab === 'connect' ? (
-        <ConnectScreen
-          connectAddress={connectAddress}
-          connectName={connectName}
-          connectionLog={connectionLog}
-          devicePublicKey={devicePublicKey}
-          serverInfo={serverInfo}
-          onConnectAddressChange={setConnectAddress}
-          onConnectNameChange={setConnectName}
-          onConnectPress={handleConnectPeer}
-          onStartServer={handleStartServer}
-        />
-      ) : chatView === 'thread' ? (
-        <View style={styles.threadWrapper}>
-          <ChatThreadScreen
-            chat={selectedChat}
-            messages={selectedMessages}
-            draft={draft}
-            serverInfo={serverInfo}
-            participantCount={participantCount}
-            currentUserId={effectiveUserId}
-            onBack={() => setChatView('list')}
-            onDraftChange={setDraft}
-            onSend={handleSendMessage}
-            onPickImage={handlePickImage}
-            onClearAttachment={handleClearAttachment}
-            attachmentUri={pendingImageUri}
-            resolveAvatar={resolveAvatar}
-            resolveAuthorName={resolveAuthorName}
-            onStartDM={handleStartDM}
-            isMuted={selectedChat ? mutedChatIds.has(selectedChat.id) : false}
-            onToggleMute={handleToggleMute}
-          />
-        </View>
-      ) : (
-        <ChatListScreen
-          chats={allChats}
-          selectedChatId={selectedChatId}
-          onSelectChat={handleSelectChat}
-          onOpenSelected={handleSelectChat}
-        />
-      )}
-    </View>
+      <SecureChatContent
+        secureTab={secureTab}
+        chatView={chatView}
+        connect={{
+          connectAddress,
+          connectName,
+          connectionLog,
+          devicePublicKey,
+          serverInfo,
+          onConnectAddressChange: setConnectAddress,
+          onConnectNameChange: setConnectName,
+          onConnectPress: handleConnectPeer,
+          onStartServer: handleStartServer,
+        }}
+        thread={{
+          chat: selectedChat,
+          messages: selectedMessages,
+          draft,
+          serverInfo,
+          participantCount,
+          currentUserId: effectiveUserId,
+          onBack: () => setChatView('list'),
+          onDraftChange: setDraft,
+          onSend: handleSendMessage,
+          onPickImage: handlePickImage,
+          onClearAttachment: handleClearAttachment,
+          attachmentUri: pendingImageUri,
+          resolveAvatar,
+          resolveAuthorName,
+          onStartDM: handleStartDM,
+          isMuted: selectedChat ? mutedChatIds.has(selectedChat.id) : false,
+          onToggleMute: handleToggleMute,
+        }}
+        list={{
+          chats: allChats,
+          selectedChatId,
+          onSelectChat: handleSelectChat,
+          onOpenSelected: handleSelectChat,
+        }}
+      />
+    </SecureChatLayout>
   );
-
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 100,
-  },
-  containerCompact: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-  },
-  threadWrapper: {
-    flex: 1,
-    marginBottom: 0,
-  },
-});

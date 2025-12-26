@@ -28,6 +28,7 @@ import ChatAvatar from '@components/secureChat/ChatAvatar';
 import ChatInputBar from '@components/secureChat/ChatInputBar';
 import PrivateChatHeader from '@components/secureChat/PrivateChatHeader';
 import ViewProfileModal from '@components/secureChat/ViewProfileModal';
+import ChatImageViewer from '@components/secureChat/ChatImageViewer';
 
 type Props = {
   chat: ChatThread | null;
@@ -98,6 +99,7 @@ export default function ChatThreadScreen({
   const inputFocused = useSharedValue(0);
 
   const [selectedProfile, setSelectedProfile] = useState<SelectedProfile>(null);
+  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
 
   const handleAvatarPress = useCallback((msg: ChatMessage) => {
     const isCurrentUser = msg.outgoing === true;
@@ -269,7 +271,9 @@ export default function ChatThreadScreen({
             <Text style={authorStyle}>{authorLabel}</Text>
           </TouchableOpacity>
           {isImage ? (
-            <Image source={{ uri: msg.imageUri as string }} style={styles.messageImage} resizeMode="cover" />
+            <TouchableOpacity onPress={() => setSelectedImageUri(msg.imageUri as string)} activeOpacity={0.8}>
+              <Image source={{ uri: msg.imageUri as string }} style={styles.messageImage} resizeMode="cover" />
+            </TouchableOpacity>
           ) : (
             <Text style={bodyStyle}>{msg.content}</Text>
           )}
@@ -385,6 +389,11 @@ export default function ChatThreadScreen({
         isOnline={selectedProfile?.isOnline ?? false}
         onClose={() => setSelectedProfile(null)}
         onStartDM={onStartDM}
+      />
+      <ChatImageViewer
+        uri={selectedImageUri}
+        visible={selectedImageUri !== null}
+        onClose={() => setSelectedImageUri(null)}
       />
     </KeyboardAvoidingView>
   );
