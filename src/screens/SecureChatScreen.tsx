@@ -10,6 +10,7 @@ import type { ChatMessage, ChatThread, ServerInfo } from '../types/secureChat';
 import type { AvatarType } from '../types/profile';
 import * as date from 'date-and-time';
 import Toast from 'react-native-toast-message';
+import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../theme/ThemeProvider';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 import { getAuthSession, onAuthStateChange, type AuthSession } from '../services/auth';
@@ -55,6 +56,7 @@ export default function SecureChatScreen({ isActive = false }: Props) {
   const [dmChannels, setDmChannels] = useState<ChatThread[]>([]);
   const [selectedChatId, setSelectedChatId] = useState<string>('global');
   const [draft, setDraft] = useState('');
+  const [pendingImageUri, setPendingImageUri] = useState<string | null>(null);
   const [connectAddress, setConnectAddress] = useState('');
   const [connectName, setConnectName] = useState('');
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
@@ -150,6 +152,27 @@ export default function SecureChatScreen({ isActive = false }: Props) {
   useEffect(() => {
     resolveAuthorNameRef.current = resolveAuthorName;
   }, [resolveAuthorName]);
+
+  const handlePickImage = useCallback(async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission required', 'Allow photo access to attach images.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled) {
+      const uri = result.assets[0]?.uri;
+      if (uri) setPendingImageUri(uri);
+    }
+  }, []);
+
+  const handleClearAttachment = useCallback(() => {
+    setPendingImageUri(null);
+  }, []);
 
   const notifyIncomingMessage = useCallback(
     (chatId: string, message: ChatMessage) => {
@@ -628,6 +651,7 @@ export default function SecureChatScreen({ isActive = false }: Props) {
     setSelectedChatId(chatId);
     setRoomId(chatId);
     setChatView('thread');
+    setPendingImageUri(null);
     
     if (chatId.startsWith('dm:')) {
       try {
@@ -648,132 +672,186 @@ export default function SecureChatScreen({ isActive = false }: Props) {
     }
   }, [effectiveUserId]);
 
+  const appendLocalImageMessage = useCallback(
+    (chatId: string, imageUri: string) => {
+      const now = new Date();
+      const outgoingAvatarUri = userAvatarType === 'custom' ? userAvatarUri : undefined;
+      const message: ChatMessage = {
+        id: `${now.getTime()}-image`,
+        chatId,
+        authorId,
+        author: displayLabel,
+        content: 'Photo',
+        timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        createdAt: now.toISOString(),
+        avatarUri: outgoingAvatarUri,
+        outgoing: true,
+        type: 'image',
+        imageUri,
+      };
+
+      setMessagesByChat((prev) => {
+        const existing = prev[chatId] ?? [];
+        return { ...prev, [chatId]: [...existing, message] };
+      });
+
+      setChats((prev) =>
+        prev.map((chat) =>
+          chat.id === chatId
+            ? {
+                ...chat,
+                lastMessage: { text: message.content, ts: message.timestamp, from: 'You', authorId },
+              }
+            : chat,
+        ),
+      );
+    },
+    [authorId, displayLabel, userAvatarType, userAvatarUri],
+  );
+
   // Update handleSendMessage to support DMs
   const handleSendMessage = async () => {
-    if (!draft.trim() || !selectedChat) return;
-    
+    if (!selectedChat) return;
+    const trimmed = draft.trim();
+    const hasText = trimmed.length > 0;
+    const hasImage = Boolean(pendingImageUri);
+    let sentText = false;
+
+    if (!hasText && !hasImage) return;
+
     const isDM = selectedChat.id.startsWith('dm:');
-    
-    if (isDM) {
+
+    if (hasText && isDM) {
       if (isSupabaseConfigured && !isUuid(effectiveUserId)) {
         Alert.alert(
           'Direct message unavailable',
           'Sign in with a Supabase account to send synced DMs.',
         );
-        return;
+      } else {
+        try {
+          const outgoingAvatarUri = userAvatarType === 'custom' ? userAvatarUri : undefined;
+          const message = await sendDMMessage(selectedChat.id, {
+            chatId: selectedChat.id,
+            authorId: effectiveUserId,
+            author: displayLabel,
+            content: trimmed,
+            avatarUri: outgoingAvatarUri,
+            outgoing: true,
+            type: 'text',
+          });
+
+          if (message) {
+            setMessagesByChat((prev) => {
+              const existing = prev[selectedChat.id] ?? [];
+              const seen = existing.some((m) => m.id === message.id);
+              if (seen) return prev;
+              return { ...prev, [selectedChat.id]: [...existing, message] };
+            });
+            if (message.createdAt) {
+              lastDmFetchRef.current[selectedChat.id] = message.createdAt;
+            }
+
+            const channels = await getUserDMChannels(effectiveUserId);
+            setDmChannels(channels.map((ch) => dmChannelToChatThread(ch, effectiveUserId)));
+          }
+
+          sentText = true;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Failed to send DM.';
+          Alert.alert('Direct message error', message);
+        }
       }
-      try {
+    }
+
+    if (hasText && !isDM) {
+      if (!isSupabaseConfigured || !supabase) {
+        Alert.alert('Supabase not configured', 'Set SUPABASE_URL and SUPABASE_ANON_KEY to send messages.');
+      } else {
+        const supabaseClient = supabase;
+        const now = new Date();
         const outgoingAvatarUri = userAvatarType === 'custom' ? userAvatarUri : undefined;
-        const message = await sendDMMessage(selectedChat.id, {
+        const message: ChatMessage = {
+          id: now.getTime().toString(),
           chatId: selectedChat.id,
-          authorId: effectiveUserId,
+          authorId,
           author: displayLabel,
-          content: draft.trim(),
+          content: trimmed,
+          timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          createdAt: now.toISOString(),
           avatarUri: outgoingAvatarUri,
           outgoing: true,
           type: 'text',
+        };
+
+        setMessagesByChat((prev) => {
+          const existing = prev[selectedChat.id] ?? [];
+          return { ...prev, [selectedChat.id]: [...existing, message] };
         });
-        
-        if (message) {
-          setMessagesByChat((prev) => {
-            const existing = prev[selectedChat.id] ?? [];
-            const seen = existing.some((m) => m.id === message.id);
-            if (seen) return prev;
-            return { ...prev, [selectedChat.id]: [...existing, message] };
-          });
-          if (message.createdAt) {
-            lastDmFetchRef.current[selectedChat.id] = message.createdAt;
-          }
-          
-          const channels = await getUserDMChannels(effectiveUserId);
-          setDmChannels(channels.map((ch) => dmChannelToChatThread(ch, effectiveUserId)));
-        }
-        
-        setDraft('');
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to send DM.';
-        Alert.alert('Direct message error', message);
-      }
-      return;
-    }
-    
-    if (!isSupabaseConfigured || !supabase) {
-      Alert.alert('Supabase not configured', 'Set SUPABASE_URL and SUPABASE_ANON_KEY to send messages.');
-      return;
-    }
-    const supabaseClient = supabase;
-    const now = new Date();
-    const outgoingAvatarUri = userAvatarType === 'custom' ? userAvatarUri : undefined;
-    const message: ChatMessage = {
-      id: now.getTime().toString(),
-      chatId: selectedChat.id,
-      authorId,
-      author: displayLabel,
-      content: draft.trim(),
-      timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      createdAt: now.toISOString(),
-      avatarUri: outgoingAvatarUri,
-      outgoing: true,
-      type: 'text',
-    };
 
-    setMessagesByChat((prev) => {
-      const existing = prev[selectedChat.id] ?? [];
-      return { ...prev, [selectedChat.id]: [...existing, message] };
-    });
+        setChats((prev) =>
+          prev.map((chat) =>
+            chat.id === selectedChat.id
+              ? {
+                  ...chat,
+                  lastMessage: { text: message.content, ts: message.timestamp, from: 'You', authorId },
+                }
+              : chat,
+          ),
+        );
 
-    setChats((prev) =>
-      prev.map((chat) =>
-        chat.id === selectedChat.id
-          ? {
-              ...chat,
-              lastMessage: { text: message.content, ts: message.timestamp, from: 'You', authorId },
-            }
-          : chat,
-      ),
-    );
-    setDraft('');
-
-    // Persist to Supabase (best-effort).
-    supabaseClient
-      .from('messages')
-      .insert({
-        room_id: selectedChat.id,
-        author: displayLabel,
-        author_id: authorId ?? null,
-        content: message.content,
-        created_at: new Date().toISOString(),
-      })
-      .then(async ({ error }) => {
-        if (!error) return;
-        if (error.message?.includes('author_id')) {
-          const fallback = await supabaseClient.from('messages').insert({
+        // Persist to Supabase (best-effort).
+        supabaseClient
+          .from('messages')
+          .insert({
             room_id: selectedChat.id,
             author: displayLabel,
+            author_id: authorId ?? null,
             content: message.content,
             created_at: new Date().toISOString(),
+          })
+          .then(async ({ error }) => {
+            if (!error) return;
+            if (error.message?.includes('author_id')) {
+              const fallback = await supabaseClient.from('messages').insert({
+                room_id: selectedChat.id,
+                author: displayLabel,
+                content: message.content,
+                created_at: new Date().toISOString(),
+              });
+              if (fallback.error) {
+                setConnectionLog((prev) => [`Save error: ${fallback.error.message}`, ...prev]);
+              }
+              return;
+            }
+            setConnectionLog((prev) => [`Save error: ${error.message}`, ...prev]);
           });
-          if (fallback.error) {
-            setConnectionLog((prev) => [`Save error: ${fallback.error.message}`, ...prev]);
-          }
-          return;
-        }
-        setConnectionLog((prev) => [`Save error: ${error.message}`, ...prev]);
-      });
 
-    // Broadcast to room (ephemeral).
-    const channel = channelRef.current;
-    if (channel) {
-      const payload = { ...message, outgoing: false };
-      if (isChannelReady) {
-        await channel.send({
-          type: 'broadcast',
-          event: 'message',
-          payload,
-        });
-      } else {
-        await channel.httpSend('message', payload);
+        // Broadcast to room (ephemeral).
+        const channel = channelRef.current;
+        if (channel) {
+          const payload = { ...message, outgoing: false };
+          if (isChannelReady) {
+            await channel.send({
+              type: 'broadcast',
+              event: 'message',
+              payload,
+            });
+          } else {
+            await channel.httpSend('message', payload);
+          }
+        }
+
+        sentText = true;
       }
+    }
+
+    if (sentText) {
+      setDraft('');
+    }
+
+    if (hasImage && pendingImageUri) {
+      appendLocalImageMessage(selectedChat.id, pendingImageUri);
+      setPendingImageUri(null);
     }
   };
 
@@ -922,6 +1000,9 @@ export default function SecureChatScreen({ isActive = false }: Props) {
             onBack={() => setChatView('list')}
             onDraftChange={setDraft}
             onSend={handleSendMessage}
+            onPickImage={handlePickImage}
+            onClearAttachment={handleClearAttachment}
+            attachmentUri={pendingImageUri}
             resolveAvatar={resolveAvatar}
             resolveAuthorName={resolveAuthorName}
             onStartDM={handleStartDM}

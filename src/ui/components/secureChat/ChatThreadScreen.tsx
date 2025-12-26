@@ -6,7 +6,7 @@ import {
   Platform,
   StyleSheet,
   Text,
-  TextInput,
+  Image,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -25,6 +25,7 @@ import PulseBadge from '@components/PulseBadge';
 import type { ChatAvatarSource, ChatMessage, ChatThread, ServerInfo } from '@app-types/secureChat';
 import { useTheme } from '@theme/ThemeProvider';
 import ChatAvatar from '@components/secureChat/ChatAvatar';
+import ChatInputBar from '@components/secureChat/ChatInputBar';
 import PrivateChatHeader from '@components/secureChat/PrivateChatHeader';
 import ViewProfileModal from '@components/secureChat/ViewProfileModal';
 
@@ -38,6 +39,9 @@ type Props = {
   onBack: () => void;
   onDraftChange: (value: string) => void;
   onSend: () => void;
+  onPickImage?: () => void;
+  onClearAttachment?: () => void;
+  attachmentUri?: string | null;
   resolveAvatar: (message: ChatMessage) => ChatAvatarSource;
   resolveAuthorName: (message: ChatMessage) => string;
   onStartDM?: (userId: string, userName: string) => void;
@@ -72,6 +76,9 @@ export default function ChatThreadScreen({
   onBack,
   onDraftChange,
   onSend,
+  onPickImage,
+  onClearAttachment,
+  attachmentUri,
   resolveAvatar,
   resolveAuthorName,
   onStartDM,
@@ -242,6 +249,7 @@ export default function ChatThreadScreen({
     const isOutgoing = Boolean(msg.outgoing);
     const avatarSource = resolveAvatar(msg);
     const authorLabel = resolveAuthorName(msg);
+    const isImage = msg.type === 'image' && msg.imageUri;
 
     return (
       <Animated.View
@@ -260,7 +268,11 @@ export default function ChatThreadScreen({
           <TouchableOpacity onPress={() => handleAvatarPress(msg)} activeOpacity={0.7}>
             <Text style={authorStyle}>{authorLabel}</Text>
           </TouchableOpacity>
-          <Text style={bodyStyle}>{msg.content}</Text>
+          {isImage ? (
+            <Image source={{ uri: msg.imageUri as string }} style={styles.messageImage} resizeMode="cover" />
+          ) : (
+            <Text style={bodyStyle}>{msg.content}</Text>
+          )}
           <Text style={timeStyle}>{msg.timestamp}</Text>
         </View>
         {isOutgoing && (
@@ -354,19 +366,14 @@ export default function ChatThreadScreen({
             inputBarAnimatedStyle,
           ]}
         >
-          <TextInput
-            placeholder="Type a message..."
-            placeholderTextColor="#9ca3af"
-            style={styles.input}
-            value={draft}
-            onChangeText={onDraftChange}
-            onSubmitEditing={onSend}
-            returnKeyType="send"
-            blurOnSubmit={false}
+          <ChatInputBar
+            draft={draft}
+            onDraftChange={onDraftChange}
+            onSend={onSend}
+            onPickImage={onPickImage ?? (() => undefined)}
+            onClearAttachment={onClearAttachment}
+            attachmentUri={attachmentUri}
           />
-          <TouchableOpacity onPress={onSend} style={styles.sendButton}>
-            <MaterialCommunityIcons name="send" size={18} color={colors.accentText} />
-          </TouchableOpacity>
         </Animated.View>
       </Animated.View>
 
@@ -557,26 +564,17 @@ const createChatStyles = (colors: {
       color: colors.accentText,
     },
     inputBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
       borderWidth: 1,
       borderColor: colors.border,
       borderRadius: 12,
       backgroundColor: colors.card,
-      paddingHorizontal: 12,
-      paddingVertical: Platform.OS === 'ios' ? 10 : 8,
+      padding: 8,
       marginTop: 8,
     },
-    input: {
-      flex: 1,
-      color: colors.text,
-      minHeight: 40,
-      fontSize: 16,
-    },
-    sendButton: {
-      marginLeft: 8,
-      padding: 10,
-      borderRadius: 16,
-      backgroundColor: colors.accent,
+    messageImage: {
+      marginTop: 6,
+      width: 180,
+      height: 180,
+      borderRadius: 10,
     },
   });
