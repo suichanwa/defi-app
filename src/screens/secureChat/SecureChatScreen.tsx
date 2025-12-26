@@ -4,6 +4,7 @@ import type { ChatMessage, ChatThread, ServerInfo } from '@app-types/secureChat'
 import type { SecureChatMessageRow, SecureChatScreenProps } from '@app-types/secureChatScreen';
 import * as date from 'date-and-time';
 import Toast from 'react-native-toast-message';
+import * as Clipboard from 'expo-clipboard';
 import SecureChatContent from './components/SecureChatContent';
 import SecureChatLayout from './components/SecureChatLayout';
 import * as SecureChatConstants from '@constants/secureChatScreen';
@@ -40,6 +41,7 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
   const [connectionLog, setConnectionLog] = useState<string[]>([SecureChatConstants.DEFAULT_CONNECTION_LOG]);
   const [roomId, setRoomId] = useState<string>(SecureChatConstants.DEFAULT_GLOBAL_CHAT_ID);
   const [mutedChatIds, setMutedChatIds] = useState<Set<string>>(() => new Set());
+  const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const { width } = useWindowDimensions();
   const isCompact = width < SecureChatConstants.CHAT_COMPACT_WIDTH;
   const timeLabel = useTickingClock();
@@ -101,6 +103,11 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
         setConnectionLog((prev) => [`History error: ${message}`, ...prev]);
       },
     });
+
+  const loadInitialRef = useRef(loadInitial);
+  useEffect(() => {
+    loadInitialRef.current = loadInitial;
+  }, [loadInitial]);
 
   const selectedMessages = useMemo(
     () => messagesByChat[selectedChatId] ?? [],
@@ -205,6 +212,47 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     resolveAuthorNameRef.current = resolveAuthorName;
   }, [resolveAuthorName]);
 
+  const presencePayload = useMemo(
+    () => ({ user: displayLabel, room: roomId, authorId }),
+    [authorId, displayLabel, roomId],
+  );
+
+  const handleRealtimeSubscribed = useCallback(async () => {
+    setConnectionLog((prev) => [`Joined room ${roomId}.`, ...prev]);
+    setServerInfo({ address: 'supabase', port: 0, status: 'running' });
+    setChats((prev) =>
+      prev.map((chat) => (chat.id === roomId ? { ...chat, isOnline: true } : chat)),
+    );
+    await loadInitialRef.current(roomId);
+  }, [roomId]);
+
+  const handleRealtimeError = useCallback(() => {
+    setConnectionLog((prev) => [`Failed to join room ${roomId}. Check Supabase Realtime keys.`, ...prev]);
+  }, [roomId]);
+
+  const handlePresenceChange = useCallback(
+    (count: number) => {
+      setChats((prev) =>
+        prev.map((chat) => (chat.id === roomId ? { ...chat, isOnline: count > 0 } : chat)),
+      );
+    },
+    [roomId],
+  );
+
+  useEffect(() => {
+    setEditingMessage(null);
+  }, [selectedChatId]);
+
+  const isOwnMessage = useCallback(
+    (message: ChatMessage) => {
+      if (message.outgoing === true) return true;
+      if (message.authorId && effectiveUserId && message.authorId === effectiveUserId) return true;
+      if (!message.authorId && message.author === displayLabel) return true;
+      return false;
+    },
+    [displayLabel, effectiveUserId],
+  );
+
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -296,24 +344,11 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
   const { participantCount, sendBroadcast } = useRealtimeRoom({
     roomId,
     presenceKey: authorId ?? displayLabel,
-    presencePayload: { user: displayLabel, room: roomId, authorId },
+    presencePayload,
     onIncomingMessage: handleIncomingRoomMessage,
-    onSubscribed: async () => {
-      setConnectionLog((prev) => [`Joined room ${roomId}.`, ...prev]);
-      setServerInfo({ address: 'supabase', port: 0, status: 'running' });
-      setChats((prev) =>
-        prev.map((chat) => (chat.id === roomId ? { ...chat, isOnline: true } : chat)),
-      );
-      await loadInitial(roomId);
-    },
-    onError: () => {
-      setConnectionLog((prev) => [`Failed to join room ${roomId}. Check Supabase Realtime keys.`, ...prev]);
-    },
-    onPresenceChange: (count) => {
-      setChats((prev) =>
-        prev.map((chat) => (chat.id === roomId ? { ...chat, isOnline: count > 0 } : chat)),
-      );
-    },
+    onSubscribed: handleRealtimeSubscribed,
+    onError: handleRealtimeError,
+    onPresenceChange: handlePresenceChange,
   });
 
   const { sendText, sendImage } = useChatTransport({
@@ -380,6 +415,40 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     const hasImage = Boolean(pendingImageUri);
     const isDM = selectedChat.id.startsWith('dm:');
 
+    if (editingMessage && selectedChat.id === editingMessage.chatId) {
+      if (!hasText) {
+        Alert.alert('Edit message', 'Message cannot be empty.');
+        return;
+      }
+      const currentList = messagesByChat[selectedChat.id] ?? [];
+      const isLastMessage = currentList[currentList.length - 1]?.id === editingMessage.id;
+      const nextList = currentList.map((message) =>
+        message.id === editingMessage.id ? { ...message, content: trimmed } : message,
+      );
+      setMessagesByChat((prev) => ({ ...prev, [selectedChat.id]: nextList }));
+      if (isLastMessage) {
+        const updatedAuthor = resolveAuthorName(editingMessage);
+        setChats((prev) =>
+          prev.map((chat) =>
+            chat.id === selectedChat.id
+              ? {
+                  ...chat,
+                  lastMessage: {
+                    text: trimmed,
+                    ts: editingMessage.timestamp,
+                    from: updatedAuthor,
+                    authorId: editingMessage.authorId,
+                  },
+                }
+              : chat,
+          ),
+        );
+      }
+      setDraft('');
+      setEditingMessage(null);
+      return;
+    }
+
     if (!hasText && !hasImage) return;
 
     if (hasText) {
@@ -405,6 +474,68 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
       }
     }
   };
+
+  const handleCopyMessage = useCallback(async (message: ChatMessage) => {
+    const text = message.type === 'image' ? message.imageUri ?? '' : message.content;
+    if (!text) return;
+    await Clipboard.setStringAsync(text);
+    Toast.show({
+      type: 'chat',
+      text1: 'Copied to clipboard',
+      text2: message.type === 'image' ? 'Image link copied.' : text.length > 80 ? `${text.slice(0, 80)}...` : text,
+      position: 'top',
+      visibilityTime: 2000,
+    });
+  }, []);
+
+  const handleReplyMessage = useCallback(
+    (message: ChatMessage) => {
+      const author = resolveAuthorName(message);
+      setDraft(`@${author} `);
+    },
+    [resolveAuthorName, setDraft],
+  );
+
+  const handleEditMessage = useCallback(
+    (message: ChatMessage) => {
+      if (!isOwnMessage(message)) return;
+      if (message.type === 'image') return;
+      setEditingMessage(message);
+      setDraft(message.content);
+    },
+    [isOwnMessage, setDraft, setEditingMessage],
+  );
+
+  const handleDeleteMessage = useCallback(
+    (message: ChatMessage) => {
+      if (!isOwnMessage(message)) return;
+      const currentList = messagesByChat[message.chatId] ?? [];
+      const isLastMessage = currentList[currentList.length - 1]?.id === message.id;
+      const nextList = currentList.filter((item) => item.id !== message.id);
+      setMessagesByChat((prev) => ({ ...prev, [message.chatId]: nextList }));
+      if (isLastMessage) {
+        const last = nextList[nextList.length - 1];
+        setChats((prev) =>
+          prev.map((chat) =>
+            chat.id === message.chatId
+              ? {
+                  ...chat,
+                  lastMessage: last
+                    ? {
+                        text: last.content,
+                        ts: last.timestamp,
+                        from: resolveAuthorName(last),
+                        authorId: last.authorId,
+                      }
+                    : undefined,
+                }
+              : chat,
+          ),
+        );
+      }
+    },
+    [isOwnMessage, messagesByChat, resolveAuthorName, setMessagesByChat, setChats],
+  );
 
   const handleToggleMute = useCallback(() => {
     if (!selectedChat) return;
@@ -542,6 +673,7 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
           serverInfo,
           participantCount,
           currentUserId: effectiveUserId,
+          currentUserLabel: displayLabel,
           onBack: () => setView('list'),
           onDraftChange: setDraft,
           onSend: handleSendMessage,
@@ -553,6 +685,10 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
           attachmentUri: pendingImageUri,
           resolveAvatar,
           resolveAuthorName,
+          onCopyMessage: handleCopyMessage,
+          onReplyMessage: handleReplyMessage,
+          onEditMessage: handleEditMessage,
+          onDeleteMessage: handleDeleteMessage,
           onStartDM: handleStartDM,
           isMuted: selectedChat ? mutedChatIds.has(selectedChat.id) : false,
           onToggleMute: handleToggleMute,

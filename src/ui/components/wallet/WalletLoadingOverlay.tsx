@@ -9,7 +9,7 @@ type WalletLoadingOverlayProps = {
 
 export default function WalletLoadingOverlay({ styles, label = 'Creating wallet...' }: WalletLoadingOverlayProps) {
   return (
-    <View style={styles.loadingOverlay} pointerEvents="auto">
+    <View style={[styles.loadingOverlay, { pointerEvents: 'auto' }]}>
       <View style={styles.loadingOverlayCard}>
         <ActivityIndicator size="small" color="#4f46e5" />
         <Text style={styles.loadingOverlayText}>{label}</Text>

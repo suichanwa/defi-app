@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Easing, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createWalletStyles } from '@styles/WalletStyles';
 import WalletHelpModal from './WalletHelpModal';
@@ -65,13 +65,13 @@ function ScreenTransition({ children, triggerKey }: ScreenTransitionProps) {
       Animated.timing(opacity, {
         toValue: 1,
         duration: 220,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(translateY, {
         toValue: 0,
         duration: 260,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
   }, [opacity, translateY, triggerKey]);

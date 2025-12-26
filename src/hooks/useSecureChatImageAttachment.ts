@@ -19,10 +19,17 @@ export function useSecureChatImageAttachment(onAttachmentChange: (value: string 
       allowsEditing: true,
       quality: 0.8,
     });
-    if (!result.canceled) {
-      const uri = result.assets[0]?.uri;
-      if (uri) onAttachmentChange(uri);
+    if (result.canceled) return;
+    if (!result.assets || result.assets.length === 0) {
+      Alert.alert('Image selection failed', 'Unable to read the selected image.');
+      return;
     }
+    const uri = result.assets[0]?.uri;
+    if (!uri) {
+      Alert.alert('Image selection failed', 'Unable to read the selected image.');
+      return;
+    }
+    onAttachmentChange(uri);
   }, [onAttachmentChange]);
 
   const clearImage = useCallback(() => {

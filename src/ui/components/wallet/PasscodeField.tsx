@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Platform, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { createWalletStyles } from '@styles/WalletStyles';
 
 const PASSCODE_LENGTH = 6;
@@ -27,6 +27,7 @@ export default function PasscodeField({
   const prevAutoFocus = useRef(false);
   const digits = value.split('');
   const activeIndex = Math.min(value.length, PASSCODE_LENGTH - 1);
+  const isWeb = Platform.OS === 'web';
 
   useEffect(() => {
     if (!autoFocus || prevAutoFocus.current) {
@@ -83,9 +84,11 @@ export default function PasscodeField({
         autoFocus={autoFocus}
         secureTextEntry
         style={styles.passcodeHiddenInput}
-        showSoftInputOnFocus={false}
-        caretHidden
-        contextMenuHidden
+        {...(!isWeb && {
+          showSoftInputOnFocus: false,
+          caretHidden: true,
+          contextMenuHidden: true,
+        })}
         autoCorrect={false}
       />
     </View>

@@ -165,10 +165,11 @@ export default function WalletScreen() {
   }, [prices, chainTokens]);
 
   useEffect(() => {
+    if (status !== 'unlocked') return;
     fetchPrices();
     const interval = setInterval(fetchPrices, 1_000);
     return () => clearInterval(interval);
-  }, [trackedPairs]);
+  }, [status, trackedPairs]);
 
   useEffect(() => {
     totalValueAnimated.setValue(totalValueUSD);

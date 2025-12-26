@@ -19,6 +19,7 @@ export type SecureChatThreadProps = {
   serverInfo: ServerInfo | null;
   participantCount: number;
   currentUserId?: string;
+  currentUserLabel?: string;
   onBack: () => void;
   onDraftChange: (value: string) => void;
   onSend: () => void;
@@ -30,6 +31,10 @@ export type SecureChatThreadProps = {
   attachmentUri?: string | null;
   resolveAvatar: (message: ChatMessage) => ChatAvatarSource;
   resolveAuthorName: (message: ChatMessage) => string;
+  onCopyMessage?: (message: ChatMessage) => void;
+  onReplyMessage?: (message: ChatMessage) => void;
+  onEditMessage?: (message: ChatMessage) => void;
+  onDeleteMessage?: (message: ChatMessage) => void;
   onStartDM?: (userId: string, userName: string) => void;
   isMuted?: boolean;
   onToggleMute?: () => void;

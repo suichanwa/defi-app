@@ -29,6 +29,7 @@ import ChatInputBar from '@components/secureChat/ChatInputBar';
 import ChatThreadHeader from '@components/secureChat/ChatThreadHeader';
 import ViewProfileModal from '@components/secureChat/ViewProfileModal';
 import ChatImageViewer from '@components/secureChat/ChatImageViewer';
+import MessageSettingsMenu from '@components/secureChat/MessageSettingsMenu';
 
 type Props = {
   chat: ChatThread | null;
@@ -37,6 +38,7 @@ type Props = {
   serverInfo: ServerInfo | null;
   participantCount?: number;
   currentUserId?: string;
+  currentUserLabel?: string;
   onBack: () => void;
   onDraftChange: (value: string) => void;
   onSend: () => void;
@@ -48,6 +50,10 @@ type Props = {
   attachmentUri?: string | null;
   resolveAvatar: (message: ChatMessage) => ChatAvatarSource;
   resolveAuthorName: (message: ChatMessage) => string;
+  onCopyMessage?: (message: ChatMessage) => void;
+  onReplyMessage?: (message: ChatMessage) => void;
+  onEditMessage?: (message: ChatMessage) => void;
+  onDeleteMessage?: (message: ChatMessage) => void;
   onStartDM?: (userId: string, userName: string) => void;
   isMuted?: boolean;
   onToggleMute?: () => void;
@@ -77,6 +83,7 @@ export default function ChatThreadScreen({
   serverInfo,
   participantCount = 0,
   currentUserId,
+  currentUserLabel,
   onBack,
   onDraftChange,
   onSend,
@@ -88,6 +95,10 @@ export default function ChatThreadScreen({
   attachmentUri,
   resolveAvatar,
   resolveAuthorName,
+  onCopyMessage,
+  onReplyMessage,
+  onEditMessage,
+  onDeleteMessage,
   onStartDM,
   isMuted,
   onToggleMute,
@@ -106,6 +117,16 @@ export default function ChatThreadScreen({
 
   const [selectedProfile, setSelectedProfile] = useState<SelectedProfile>(null);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+
+  const canManageMessage = useCallback(
+    (message: ChatMessage) => {
+      if (message.outgoing === true) return true;
+      if (currentUserId && message.authorId && message.authorId === currentUserId) return true;
+      if (currentUserLabel && message.author === currentUserLabel) return true;
+      return false;
+    },
+    [currentUserId, currentUserLabel],
+  );
 
   const handleAvatarPress = useCallback((msg: ChatMessage) => {
     const isCurrentUser = msg.outgoing === true;
@@ -258,6 +279,8 @@ export default function ChatThreadScreen({
     const avatarSource = resolveAvatar(msg);
     const authorLabel = resolveAuthorName(msg);
     const isImage = msg.type === 'image' && msg.imageUri;
+    const canManage = canManageMessage(msg);
+    const iconColor = isOutgoing ? colors.accentText : colors.text;
 
     return (
       <Animated.View
@@ -273,9 +296,22 @@ export default function ChatThreadScreen({
           />
         )}
         <View style={bubbleStyle}>
-          <TouchableOpacity onPress={() => handleAvatarPress(msg)} activeOpacity={0.7}>
-            <Text style={authorStyle}>{authorLabel}</Text>
-          </TouchableOpacity>
+          <View style={styles.messageHeader}>
+            <TouchableOpacity onPress={() => handleAvatarPress(msg)} activeOpacity={0.7} style={styles.authorButton}>
+              <Text style={authorStyle} numberOfLines={1}>
+                {authorLabel}
+              </Text>
+            </TouchableOpacity>
+            <MessageSettingsMenu
+              canManage={canManage}
+              canEdit={msg.type !== 'image'}
+              iconColor={iconColor}
+              onCopy={() => onCopyMessage?.(msg)}
+              onReply={() => onReplyMessage?.(msg)}
+              onEdit={onEditMessage ? () => onEditMessage(msg) : undefined}
+              onDelete={onDeleteMessage ? () => onDeleteMessage(msg) : undefined}
+            />
+          </View>
           {isImage ? (
             <TouchableOpacity onPress={() => setSelectedImageUri(msg.imageUri as string)} activeOpacity={0.8}>
               <Image source={{ uri: msg.imageUri as string }} style={styles.messageImage} resizeMode="cover" />
@@ -492,6 +528,15 @@ const createChatStyles = (colors: {
       fontWeight: '700',
       fontSize: 13,
       color: colors.accentText,
+    },
+    messageHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    authorButton: {
+      flexShrink: 1,
+      paddingRight: 6,
     },
     messageBody: {
       marginTop: 4,

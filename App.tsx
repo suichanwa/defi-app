@@ -96,11 +96,9 @@ function AppContent() {
         <Animated.View
           style={[
             styles.screenLayer,
-            { backgroundColor: colors.background },
+            { backgroundColor: colors.background, pointerEvents: walletPointerEvents },
             walletAnimatedStyle,
-            isWeb && { pointerEvents: walletPointerEvents },
           ]}
-          pointerEvents={isWeb ? undefined : walletPointerEvents}
         >
           {renderWalletLayer()}
         </Animated.View>
@@ -109,11 +107,9 @@ function AppContent() {
           style={[
             styles.screenLayer,
             styles.chatLayer,
-            { backgroundColor: colors.background },
+            { backgroundColor: colors.background, pointerEvents: chatPointerEvents },
             secureChatAnimatedStyle,
-            isWeb && { pointerEvents: chatPointerEvents },
           ]}
-          pointerEvents={isWeb ? undefined : chatPointerEvents}
         >
           <SecureChatScreen isActive={activeTab === 'secureChat'} />
         </Animated.View>
