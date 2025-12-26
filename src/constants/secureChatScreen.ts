@@ -1,5 +1,15 @@
 export const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export const DM_POLL_INTERVAL_ACTIVE_MS = 1200;
 export const DM_POLL_INTERVAL_IDLE_MS = 3000;
-export const CHAT_HISTORY_PAGE_SIZE = 50;
+export const CHAT_HISTORY_PAGE_SIZE = 20;
 export const CHAT_HISTORY_SCROLL_THRESHOLD = 80;
+export const CHAT_COMPACT_WIDTH = 720;
+export const DEFAULT_GLOBAL_CHAT_ID = 'global';
+export const DEFAULT_GLOBAL_CHAT_NAME = 'Global room';
+export const DEFAULT_GLOBAL_CHAT_PEER = 'supabase-realtime';
+export const DEFAULT_GLOBAL_CHAT_JOIN_TEXT = 'Join to start chatting.';
+export const DEFAULT_GLOBAL_CONNECTED_TEXT = 'Connected to Supabase Realtime.';
+export const DEFAULT_CONNECTION_LOG = 'No active peer connections yet.';
+export const DEFAULT_HOST_ADDRESS = '192.168.0.24';
+export const DEFAULT_HOST_PORT_BASE = 9000;
+export const DEFAULT_HOST_PORT_RANGE = 300;

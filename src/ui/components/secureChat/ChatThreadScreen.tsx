@@ -24,6 +24,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import PulseBadge from '@components/PulseBadge';
 import type { ChatAvatarSource, ChatMessage, ChatThread, ServerInfo } from '@app-types/secureChat';
 import { useTheme } from '@theme/ThemeProvider';
+import { CHAT_HISTORY_SCROLL_THRESHOLD } from '@constants/secureChatScreen';
 import ChatAvatar from '@components/secureChat/ChatAvatar';
 import ChatInputBar from '@components/secureChat/ChatInputBar';
 import PrivateChatHeader from '@components/secureChat/PrivateChatHeader';
@@ -42,6 +43,9 @@ type Props = {
   onSend: () => void;
   onPickImage?: () => void;
   onClearAttachment?: () => void;
+  onLoadMore?: () => void;
+  isLoadingMore?: boolean;
+  hasMoreMessages?: boolean;
   attachmentUri?: string | null;
   resolveAvatar: (message: ChatMessage) => ChatAvatarSource;
   resolveAuthorName: (message: ChatMessage) => string;
@@ -79,6 +83,9 @@ export default function ChatThreadScreen({
   onSend,
   onPickImage,
   onClearAttachment,
+  onLoadMore,
+  isLoadingMore = false,
+  hasMoreMessages = false,
   attachmentUri,
   resolveAvatar,
   resolveAuthorName,
@@ -331,26 +338,18 @@ export default function ChatThreadScreen({
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
-            onLayout={() => {
-              // Scroll to bottom when layout completes
-              if (messages.length > 0) {
-                scrollToBottom(false);
+            onScroll={(event) => {
+              if (!onLoadMore || isLoadingMore || !hasMoreMessages) return;
+              const offsetY = event.nativeEvent.contentOffset.y;
+              if (offsetY <= CHAT_HISTORY_SCROLL_THRESHOLD) {
+                onLoadMore();
               }
             }}
-            onContentSizeChange={() => {
-              // Scroll when content size changes (new messages)
-              if (messages.length > 0) {
-                scrollToBottom(true);
-              }
+            scrollEventThrottle={16}
+            maintainVisibleContentPosition={{
+              minIndexForVisible: 0,
+              autoscrollToTopThreshold: 100,
             }}
-            maintainVisibleContentPosition={
-              isIOS
-                ? {
-                    minIndexForVisible: 0,
-                    autoscrollToTopThreshold: 100,
-                  }
-                : undefined
-            }
             inverted={false}
             removeClippedSubviews={false}
           />

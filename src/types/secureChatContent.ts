@@ -24,6 +24,9 @@ export type SecureChatThreadProps = {
   onSend: () => void;
   onPickImage: () => void;
   onClearAttachment: () => void;
+  onLoadMore?: () => void;
+  isLoadingMore?: boolean;
+  hasMoreMessages?: boolean;
   attachmentUri?: string | null;
   resolveAvatar: (message: ChatMessage) => ChatAvatarSource;
   resolveAuthorName: (message: ChatMessage) => string;

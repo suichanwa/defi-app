@@ -7,17 +7,29 @@ import * as date from 'date-and-time';
 import Toast from 'react-native-toast-message';
 import SecureChatContent from './components/SecureChatContent';
 import SecureChatLayout from './components/SecureChatLayout';
-import { DM_POLL_INTERVAL_ACTIVE_MS, DM_POLL_INTERVAL_IDLE_MS, UUID_REGEX } from '@constants/secureChatScreen';
+import {
+  CHAT_HISTORY_PAGE_SIZE,
+  DM_POLL_INTERVAL_ACTIVE_MS,
+  DM_POLL_INTERVAL_IDLE_MS,
+  CHAT_COMPACT_WIDTH,
+  DEFAULT_GLOBAL_CHAT_ID,
+  DEFAULT_GLOBAL_CHAT_NAME,
+  DEFAULT_GLOBAL_CHAT_PEER,
+  DEFAULT_GLOBAL_CHAT_JOIN_TEXT,
+  DEFAULT_GLOBAL_CONNECTED_TEXT,
+  DEFAULT_CONNECTION_LOG,
+  DEFAULT_HOST_ADDRESS,
+  DEFAULT_HOST_PORT_BASE,
+  DEFAULT_HOST_PORT_RANGE,
+} from '@constants/secureChatScreen';
 import { useSecureChatIdentity } from '@hooks/useSecureChatIdentity';
 import { useSecureChatImageAttachment } from '@hooks/useSecureChatImageAttachment';
+import { useSecureChatUIState } from '@hooks/secureChat/useSecureChatUIState';
 import { useTickingClock } from '@hooks/useTickingClock';
+import { useRoomHistory } from '@hooks/useRoomHistory';
 import { uploadChatImage } from '@services/chatImageStorage';
-import {
-  decodeChatImageContent,
-  encodeChatImageContent,
-  resolveChatImageMessage,
-  resolveChatImageMessages,
-} from '@utils/secureChatImages';
+import { encodeChatImageContent, resolveChatImageMessage, resolveChatImageMessages } from '@utils/secureChatImages';
+import { createOutgoingImageMessage, createOutgoingTextMessage, isUuid, mapRowToMessage } from '@utils/secureChatUtils';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import { useChatAvatar } from '../../hooks/useChatAvatar';
 import { useChatProfiles } from '../../hooks/useChatProfiles';
@@ -32,32 +44,22 @@ import {
   subscribeToDMMessages,
 } from '../../services/directMessages';
 
-const isUuid = (value: string) => UUID_REGEX.test(value);
-
 export default function SecureChatScreen({ isActive = false }: SecureChatScreenProps) {
-  const [secureTab, setSecureTab] = useState<'chats' | 'connect'>('chats');
-  const [chatView, setChatView] = useState<'list' | 'thread'>('list');
   const [chats, setChats] = useState<ChatThread[]>([
     {
-      id: 'global',
-      name: 'Global room',
+      id: DEFAULT_GLOBAL_CHAT_ID,
+      name: DEFAULT_GLOBAL_CHAT_NAME,
       participants: ['You'],
-      peerAddress: 'supabase-realtime',
+      peerAddress: DEFAULT_GLOBAL_CHAT_PEER,
       isOnline: false,
-      lastMessage: { text: 'Join to start chatting.', ts: date.format(new Date(), 'HH:mm'), from: 'System' },
+      lastMessage: { text: DEFAULT_GLOBAL_CHAT_JOIN_TEXT, ts: date.format(new Date(), 'HH:mm'), from: 'System' },
     },
   ]);
-  const [messagesByChat, setMessagesByChat] = useState<Record<string, ChatMessage[]>>({});
   const [dmChannels, setDmChannels] = useState<ChatThread[]>([]);
-  const [selectedChatId, setSelectedChatId] = useState<string>('global');
-  const [draft, setDraft] = useState('');
-  const [connectAddress, setConnectAddress] = useState('');
-  const [connectName, setConnectName] = useState('');
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
-  const [connectionLog, setConnectionLog] = useState<string[]>(['No active peer connections yet.']);
-  const [roomId, setRoomId] = useState<string>('global');
+  const [connectionLog, setConnectionLog] = useState<string[]>([DEFAULT_CONNECTION_LOG]);
+  const [roomId, setRoomId] = useState<string>(DEFAULT_GLOBAL_CHAT_ID);
   const channelRef = useRef<RealtimeChannel | null>(null);
-  const [historyLoading, setHistoryLoading] = useState(false);
   const [isChannelReady, setIsChannelReady] = useState(false);
   const [participantCount, setParticipantCount] = useState(0);
   const [mutedChatIds, setMutedChatIds] = useState<Set<string>>(() => new Set());
@@ -65,7 +67,7 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
   const dmChannelHeadsRef = useRef<Record<string, string | null>>({});
   const dmPollInFlightRef = useRef(false);
   const { width } = useWindowDimensions();
-  const isCompact = width < 720;
+  const isCompact = width < CHAT_COMPACT_WIDTH;
   const timeLabel = useTickingClock();
   const {
     authorId,
@@ -75,7 +77,19 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     userAvatarType,
     userAvatarSeed,
   } = useSecureChatIdentity(isActive);
-  const { pendingImageUri, pickImage, clearImage, setPendingImageUri } = useSecureChatImageAttachment();
+  const {
+    state: { secureTab, chatView, selectedChatId, draft, connectAddress, connectName, pendingImageUri },
+    actions: {
+      setTab,
+      setView,
+      selectChat,
+      setDraft,
+      setConnectAddress,
+      setConnectName,
+      setAttachment,
+    },
+  } = useSecureChatUIState();
+  const { pickImage, clearImage } = useSecureChatImageAttachment(setAttachment);
 
   const getChatById = useCallback(
     (chatId: string) =>
@@ -91,10 +105,67 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
 
   const devicePublicKey = useMemo(() => `user:${displayLabel}`, [displayLabel]);
 
+  const handlePickImage = useCallback(async () => {
+    await pickImage();
+  }, [pickImage]);
+
+  const handleClearAttachment = useCallback(() => {
+    clearImage();
+  }, [clearImage]);
+
+  const notifyIncomingMessage = useCallback(
+    (chatId: string, message: ChatMessage) => {
+      if (message.type === 'system') return;
+      if (message.outgoing === true) return;
+      if (message.authorId && message.authorId === effectiveUserId) return;
+      if (!message.authorId && message.author === displayLabel) return;
+      if (mutedChatIds.has(chatId)) return;
+      if (secureTab === 'chats' && chatView === 'thread' && selectedChatId === chatId) return;
+
+      const chatName = getChatById(chatId)?.name ?? message.author ?? 'New message';
+      Toast.show({
+        type: 'chat',
+        text1: chatName,
+        text2: message.content,
+        position: 'top',
+        visibilityTime: 3500,
+      });
+    },
+    [chatView, displayLabel, effectiveUserId, getChatById, mutedChatIds, secureTab, selectedChatId],
+  );
+
+  const notifyIncomingMessageRef = useRef(notifyIncomingMessage);
+  useEffect(() => {
+    notifyIncomingMessageRef.current = notifyIncomingMessage;
+  }, [notifyIncomingMessage]);
+
+  const mapRow = useCallback(
+    (row: SecureChatMessageRow) =>
+      mapRowToMessage(row, {
+        authorId,
+        displayLabel,
+        userAvatarType,
+        userAvatarUri,
+      }),
+    [authorId, displayLabel, userAvatarType, userAvatarUri],
+  );
+
+  const { messagesByChat, setMessagesByChat, historyStateByChat, loadInitial, loadOlder, ensureChatInitialized } =
+    useRoomHistory({
+      pageSize: CHAT_HISTORY_PAGE_SIZE,
+      mapRow,
+      resolveMessages: resolveChatImageMessages,
+      onHistoryError: (message) => {
+        setConnectionLog((prev) => [`History error: ${message}`, ...prev]);
+      },
+    });
+
   const selectedMessages = useMemo(
     () => messagesByChat[selectedChatId] ?? [],
     [messagesByChat, selectedChatId],
   );
+
+  const selectedHistoryState = historyStateByChat[selectedChatId];
 
   const authorIds = useMemo(() => {
     const ids = new Set<string>();
@@ -135,62 +206,6 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     resolveAuthorNameRef.current = resolveAuthorName;
   }, [resolveAuthorName]);
 
-  const handlePickImage = useCallback(async () => {
-    await pickImage();
-  }, [pickImage]);
-
-  const handleClearAttachment = useCallback(() => {
-    clearImage();
-  }, [clearImage]);
-
-  const notifyIncomingMessage = useCallback(
-    (chatId: string, message: ChatMessage) => {
-      if (message.type === 'system') return;
-      if (message.outgoing === true) return;
-      if (message.authorId && message.authorId === effectiveUserId) return;
-      if (!message.authorId && message.author === displayLabel) return;
-      if (mutedChatIds.has(chatId)) return;
-      if (secureTab === 'chats' && chatView === 'thread' && selectedChatId === chatId) return;
-
-      const chatName = getChatById(chatId)?.name ?? message.author ?? 'New message';
-      Toast.show({
-        type: 'chat',
-        text1: chatName,
-        text2: message.content,
-        position: 'top',
-        visibilityTime: 3500,
-      });
-    },
-    [chatView, displayLabel, effectiveUserId, getChatById, mutedChatIds, secureTab, selectedChatId],
-  );
-
-  const notifyIncomingMessageRef = useRef(notifyIncomingMessage);
-  useEffect(() => {
-    notifyIncomingMessageRef.current = notifyIncomingMessage;
-  }, [notifyIncomingMessage]);
-
-  const mapRowToMessage = (row: SecureChatMessageRow) => {
-    const ts = row.created_at ? new Date(row.created_at) : new Date();
-    const isOutgoing = authorId ? row.author_id === authorId : row.author === displayLabel;
-    const outgoingAvatarUri = isOutgoing && userAvatarType === 'custom' ? userAvatarUri : undefined;
-    const imagePath = row.image_path ?? decodeChatImageContent(row.content);
-    const type = row.message_type ?? (imagePath ? 'image' : 'text');
-    const content = imagePath && row.content.startsWith('__image__:') ? 'Photo' : row.content;
-    return {
-      id: row.id,
-      chatId: row.room_id,
-      authorId: row.author_id ?? undefined,
-      author: row.author,
-      content,
-      timestamp: ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      createdAt: row.created_at ?? ts.toISOString(),
-      outgoing: isOutgoing,
-      avatarUri: isOutgoing ? outgoingAvatarUri : undefined,
-      type,
-      imagePath: imagePath ?? undefined,
-    };
-  };
-
   useEffect(() => {
     if (!isSupabaseConfigured) {
       setConnectionLog((prev) => [
@@ -206,16 +221,16 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
 
     // Always keep a "global" room available.
     setChats((prev) => {
-      if (prev.find((c) => c.id === 'global')) return prev;
+      if (prev.find((c) => c.id === DEFAULT_GLOBAL_CHAT_ID)) return prev;
       const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       return [
         {
-          id: 'global',
-          name: 'Global room',
+          id: DEFAULT_GLOBAL_CHAT_ID,
+          name: DEFAULT_GLOBAL_CHAT_NAME,
           participants: ['You'],
-          peerAddress: 'supabase-realtime',
+          peerAddress: DEFAULT_GLOBAL_CHAT_PEER,
           isOnline: true,
-          lastMessage: { text: 'Connected to Supabase Realtime.', ts: now, from: 'System' },
+          lastMessage: { text: DEFAULT_GLOBAL_CONNECTED_TEXT, ts: now, from: 'System' },
         },
         ...prev,
       ];
@@ -311,7 +326,7 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
           setChats((prev) =>
             prev.map((chat) => (chat.id === roomId ? { ...chat, isOnline: true } : chat)),
           );
-          await loadHistory(roomId);
+          await loadInitial(roomId);
         }
         if (status === 'CHANNEL_ERROR') {
           setIsChannelReady(false);
@@ -329,65 +344,11 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     };
   }, [authorId, displayLabel, roomId]);
 
-  const loadHistory = async (room: string) => {
-    if (!isSupabaseConfigured || !supabase) return;
-    const supabaseClient = supabase;
-    setHistoryLoading(true);
-    let data: SecureChatMessageRow[] | null = null;
-    let error: { message?: string } | null = null;
-    const trySelect = async (fields: string) => {
-      const response = await supabaseClient
-        .from('messages')
-        .select(fields)
-        .eq('room_id', room)
-        .order('created_at', { ascending: true })
-        .limit(200);
-      data = response.data as SecureChatMessageRow[] | null;
-      error = response.error;
-    };
-
-    await trySelect('id, room_id, author, author_id, content, created_at, image_path, message_type');
-
-    if (error?.message?.includes('image_path') || error?.message?.includes('message_type')) {
-      await trySelect('id, room_id, author, author_id, content, created_at');
-    }
-
-    if (error?.message?.includes('author_id')) {
-      await trySelect('id, room_id, author, content, created_at, image_path, message_type');
-    }
-
-    if (error?.message?.includes('author_id') && (error.message?.includes('image_path') || error.message?.includes('message_type'))) {
-      await trySelect('id, room_id, author, content, created_at');
-    }
-
-    if (error) {
-      setConnectionLog((prev) => [`History error: ${error.message}`, ...prev]);
-      setHistoryLoading(false);
-      return;
-    }
-
-    const mapped = await resolveChatImageMessages((data ?? []).map(mapRowToMessage));
-    setMessagesByChat((prev) => ({ ...prev, [room]: mapped }));
-    if (mapped.length > 0) {
-      const last = mapped[mapped.length - 1];
-      setChats((prev) =>
-        prev.map((chat) =>
-          chat.id === room
-            ? {
-                ...chat,
-                lastMessage: {
-                  text: last.content,
-                  ts: last.timestamp,
-                  from: resolveAuthorName(last),
-                  authorId: last.authorId,
-                },
-              }
-            : chat,
-        ),
-      );
-    }
-    setHistoryLoading(false);
-  };
+  const handleLoadMoreMessages = useCallback(() => {
+    if (!selectedChat) return;
+    if (selectedChat.id.startsWith('dm:')) return;
+    loadOlder(selectedChat.id);
+  }, [loadOlder, selectedChat]);
 
   // Load DM channels when user is ready
   useEffect(() => {
@@ -411,7 +372,7 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     return () => {
       mounted = false;
     };
-  }, [effectiveUserId]);
+  }, [effectiveUserId, ensureChatInitialized]);
 
   // Subscribe to DM messages
   useEffect(() => {
@@ -583,23 +544,20 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
       setDmChannels(channels.map((ch) => dmChannelToChatThread(ch, effectiveUserId)));
       
       // Navigate to the DM thread
-      setSelectedChatId(channel.id);
+      selectChat(channel.id);
       setRoomId(channel.id);
-      setChatView('thread');
-      setSecureTab('chats');
+      setTab('chats');
     } catch (error) {
       console.error('Failed to start DM:', error);
       const message = error instanceof Error ? error.message : 'Failed to start DM.';
       Alert.alert('Direct message error', message);
     }
-  }, [effectiveUserId, displayLabel]);
+  }, [effectiveUserId, displayLabel, selectChat, setTab]);
 
   // Update handleSelectChat to load DM messages
   const handleSelectChat = useCallback(async (chatId: string) => {
-    setSelectedChatId(chatId);
+    selectChat(chatId);
     setRoomId(chatId);
-    setChatView('thread');
-    setPendingImageUri(null);
     
     if (chatId.startsWith('dm:')) {
       try {
@@ -616,28 +574,21 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
         Alert.alert('Direct message error', message);
       }
     } else {
-      setMessagesByChat((prev) => (prev[chatId] ? prev : { ...prev, [chatId]: [] }));
+      ensureChatInitialized(chatId);
     }
-  }, [effectiveUserId]);
+  }, [effectiveUserId, ensureChatInitialized, selectChat]);
 
   const appendLocalImageMessage = useCallback(
     (chatId: string, imageUri: string, imagePath?: string) => {
-      const now = new Date();
       const outgoingAvatarUri = userAvatarType === 'custom' ? userAvatarUri : undefined;
-      const message: ChatMessage = {
-        id: `${now.getTime()}-image`,
+      const message = createOutgoingImageMessage({
         chatId,
         authorId,
         author: displayLabel,
-        content: 'Photo',
-        timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        createdAt: now.toISOString(),
         avatarUri: outgoingAvatarUri,
-        outgoing: true,
-        type: 'image',
         imageUri,
         imagePath,
-      };
+      });
 
       setMessagesByChat((prev) => {
         const existing = prev[chatId] ?? [];
@@ -760,20 +711,14 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
         Alert.alert('Supabase not configured', 'Set SUPABASE_URL and SUPABASE_ANON_KEY to send messages.');
       } else {
         const supabaseClient = supabase;
-        const now = new Date();
         const outgoingAvatarUri = userAvatarType === 'custom' ? userAvatarUri : undefined;
-        const message: ChatMessage = {
-          id: now.getTime().toString(),
+        const message = createOutgoingTextMessage({
           chatId: selectedChat.id,
           authorId,
           author: displayLabel,
           content: trimmed,
-          timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          createdAt: now.toISOString(),
           avatarUri: outgoingAvatarUri,
-          outgoing: true,
-          type: 'text',
-        };
+        });
 
         setMessagesByChat((prev) => {
           const existing = prev[selectedChat.id] ?? [];
@@ -868,20 +813,14 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
         });
         appendLocalImageMessage(selectedChat.id, upload.signedUrl, upload.path);
 
-        const imagePayload: ChatMessage = {
-          id: `${Date.now()}-image`,
+        const imagePayload = createOutgoingImageMessage({
           chatId: selectedChat.id,
           authorId,
           author: displayLabel,
-          content: 'Photo',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          createdAt: new Date().toISOString(),
           avatarUri: userAvatarType === 'custom' ? userAvatarUri : undefined,
-          outgoing: true,
-          type: 'image',
           imagePath: upload.path,
           imageUri: upload.signedUrl,
-        };
+        });
 
         if (isDM) {
           await sendDMMessage(selectedChat.id, imagePayload);
@@ -907,7 +846,7 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
         const message = error instanceof Error ? error.message : 'Failed to send image.';
         Alert.alert('Image upload error', message);
       } finally {
-        setPendingImageUri(null);
+        setAttachment(null);
       }
     }
   };
@@ -964,18 +903,17 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     }));
 
     setConnectionLog((prev) => [`Connected to ${address}.`, ...prev]);
-    setSelectedChatId(chatId);
+    selectChat(chatId);
     setRoomId(chatId);
-    setSecureTab('chats');
-    setChatView('thread');
+    setTab('chats');
     setConnectAddress('');
     setConnectName('');
   };
 
   const handleStartServer = () => {
     if (serverInfo?.status === 'running') return;
-    const address = '192.168.0.24';
-    const port = 9_000 + Math.floor(Math.random() * 300);
+    const address = DEFAULT_HOST_ADDRESS;
+    const port = DEFAULT_HOST_PORT_BASE + Math.floor(Math.random() * DEFAULT_HOST_PORT_RANGE);
 
     setServerInfo({ address, port, status: 'starting' });
     setConnectionLog((prev) => [`Starting secure server on ${address}:${port}...`, ...prev]);
@@ -1003,17 +941,14 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
   };
 
   const handleTabChange = (tab: 'chats' | 'connect') => {
-    setSecureTab(tab);
-    if (tab === 'chats') {
-      setChatView('list');
-    }
+    setTab(tab);
   };
 
   useEffect(() => {
     if (Platform.OS !== 'android' || !isActive) return;
     const onBackPress = () => {
       if (secureTab === 'chats' && chatView === 'thread') {
-        setChatView('list');
+        setView('list');
         return true;
       }
       return false;
@@ -1050,11 +985,14 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
           serverInfo,
           participantCount,
           currentUserId: effectiveUserId,
-          onBack: () => setChatView('list'),
+          onBack: () => setView('list'),
           onDraftChange: setDraft,
           onSend: handleSendMessage,
           onPickImage: handlePickImage,
           onClearAttachment: handleClearAttachment,
+          onLoadMore: handleLoadMoreMessages,
+          isLoadingMore: selectedHistoryState?.loading ?? false,
+          hasMoreMessages: selectedHistoryState?.hasMore ?? false,
           attachmentUri: pendingImageUri,
           resolveAvatar,
           resolveAuthorName,

@@ -1,17 +1,13 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 
 type SecureChatImageAttachment = {
-  pendingImageUri: string | null;
   pickImage: () => Promise<void>;
   clearImage: () => void;
-  setPendingImageUri: (value: string | null) => void;
 };
 
-export function useSecureChatImageAttachment(): SecureChatImageAttachment {
-  const [pendingImageUri, setPendingImageUri] = useState<string | null>(null);
-
+export function useSecureChatImageAttachment(onAttachmentChange: (value: string | null) => void): SecureChatImageAttachment {
   const pickImage = useCallback(async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -25,13 +21,13 @@ export function useSecureChatImageAttachment(): SecureChatImageAttachment {
     });
     if (!result.canceled) {
       const uri = result.assets[0]?.uri;
-      if (uri) setPendingImageUri(uri);
+      if (uri) onAttachmentChange(uri);
     }
-  }, []);
+  }, [onAttachmentChange]);
 
   const clearImage = useCallback(() => {
-    setPendingImageUri(null);
-  }, []);
+    onAttachmentChange(null);
+  }, [onAttachmentChange]);
 
-  return { pendingImageUri, pickImage, clearImage, setPendingImageUri };
+  return { pickImage, clearImage };
 }
