@@ -44,7 +44,7 @@ export async function selectMessagesPage({
 
     const { data, error } = await query;
     if (!error && data) {
-      return { data: data as SecureChatMessageRow[], error: null };
+      return { data: data as unknown as SecureChatMessageRow[], error: null };
     }
 
     lastError = error ?? { message: 'Unknown query error.' };

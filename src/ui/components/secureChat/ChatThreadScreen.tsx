@@ -21,13 +21,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import PulseBadge from '@components/PulseBadge';
 import type { ChatAvatarSource, ChatMessage, ChatThread, ServerInfo } from '@app-types/secureChat';
 import { useTheme } from '@theme/ThemeProvider';
 import { CHAT_HISTORY_SCROLL_THRESHOLD } from '@constants/secureChatScreen';
 import ChatAvatar from '@components/secureChat/ChatAvatar';
 import ChatInputBar from '@components/secureChat/ChatInputBar';
-import PrivateChatHeader from '@components/secureChat/PrivateChatHeader';
+import ChatThreadHeader from '@components/secureChat/ChatThreadHeader';
 import ViewProfileModal from '@components/secureChat/ViewProfileModal';
 import ChatImageViewer from '@components/secureChat/ChatImageViewer';
 
@@ -309,22 +308,13 @@ export default function ChatThreadScreen({
     >
       <Animated.View style={[styles.container, containerAnimatedStyle]}>
         {/* Header */}
-        <View style={styles.headerRow}>
-          <View style={styles.headerMain}>
-            <View style={styles.headerTitleRow}>
-              <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                <MaterialCommunityIcons name="arrow-left" size={18} color={colors.text} />
-              </TouchableOpacity>
-              <PrivateChatHeader chat={chat} isMuted={isMuted} onToggleMute={onToggleMute} />
-            </View>
-          </View>
-          <View style={styles.statusColumn}>
-            <View style={styles.statusRow}>
-              <PulseBadge size={10} color={serverInfo ? colors.accent : '#f97316'} />
-            </View>
-            <Text style={styles.participantText}></Text>
-          </View>
-        </View>
+        <ChatThreadHeader
+          chat={chat}
+          serverInfo={serverInfo}
+          onBack={onBack}
+          isMuted={isMuted}
+          onToggleMute={onToggleMute}
+        />
 
         {/* Messages */}
         <Animated.View style={[styles.messageListWrapper, messagesAnimatedStyle]}>
@@ -439,52 +429,6 @@ const createChatStyles = (colors: {
       borderColor: colors.border,
       backgroundColor: colors.card,
       padding: 16,
-    },
-    headerRow: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
-    },
-    headerMain: {
-      flex: 1,
-      paddingRight: 12,
-    },
-    headerTitleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    backButton: {
-      marginRight: 8,
-      padding: 8,
-      borderRadius: 16,
-      backgroundColor: colors.border,
-    },
-    title: {
-      fontSize: 20,
-      fontWeight: '600',
-      color: colors.text,
-    },
-    subtitle: {
-      marginTop: 4,
-      color: colors.muted,
-    },
-    statusRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    statusColumn: {
-      alignItems: 'flex-end',
-    },
-    statusText: {
-      marginLeft: 6,
-      fontSize: 12,
-      fontWeight: '600',
-      color: colors.muted,
-    },
-    participantText: {
-      marginTop: 4,
-      fontSize: 12,
-      color: colors.muted,
     },
     messageListWrapper: {
       flex: 1,
