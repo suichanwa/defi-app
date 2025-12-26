@@ -1,5 +1,6 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { ChatMessage, ChatThread } from '../types/secureChat';
+import { resolveChatImageMessage, resolveChatImageMessages, decodeChatImageContent, encodeChatImageContent } from '@utils/secureChatImages';
 import { isSupabaseConfigured, supabase } from './supabaseClient';
 import { getJson, setJson } from './storage';
 
@@ -40,6 +41,8 @@ type DMMessageRow = {
   author_label: string;
   content: string;
   created_at: string;
+  image_path?: string | null;
+  message_type?: 'text' | 'system' | 'image' | null;
 };
 
 type DMChannelHeadRow = {
@@ -111,16 +114,20 @@ const mapRemoteChannel = (row: DMChannelRow): StoredDMChannel => ({
 const mapRemoteMessage = (row: DMMessageRow, currentUserId?: string): ChatMessage => {
   const ts = new Date(row.created_at);
   const outgoing = currentUserId ? row.author_id === currentUserId : undefined;
+  const decodedPath = decodeChatImageContent(row.content);
+  const imagePath = row.image_path ?? decodedPath;
+  const type = row.message_type ?? (imagePath ? 'image' : 'text');
   return {
     id: row.id,
     chatId: row.channel_id,
     authorId: row.author_id,
     author: row.author_label,
-    content: row.content,
+    content: imagePath && decodedPath ? 'Photo' : row.content,
     timestamp: ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     createdAt: row.created_at,
     outgoing,
-    type: 'text',
+    type,
+    imagePath: imagePath ?? undefined,
   };
 };
 
@@ -303,19 +310,42 @@ export async function sendDMMessage(
 ): Promise<ChatMessage | null> {
   const authorId = message.authorId ?? '';
   if (canUseSupabase(authorId) && supabase) {
+    const insertPayload = {
+      channel_id: channelId,
+      author_id: authorId,
+      author_label: message.author,
+      content: message.content,
+      image_path: message.imagePath ?? null,
+      message_type: message.type ?? 'text',
+    };
+
     const { data, error } = await supabase
       .from('dm_messages')
-      .insert({
-        channel_id: channelId,
-        author_id: authorId,
-        author_label: message.author,
-        content: message.content,
-      })
-      .select('id, channel_id, author_id, author_label, content, created_at')
+      .insert(insertPayload)
+      .select('id, channel_id, author_id, author_label, content, created_at, image_path, message_type')
       .single();
 
     if (!error && data) {
-      return mapRemoteMessage(data as DMMessageRow, authorId);
+      return resolveChatImageMessage(mapRemoteMessage(data as DMMessageRow, authorId));
+    }
+
+    if (error?.message?.includes('image_path') || error?.message?.includes('message_type')) {
+      const fallbackContent = message.imagePath ? encodeChatImageContent(message.imagePath) : message.content;
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('dm_messages')
+        .insert({
+          channel_id: channelId,
+          author_id: authorId,
+          author_label: message.author,
+          content: fallbackContent,
+        })
+        .select('id, channel_id, author_id, author_label, content, created_at')
+        .single();
+
+      if (!fallbackError && fallbackData) {
+        return resolveChatImageMessage(mapRemoteMessage(fallbackData as DMMessageRow, authorId));
+      }
+      throw createSupabaseError('Supabase DM message insert failed', fallbackError);
     }
 
     throw createSupabaseError('Supabase DM message insert failed', error);
@@ -350,12 +380,26 @@ export async function getDMMessages(channelId: string, currentUserId?: string): 
   if (currentUserId && canUseSupabase(currentUserId) && supabase) {
     const { data, error } = await supabase
       .from('dm_messages')
-      .select('id, channel_id, author_id, author_label, content, created_at')
+      .select('id, channel_id, author_id, author_label, content, created_at, image_path, message_type')
       .eq('channel_id', channelId)
       .order('created_at', { ascending: true });
 
     if (!error && data) {
-      return data.map((row) => mapRemoteMessage(row as DMMessageRow, currentUserId));
+      const mapped = data.map((row) => mapRemoteMessage(row as DMMessageRow, currentUserId));
+      return resolveChatImageMessages(mapped);
+    }
+
+    if (error?.message?.includes('image_path') || error?.message?.includes('message_type')) {
+      const fallback = await supabase
+        .from('dm_messages')
+        .select('id, channel_id, author_id, author_label, content, created_at')
+        .eq('channel_id', channelId)
+        .order('created_at', { ascending: true });
+      if (!fallback.error && fallback.data) {
+        const mapped = fallback.data.map((row) => mapRemoteMessage(row as DMMessageRow, currentUserId));
+        return resolveChatImageMessages(mapped);
+      }
+      throw createSupabaseError('Supabase DM messages fetch failed', fallback.error);
     }
 
     throw createSupabaseError('Supabase DM messages fetch failed', error);
@@ -374,13 +418,28 @@ export async function getDMMessagesSince(
   if (currentUserId && canUseSupabase(currentUserId) && supabase) {
     const { data, error } = await supabase
       .from('dm_messages')
-      .select('id, channel_id, author_id, author_label, content, created_at')
+      .select('id, channel_id, author_id, author_label, content, created_at, image_path, message_type')
       .eq('channel_id', channelId)
       .gt('created_at', sinceIso)
       .order('created_at', { ascending: true });
 
     if (!error && data) {
-      return data.map((row) => mapRemoteMessage(row as DMMessageRow, currentUserId));
+      const mapped = data.map((row) => mapRemoteMessage(row as DMMessageRow, currentUserId));
+      return resolveChatImageMessages(mapped);
+    }
+
+    if (error?.message?.includes('image_path') || error?.message?.includes('message_type')) {
+      const fallback = await supabase
+        .from('dm_messages')
+        .select('id, channel_id, author_id, author_label, content, created_at')
+        .eq('channel_id', channelId)
+        .gt('created_at', sinceIso)
+        .order('created_at', { ascending: true });
+      if (!fallback.error && fallback.data) {
+        const mapped = fallback.data.map((row) => mapRemoteMessage(row as DMMessageRow, currentUserId));
+        return resolveChatImageMessages(mapped);
+      }
+      throw createSupabaseError('Supabase DM messages fetch failed', fallback.error);
     }
 
     throw createSupabaseError('Supabase DM messages fetch failed', error);
@@ -410,15 +469,18 @@ export function subscribeToDMMessages(currentUserId: string, listener: DMListene
       realtimeUserId = currentUserId;
       realtimeChannel = supabase.channel(`dm-messages:${currentUserId}`);
       realtimeChannel
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'dm_messages' },
-          (payload) => {
-            const row = payload.new as DMMessageRow;
-            const message = mapRemoteMessage(row, currentUserId);
-            listeners.forEach((cb) => cb(row.channel_id, message));
-          },
-        )
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'dm_messages' }, (payload) => {
+          const row = payload.new as DMMessageRow;
+          resolveChatImageMessage(mapRemoteMessage(row, currentUserId))
+            .then((message) => {
+              listeners.forEach((cb) => cb(row.channel_id, message));
+            })
+            .catch((error) => {
+              console.warn('Failed to resolve chat image URL:', error);
+              const fallback = mapRemoteMessage(row, currentUserId);
+              listeners.forEach((cb) => cb(row.channel_id, fallback));
+            });
+        })
         .subscribe();
     }
   }
@@ -437,7 +499,8 @@ export function dmChannelToChatThread(channel: StoredDMChannel, currentUserId: s
   const otherUserIndex = channel.participants[0] === currentUserId ? 1 : 0;
   const otherUserName = channel.participantNames[otherUserIndex];
   const messageFromStore = channel.messages?.[channel.messages.length - 1];
-  const lastText = channel.lastMessageText ?? messageFromStore?.content ?? 'Start a conversation';
+  const rawLastText = channel.lastMessageText ?? messageFromStore?.content ?? 'Start a conversation';
+  const lastText = decodeChatImageContent(rawLastText) ? 'Photo' : rawLastText;
   const lastTs =
     channel.lastMessageAt ??
     channel.createdAt ??

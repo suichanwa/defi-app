@@ -12,6 +12,7 @@ export type ChatMessage = {
   outgoing?: boolean;
   type?: 'text' | 'system' | 'image';
   imageUri?: string;
+  imagePath?: string;
 };
 
 export type ChatAuthorProfile = {

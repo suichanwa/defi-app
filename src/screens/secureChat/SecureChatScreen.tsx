@@ -2,18 +2,23 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, BackHandler, Platform, useWindowDimensions } from 'react-native';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { ChatMessage, ChatThread, ServerInfo } from '@app-types/secureChat';
-import type { AvatarType } from '@app-types/profile';
 import type { SecureChatMessageRow, SecureChatScreenProps } from '@app-types/secureChatScreen';
 import * as date from 'date-and-time';
 import Toast from 'react-native-toast-message';
-import * as ImagePicker from 'expo-image-picker';
 import SecureChatContent from './components/SecureChatContent';
 import SecureChatLayout from './components/SecureChatLayout';
 import { DM_POLL_INTERVAL_ACTIVE_MS, DM_POLL_INTERVAL_IDLE_MS, UUID_REGEX } from '@constants/secureChatScreen';
+import { useSecureChatIdentity } from '@hooks/useSecureChatIdentity';
+import { useSecureChatImageAttachment } from '@hooks/useSecureChatImageAttachment';
+import { useTickingClock } from '@hooks/useTickingClock';
+import { uploadChatImage } from '@services/chatImageStorage';
+import {
+  decodeChatImageContent,
+  encodeChatImageContent,
+  resolveChatImageMessage,
+  resolveChatImageMessages,
+} from '@utils/secureChatImages';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
-import { getAuthSession, onAuthStateChange, type AuthSession } from '../../services/auth';
-import { getAnonymousId, toAnonymousProfileId } from '../../services/identity';
-import { loadProfileSettings } from '../../services/profileStore';
 import { useChatAvatar } from '../../hooks/useChatAvatar';
 import { useChatProfiles } from '../../hooks/useChatProfiles';
 import {
@@ -46,22 +51,13 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
   const [dmChannels, setDmChannels] = useState<ChatThread[]>([]);
   const [selectedChatId, setSelectedChatId] = useState<string>('global');
   const [draft, setDraft] = useState('');
-  const [pendingImageUri, setPendingImageUri] = useState<string | null>(null);
   const [connectAddress, setConnectAddress] = useState('');
   const [connectName, setConnectName] = useState('');
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
   const [connectionLog, setConnectionLog] = useState<string[]>(['No active peer connections yet.']);
-  const [timeLabel, setTimeLabel] = useState('');
-  const [session, setSession] = useState<AuthSession>(null);
-  const [anonId, setAnonId] = useState<string>('');
-  const [authLabel, setAuthLabel] = useState<string>('');
-  const [profileAlias, setProfileAlias] = useState<string>('');
   const [roomId, setRoomId] = useState<string>('global');
   const channelRef = useRef<RealtimeChannel | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [userAvatarUri, setUserAvatarUri] = useState<string | undefined>(undefined);
-  const [userAvatarType, setUserAvatarType] = useState<AvatarType>('identicon');
-  const [userAvatarSeed, setUserAvatarSeed] = useState<string | undefined>(undefined);
   const [isChannelReady, setIsChannelReady] = useState(false);
   const [participantCount, setParticipantCount] = useState(0);
   const [mutedChatIds, setMutedChatIds] = useState<Set<string>>(() => new Set());
@@ -70,20 +66,16 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
   const dmPollInFlightRef = useRef(false);
   const { width } = useWindowDimensions();
   const isCompact = width < 720;
-  const authorId = useMemo(
-    () => session?.user?.id ?? (anonId ? toAnonymousProfileId(anonId) : undefined),
-    [anonId, session],
-  );
-  const displayLabel = profileAlias || authLabel || 'Anonymous';
-
-  // Generate a fallback ID for anonymous users
-  const effectiveUserId = useMemo(() => {
-    if (authorId) return authorId;
-    if (displayLabel && displayLabel !== 'Anonymous') {
-      return `anon-${displayLabel.replace(/[^a-zA-Z0-9]/g, '-')}`;
-    }
-    return `anon-${Date.now()}`;
-  }, [authorId, displayLabel]);
+  const timeLabel = useTickingClock();
+  const {
+    authorId,
+    displayLabel,
+    effectiveUserId,
+    userAvatarUri,
+    userAvatarType,
+    userAvatarSeed,
+  } = useSecureChatIdentity(isActive);
+  const { pendingImageUri, pickImage, clearImage, setPendingImageUri } = useSecureChatImageAttachment();
 
   const getChatById = useCallback(
     (chatId: string) =>
@@ -144,25 +136,12 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
   }, [resolveAuthorName]);
 
   const handlePickImage = useCallback(async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('Permission required', 'Allow photo access to attach images.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      quality: 0.8,
-    });
-    if (!result.canceled) {
-      const uri = result.assets[0]?.uri;
-      if (uri) setPendingImageUri(uri);
-    }
-  }, []);
+    await pickImage();
+  }, [pickImage]);
 
   const handleClearAttachment = useCallback(() => {
-    setPendingImageUri(null);
-  }, []);
+    clearImage();
+  }, [clearImage]);
 
   const notifyIncomingMessage = useCallback(
     (chatId: string, message: ChatMessage) => {
@@ -194,17 +173,21 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     const ts = row.created_at ? new Date(row.created_at) : new Date();
     const isOutgoing = authorId ? row.author_id === authorId : row.author === displayLabel;
     const outgoingAvatarUri = isOutgoing && userAvatarType === 'custom' ? userAvatarUri : undefined;
+    const imagePath = row.image_path ?? decodeChatImageContent(row.content);
+    const type = row.message_type ?? (imagePath ? 'image' : 'text');
+    const content = imagePath && row.content.startsWith('__image__:') ? 'Photo' : row.content;
     return {
       id: row.id,
       chatId: row.room_id,
       authorId: row.author_id ?? undefined,
       author: row.author,
-      content: row.content,
+      content,
       timestamp: ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       createdAt: row.created_at ?? ts.toISOString(),
       outgoing: isOutgoing,
       avatarUri: isOutgoing ? outgoingAvatarUri : undefined,
-      type: 'text' as const,
+      type,
+      imagePath: imagePath ?? undefined,
     };
   };
 
@@ -214,48 +197,8 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
         'Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY to enable chat.',
         ...prev,
       ]);
-      return undefined;
     }
-    let active = true;
-    getAuthSession().then(async (current) => {
-      if (!active) return;
-      setSession(current);
-      const anonIdValue = await getAnonymousId();
-      setAnonId(anonIdValue);
-      const label = current?.user?.email ?? current?.user?.id ?? `anon-${anonIdValue.slice(-6)}`;
-      setAuthLabel(label);
-    });
-    const sub = onAuthStateChange(async (next) => {
-      setSession(next);
-      const anonIdValue = await getAnonymousId();
-      setAnonId(anonIdValue);
-      const label = next?.user?.email ?? next?.user?.id ?? `anon-${anonIdValue.slice(-6)}`;
-      setAuthLabel(label);
-    });
-    return () => {
-      active = false;
-      sub?.unsubscribe();
-    };
   }, []);
-
-  useEffect(() => {
-    if (!isActive) return;
-    let mounted = true;
-    loadProfileSettings().then((settings) => {
-      if (!mounted) return;
-      if (settings.alias) {
-        setProfileAlias(settings.alias);
-      } else {
-        setProfileAlias('');
-      }
-      setUserAvatarUri(settings.avatarUri);
-      setUserAvatarType(settings.avatarType ?? 'identicon');
-      setUserAvatarSeed(settings.avatarSeed);
-    });
-    return () => {
-      mounted = false;
-    };
-  }, [isActive]);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -300,28 +243,56 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     channel
       .on('broadcast', { event: 'message' }, ({ payload }) => {
         const msg = payload as ChatMessage;
-        setMessagesByChat((prev) => {
-          const existing = prev[msg.chatId] ?? [];
-          const seen = existing.some((m) => m.id === msg.id);
-          if (seen) return prev;
-          notifyIncomingMessageRef.current(msg.chatId, msg);
-          return { ...prev, [msg.chatId]: [...existing, msg] };
-        });
-        setChats((prev) =>
-          prev.map((chat) =>
-            chat.id === msg.chatId
-              ? {
-                  ...chat,
-                  lastMessage: {
-                    text: msg.content,
-                    ts: msg.timestamp,
-                    from: resolveAuthorNameRef.current(msg),
-                    authorId: msg.authorId,
-                  },
-                }
-              : chat,
-          ),
-        );
+        resolveChatImageMessage(msg)
+          .then((resolved) => {
+            setMessagesByChat((prev) => {
+              const existing = prev[resolved.chatId] ?? [];
+              const seen = existing.some((m) => m.id === resolved.id);
+              if (seen) return prev;
+              notifyIncomingMessageRef.current(resolved.chatId, resolved);
+              return { ...prev, [resolved.chatId]: [...existing, resolved] };
+            });
+            setChats((prev) =>
+              prev.map((chat) =>
+                chat.id === resolved.chatId
+                  ? {
+                      ...chat,
+                      lastMessage: {
+                        text: resolved.content,
+                        ts: resolved.timestamp,
+                        from: resolveAuthorNameRef.current(resolved),
+                        authorId: resolved.authorId,
+                      },
+                    }
+                  : chat,
+              ),
+            );
+          })
+          .catch((error) => {
+            console.warn('Failed to resolve chat image URL:', error);
+            setMessagesByChat((prev) => {
+              const existing = prev[msg.chatId] ?? [];
+              const seen = existing.some((m) => m.id === msg.id);
+              if (seen) return prev;
+              notifyIncomingMessageRef.current(msg.chatId, msg);
+              return { ...prev, [msg.chatId]: [...existing, msg] };
+            });
+            setChats((prev) =>
+              prev.map((chat) =>
+                chat.id === msg.chatId
+                  ? {
+                      ...chat,
+                      lastMessage: {
+                        text: msg.content,
+                        ts: msg.timestamp,
+                        from: resolveAuthorNameRef.current(msg),
+                        authorId: msg.authorId,
+                      },
+                    }
+                  : chat,
+              ),
+            );
+          });
       })
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState();
@@ -364,26 +335,29 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     setHistoryLoading(true);
     let data: SecureChatMessageRow[] | null = null;
     let error: { message?: string } | null = null;
-    {
+    const trySelect = async (fields: string) => {
       const response = await supabaseClient
         .from('messages')
-        .select('id, room_id, author, author_id, content, created_at')
+        .select(fields)
         .eq('room_id', room)
         .order('created_at', { ascending: true })
         .limit(200);
       data = response.data as SecureChatMessageRow[] | null;
       error = response.error;
+    };
+
+    await trySelect('id, room_id, author, author_id, content, created_at, image_path, message_type');
+
+    if (error?.message?.includes('image_path') || error?.message?.includes('message_type')) {
+      await trySelect('id, room_id, author, author_id, content, created_at');
     }
 
-    if (error && error.message?.includes('author_id')) {
-      const response = await supabaseClient
-        .from('messages')
-        .select('id, room_id, author, content, created_at')
-        .eq('room_id', room)
-        .order('created_at', { ascending: true })
-        .limit(200);
-      data = response.data as SecureChatMessageRow[] | null;
-      error = response.error;
+    if (error?.message?.includes('author_id')) {
+      await trySelect('id, room_id, author, content, created_at, image_path, message_type');
+    }
+
+    if (error?.message?.includes('author_id') && (error.message?.includes('image_path') || error.message?.includes('message_type'))) {
+      await trySelect('id, room_id, author, content, created_at');
     }
 
     if (error) {
@@ -392,7 +366,7 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
       return;
     }
 
-    const mapped = (data ?? []).map(mapRowToMessage);
+    const mapped = await resolveChatImageMessages((data ?? []).map(mapRowToMessage));
     setMessagesByChat((prev) => ({ ...prev, [room]: mapped }));
     if (mapped.length > 0) {
       const last = mapped[mapped.length - 1];
@@ -414,13 +388,6 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     }
     setHistoryLoading(false);
   };
-
-  useEffect(() => {
-    const tick = () => setTimeLabel(date.format(new Date(), 'HH:mm:ss'));
-    tick();
-    const interval = setInterval(tick, 1_000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Load DM channels when user is ready
   useEffect(() => {
@@ -654,7 +621,7 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
   }, [effectiveUserId]);
 
   const appendLocalImageMessage = useCallback(
-    (chatId: string, imageUri: string) => {
+    (chatId: string, imageUri: string, imagePath?: string) => {
       const now = new Date();
       const outgoingAvatarUri = userAvatarType === 'custom' ? userAvatarUri : undefined;
       const message: ChatMessage = {
@@ -669,6 +636,7 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
         outgoing: true,
         type: 'image',
         imageUri,
+        imagePath,
       };
 
       setMessagesByChat((prev) => {
@@ -689,6 +657,49 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     },
     [authorId, displayLabel, userAvatarType, userAvatarUri],
   );
+
+  const persistImageMessageFallback = async (chatId: string, payload: ChatMessage, imagePath: string) => {
+    if (!supabase) return;
+    const supabaseClient = supabase;
+    const fallbackContent = encodeChatImageContent(imagePath);
+    supabaseClient
+      .from('messages')
+      .insert({
+        room_id: chatId,
+        author: payload.author,
+        author_id: payload.authorId ?? null,
+        content: fallbackContent,
+        created_at: payload.createdAt ?? new Date().toISOString(),
+      })
+      .then(({ error }) => {
+        if (error) {
+          setConnectionLog((prev) => [`Save error: ${error.message}`, ...prev]);
+        }
+      });
+  };
+
+  const persistImageMessage = async (chatId: string, payload: ChatMessage, imagePath: string) => {
+    if (!supabase) return;
+    const supabaseClient = supabase;
+    const { error } = await supabaseClient
+      .from('messages')
+      .insert({
+        room_id: chatId,
+        author: payload.author,
+        author_id: payload.authorId ?? null,
+        content: payload.content,
+        message_type: payload.type ?? 'image',
+        image_path: imagePath,
+        created_at: payload.createdAt ?? new Date().toISOString(),
+      });
+
+    if (!error) return;
+    if (error.message?.includes('image_path') || error.message?.includes('message_type')) {
+      await persistImageMessageFallback(chatId, payload, imagePath);
+      return;
+    }
+    setConnectionLog((prev) => [`Save error: ${error.message}`, ...prev]);
+  };
 
   // Update handleSendMessage to support DMs
   const handleSendMessage = async () => {
@@ -788,6 +799,7 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
             author: displayLabel,
             author_id: authorId ?? null,
             content: message.content,
+            message_type: message.type ?? 'text',
             created_at: new Date().toISOString(),
           })
           .then(async ({ error }) => {
@@ -796,6 +808,19 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
               const fallback = await supabaseClient.from('messages').insert({
                 room_id: selectedChat.id,
                 author: displayLabel,
+                content: message.content,
+                created_at: new Date().toISOString(),
+              });
+              if (fallback.error) {
+                setConnectionLog((prev) => [`Save error: ${fallback.error.message}`, ...prev]);
+              }
+              return;
+            }
+            if (error.message?.includes('message_type')) {
+              const fallback = await supabaseClient.from('messages').insert({
+                room_id: selectedChat.id,
+                author: displayLabel,
+                author_id: authorId ?? null,
                 content: message.content,
                 created_at: new Date().toISOString(),
               });
@@ -831,8 +856,59 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     }
 
     if (hasImage && pendingImageUri) {
-      appendLocalImageMessage(selectedChat.id, pendingImageUri);
-      setPendingImageUri(null);
+      if (!isSupabaseConfigured || !supabase) {
+        Alert.alert('Supabase not configured', 'Set SUPABASE_URL and SUPABASE_ANON_KEY to send images.');
+        return;
+      }
+      try {
+        const upload = await uploadChatImage({
+          fileUri: pendingImageUri,
+          chatId: selectedChat.id,
+          authorId: authorId ?? effectiveUserId,
+        });
+        appendLocalImageMessage(selectedChat.id, upload.signedUrl, upload.path);
+
+        const imagePayload: ChatMessage = {
+          id: `${Date.now()}-image`,
+          chatId: selectedChat.id,
+          authorId,
+          author: displayLabel,
+          content: 'Photo',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          createdAt: new Date().toISOString(),
+          avatarUri: userAvatarType === 'custom' ? userAvatarUri : undefined,
+          outgoing: true,
+          type: 'image',
+          imagePath: upload.path,
+          imageUri: upload.signedUrl,
+        };
+
+        if (isDM) {
+          await sendDMMessage(selectedChat.id, imagePayload);
+          const channels = await getUserDMChannels(effectiveUserId);
+          setDmChannels(channels.map((ch) => dmChannelToChatThread(ch, effectiveUserId)));
+        } else {
+          await persistImageMessage(selectedChat.id, imagePayload, upload.path);
+          const channel = channelRef.current;
+          if (channel) {
+            const payload = { ...imagePayload, outgoing: false };
+            if (isChannelReady) {
+              await channel.send({
+                type: 'broadcast',
+                event: 'message',
+                payload,
+              });
+            } else {
+              await channel.httpSend('message', payload);
+            }
+          }
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to send image.';
+        Alert.alert('Image upload error', message);
+      } finally {
+        setPendingImageUri(null);
+      }
     }
   };
 
