@@ -10,9 +10,13 @@ export type ChatMessage = {
   createdAt?: string;
   avatarUri?: string;
   outgoing?: boolean;
-  type?: 'text' | 'system' | 'image';
+  type?: 'text' | 'system' | 'image' | 'file';
   imageUri?: string;
   imagePath?: string;
+  fileUri?: string;
+  fileName?: string;
+  fileSize?: number;
+  fileMime?: string;
 };
 
 export type ChatAuthorProfile = {

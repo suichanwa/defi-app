@@ -2,6 +2,7 @@ import React from 'react';
 import { ActivityIndicator, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createWalletStyles } from '@styles/WalletStyles';
+import FlowMessage from './FlowMessage';
 import PasscodeField from './PasscodeField';
 import NumericKeyboard from './NumericKeyboard';
 
@@ -99,8 +100,7 @@ export default function WalletImportModal({
             onDelete={onDelete}
             onClear={onClear}
           />
-          {flowError && <Text style={styles.errorText}>{flowError}</Text>}
-          {flowMessage && <Text style={styles.successText}>{flowMessage}</Text>}
+          <FlowMessage styles={styles} error={flowError} message={flowMessage} />
           {isSubmitting && (
             <View style={styles.loadingRow}>
               <ActivityIndicator size="small" color="#4f46e5" />

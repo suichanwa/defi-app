@@ -16,8 +16,11 @@ type Props = {
   onDraftChange: (value: string) => void;
   onSend: () => void;
   onPickImage: () => void;
+  onPickFile?: () => void;
   attachmentUri?: string | null;
+  fileAttachment?: { uri: string; name: string } | null;
   onClearAttachment?: () => void;
+  onClearFile?: () => void;
   placeholder?: string;
 };
 
@@ -26,13 +29,17 @@ export default function ChatInputBar({
   onDraftChange,
   onSend,
   onPickImage,
+  onPickFile,
   attachmentUri,
+  fileAttachment,
   onClearAttachment,
+  onClearFile,
   placeholder = 'Type a message...',
 }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const hasAttachment = Boolean(attachmentUri);
+  const hasFile = Boolean(fileAttachment);
 
   return (
     <View style={styles.container}>
@@ -47,10 +54,28 @@ export default function ChatInputBar({
           ) : null}
         </View>
       ) : null}
+      {hasFile && fileAttachment ? (
+        <View style={styles.attachmentRow}>
+          <MaterialCommunityIcons name="file-outline" size={18} color={colors.text} />
+          <Text style={styles.attachmentLabel} numberOfLines={1}>
+            {fileAttachment.name}
+          </Text>
+          {onClearFile ? (
+            <TouchableOpacity onPress={onClearFile} style={styles.clearButton} accessibilityLabel="Remove file">
+              <MaterialCommunityIcons name="close-circle" size={18} color={colors.muted} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
       <View style={styles.inputRow}>
         <TouchableOpacity onPress={onPickImage} style={styles.attachButton} accessibilityLabel="Attach photo">
           <MaterialCommunityIcons name="image-outline" size={18} color={colors.accentText} />
         </TouchableOpacity>
+        {onPickFile ? (
+          <TouchableOpacity onPress={onPickFile} style={styles.attachButton} accessibilityLabel="Attach file">
+            <MaterialCommunityIcons name="paperclip" size={18} color={colors.accentText} />
+          </TouchableOpacity>
+        ) : null}
         <TextInput
           placeholder={placeholder}
           placeholderTextColor="#9ca3af"

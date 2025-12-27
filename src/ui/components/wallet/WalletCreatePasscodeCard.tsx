@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { createWalletStyles } from '@styles/WalletStyles';
+import FlowMessage from './FlowMessage';
 import PasscodeField from './PasscodeField';
 import NumericKeyboard from './NumericKeyboard';
 import WalletLoadingOverlay from './WalletLoadingOverlay';
@@ -78,8 +79,7 @@ export default function WalletCreatePasscodeCard({
         onDelete={onDelete}
         onClear={onClear}
       />
-      {flowError && <Text style={styles.errorText}>{flowError}</Text>}
-      {flowMessage && <Text style={styles.successText}>{flowMessage}</Text>}
+      <FlowMessage styles={styles} error={flowError} message={flowMessage} />
       <TouchableOpacity
         style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}
         onPress={onCreate}

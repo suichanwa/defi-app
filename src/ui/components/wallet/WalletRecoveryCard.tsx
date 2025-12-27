@@ -2,6 +2,7 @@ import React from 'react';
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createWalletStyles } from '@styles/WalletStyles';
+import FlowMessage from './FlowMessage';
 
 type WalletRecoveryCardProps = {
   styles: ReturnType<typeof createWalletStyles>;
@@ -86,8 +87,7 @@ export default function WalletRecoveryCard({
         style={styles.input}
         autoCapitalize="none"
       />
-      {flowError && <Text style={styles.errorText}>{flowError}</Text>}
-      {flowMessage && <Text style={styles.successText}>{flowMessage}</Text>}
+      <FlowMessage styles={styles} error={flowError} message={flowMessage} />
       {isSubmitting && (
         <View style={styles.loadingRow}>
           <ActivityIndicator size="small" color="#4f46e5" />

@@ -20,6 +20,7 @@ export function useRoomHistory({ pageSize, mapRow, resolveMessages, onHistoryErr
   const [messagesByChat, setMessagesByChat] = useState<Record<string, ChatMessage[]>>({});
   const [historyStateByChat, setHistoryStateByChat] = useState<Record<string, HistoryState>>({});
   const historyLoadedRef = useRef<Record<string, boolean>>({});
+  const loadInitialInFlightRef = useRef<Record<string, boolean>>({});
   const loadMoreInFlightRef = useRef<Record<string, boolean>>({});
 
   const ensureChatInitialized = useCallback((chatId: string) => {
@@ -36,9 +37,13 @@ export function useRoomHistory({ pageSize, mapRow, resolveMessages, onHistoryErr
 
   const loadInitial = useCallback(
     async (roomId: string) => {
+      if (loadInitialInFlightRef.current[roomId]) {
+        return;
+      }
       if (historyLoadedRef.current[roomId] && (messagesByChat[roomId]?.length ?? 0) > 0) {
         return;
       }
+      loadInitialInFlightRef.current[roomId] = true;
 
       setHistoryStateByChat((prev) => ({
         ...prev,
@@ -63,6 +68,7 @@ export function useRoomHistory({ pageSize, mapRow, resolveMessages, onHistoryErr
           },
         }));
         onHistoryError?.(error.message ?? 'History error');
+        loadInitialInFlightRef.current[roomId] = false;
         return;
       }
 
@@ -78,6 +84,7 @@ export function useRoomHistory({ pageSize, mapRow, resolveMessages, onHistoryErr
       }));
 
       historyLoadedRef.current[roomId] = true;
+      loadInitialInFlightRef.current[roomId] = false;
     },
     [mapRow, messagesByChat, onHistoryError, pageSize, resolveMessages],
   );

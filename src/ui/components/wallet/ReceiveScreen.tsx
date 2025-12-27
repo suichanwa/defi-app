@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Animated, Text, TouchableOpacity, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { createWalletStyles } from '@styles/WalletStyles';
+import FlowMessage from './FlowMessage';
 import { useTheme } from '@theme/ThemeProvider';
 import { useWalletCardAnimation } from '../../../animations/walletAnimations';
 
@@ -31,7 +32,7 @@ export default function ReceiveScreen({ chainName, address, flowMessage, onCopy,
         <Text style={styles.setupSubtitle}>Wallet address unavailable.</Text>
       )}
       {address && <Text style={styles.addressPill}>{address}</Text>}
-      {flowMessage && <Text style={styles.successText}>{flowMessage}</Text>}
+      <FlowMessage styles={styles} message={flowMessage} />
       <TouchableOpacity style={styles.primaryButton} onPress={onCopy} activeOpacity={0.9}>
         <Text style={styles.primaryButtonText}>Copy address</Text>
       </TouchableOpacity>

@@ -8,9 +8,17 @@ type RealtimeArgs = {
   presenceKey: string;
   presencePayload?: Record<string, unknown>;
   onIncomingMessage: (message: ChatMessage) => void;
+  onTyping?: (payload: TypingPayload) => void;
   onSubscribed?: () => void;
   onError?: () => void;
   onPresenceChange?: (count: number) => void;
+};
+
+export type TypingPayload = {
+  chatId: string;
+  authorId?: string;
+  author?: string;
+  isTyping: boolean;
 };
 
 export function useRealtimeRoom({
@@ -18,6 +26,7 @@ export function useRealtimeRoom({
   presenceKey,
   presencePayload,
   onIncomingMessage,
+  onTyping,
   onSubscribed,
   onError,
   onPresenceChange,
@@ -46,6 +55,9 @@ export function useRealtimeRoom({
     channel
       .on('broadcast', { event: 'message' }, ({ payload }) => {
         onIncomingMessage(payload as ChatMessage);
+      })
+      .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        onTyping?.(payload as TypingPayload);
       })
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState();
@@ -92,9 +104,27 @@ export function useRealtimeRoom({
     [isReady],
   );
 
+  const sendTyping = useCallback(
+    async (payload: TypingPayload) => {
+      const channel = channelRef.current;
+      if (!channel) return;
+      if (isReady) {
+        await channel.send({
+          type: 'broadcast',
+          event: 'typing',
+          payload,
+        });
+      } else {
+        await channel.httpSend('typing', payload);
+      }
+    },
+    [isReady],
+  );
+
   return {
     isReady,
     participantCount,
     sendBroadcast,
+    sendTyping,
   };
 }

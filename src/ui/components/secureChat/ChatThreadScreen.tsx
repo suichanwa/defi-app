@@ -3,6 +3,7 @@ import {
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   StyleSheet,
   Text,
@@ -43,18 +44,22 @@ type Props = {
   onDraftChange: (value: string) => void;
   onSend: () => void;
   onPickImage?: () => void;
+  onPickFile?: () => void;
   onClearAttachment?: () => void;
+  onClearFile?: () => void;
   onLoadMore?: () => void;
   isLoadingMore?: boolean;
   hasMoreMessages?: boolean;
   attachmentUri?: string | null;
+  fileAttachment?: { uri: string; name: string } | null;
+  typingLabel?: string | null;
   resolveAvatar: (message: ChatMessage) => ChatAvatarSource;
   resolveAuthorName: (message: ChatMessage) => string;
   onCopyMessage?: (message: ChatMessage) => void;
   onReplyMessage?: (message: ChatMessage) => void;
   onEditMessage?: (message: ChatMessage) => void;
   onDeleteMessage?: (message: ChatMessage) => void;
-  onStartDM?: (userId: string, userName: string) => void;
+  onStartP2P?: (userId: string, userName: string) => void;
   isMuted?: boolean;
   onToggleMute?: () => void;
 };
@@ -88,18 +93,22 @@ export default function ChatThreadScreen({
   onDraftChange,
   onSend,
   onPickImage,
+  onPickFile,
   onClearAttachment,
+  onClearFile,
   onLoadMore,
   isLoadingMore = false,
   hasMoreMessages = false,
   attachmentUri,
+  fileAttachment,
+  typingLabel,
   resolveAvatar,
   resolveAuthorName,
   onCopyMessage,
   onReplyMessage,
   onEditMessage,
   onDeleteMessage,
-  onStartDM,
+  onStartP2P,
   isMuted,
   onToggleMute,
 }: Props) {
@@ -117,6 +126,7 @@ export default function ChatThreadScreen({
 
   const [selectedProfile, setSelectedProfile] = useState<SelectedProfile>(null);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  const lastLoadMoreAtRef = useRef(0);
 
   const canManageMessage = useCallback(
     (message: ChatMessage) => {
@@ -259,7 +269,7 @@ export default function ChatThreadScreen({
     );
   }
 
-  const renderMessage = ({ item: msg }: { item: ChatMessage }) => {
+  const renderMessage = useCallback(({ item: msg }: { item: ChatMessage }) => {
     if (msg.type === 'system') {
       return (
         <Animated.View entering={FadeInDown.duration(200)} style={[styles.messageBubble, styles.messageSystem]}>
@@ -281,6 +291,11 @@ export default function ChatThreadScreen({
     const isImage = msg.type === 'image' && msg.imageUri;
     const canManage = canManageMessage(msg);
     const iconColor = isOutgoing ? colors.accentText : colors.text;
+    const isFile = msg.type === 'file' && msg.fileName;
+    const handleOpenFile = () => {
+      if (!msg.fileUri) return;
+      Linking.openURL(msg.fileUri).catch(() => undefined);
+    };
 
     return (
       <Animated.View
@@ -304,7 +319,7 @@ export default function ChatThreadScreen({
             </TouchableOpacity>
             <MessageSettingsMenu
               canManage={canManage}
-              canEdit={msg.type !== 'image'}
+              canEdit={msg.type !== 'image' && msg.type !== 'file'}
               iconColor={iconColor}
               onCopy={() => onCopyMessage?.(msg)}
               onReply={() => onReplyMessage?.(msg)}
@@ -315,6 +330,18 @@ export default function ChatThreadScreen({
           {isImage ? (
             <TouchableOpacity onPress={() => setSelectedImageUri(msg.imageUri as string)} activeOpacity={0.8}>
               <Image source={{ uri: msg.imageUri as string }} style={styles.messageImage} resizeMode="cover" />
+            </TouchableOpacity>
+          ) : isFile ? (
+            <TouchableOpacity onPress={handleOpenFile} activeOpacity={0.8} style={styles.fileRow}>
+              <MaterialCommunityIcons name="file-outline" size={18} color={iconColor} />
+              <View style={styles.fileDetails}>
+                <Text style={bodyStyle} numberOfLines={1}>
+                  {msg.fileName}
+                </Text>
+                <Text style={styles.fileMeta}>
+                  Tap to open
+                </Text>
+              </View>
             </TouchableOpacity>
           ) : (
             <Text style={bodyStyle}>{msg.content}</Text>
@@ -331,12 +358,22 @@ export default function ChatThreadScreen({
         )}
       </Animated.View>
     );
-  };
+  }, [
+    canManageMessage,
+    colors.accentText,
+    colors.text,
+    handleAvatarPress,
+    onCopyMessage,
+    onDeleteMessage,
+    onEditMessage,
+    onReplyMessage,
+    resolveAvatar,
+    resolveAuthorName,
+    styles,
+  ]);
 
   // Calculate keyboard offset for iOS
   const keyboardVerticalOffset = isIOS ? BOTTOM_NAV_HEIGHT + insets.bottom : 0;
-
-  const typingLabel = draft.trim().length > 0 ? 'Typing...' : '';
 
   return (
     <KeyboardAvoidingView
@@ -352,7 +389,7 @@ export default function ChatThreadScreen({
           onBack={onBack}
           isMuted={isMuted}
           onToggleMute={onToggleMute}
-          typingLabel={typingLabel}
+          typingLabel={typingLabel ?? ''}
         />
 
         {/* Messages */}
@@ -371,6 +408,9 @@ export default function ChatThreadScreen({
               if (!onLoadMore || isLoadingMore || !hasMoreMessages) return;
               const offsetY = event.nativeEvent.contentOffset.y;
               if (offsetY <= CHAT_HISTORY_SCROLL_THRESHOLD) {
+                const now = Date.now();
+                if (now - lastLoadMoreAtRef.current < 1200) return;
+                lastLoadMoreAtRef.current = now;
                 onLoadMore();
               }
             }}
@@ -380,7 +420,11 @@ export default function ChatThreadScreen({
               autoscrollToTopThreshold: 100,
             }}
             inverted={false}
-            removeClippedSubviews={false}
+            removeClippedSubviews={Platform.OS !== 'web'}
+            initialNumToRender={12}
+            maxToRenderPerBatch={8}
+            updateCellsBatchingPeriod={50}
+            windowSize={7}
           />
         </Animated.View>
 
@@ -403,8 +447,11 @@ export default function ChatThreadScreen({
             onDraftChange={onDraftChange}
             onSend={onSend}
             onPickImage={onPickImage ?? (() => undefined)}
+            onPickFile={onPickFile}
             onClearAttachment={onClearAttachment}
+            onClearFile={onClearFile}
             attachmentUri={attachmentUri}
+            fileAttachment={fileAttachment}
           />
         </Animated.View>
       </Animated.View>
@@ -416,7 +463,7 @@ export default function ChatThreadScreen({
         avatarSource={selectedProfile?.avatarSource ?? { avatarType: 'identicon', seed: 'default' }}
         isOnline={selectedProfile?.isOnline ?? false}
         onClose={() => setSelectedProfile(null)}
-        onStartDM={onStartDM}
+        onStartP2P={onStartP2P}
       />
       <ChatImageViewer
         uri={selectedImageUri}
@@ -576,5 +623,23 @@ const createChatStyles = (colors: {
       width: 180,
       height: 180,
       borderRadius: 10,
+    },
+    fileRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 6,
+      paddingVertical: 6,
+      paddingHorizontal: 8,
+      borderRadius: 10,
+      backgroundColor: `${colors.border}66`,
+      gap: 8,
+    },
+    fileDetails: {
+      flex: 1,
+    },
+    fileMeta: {
+      marginTop: 2,
+      fontSize: 11,
+      color: colors.muted,
     },
   });

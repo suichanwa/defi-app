@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useMemo, useRef } from 'react';
+import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@theme/ThemeProvider';
 import ChatAvatar from '@components/secureChat/ChatAvatar';
@@ -12,8 +12,8 @@ type ViewProfileCardProps = {
   isOnline?: boolean;
   onClose: () => void;
   onCopyId?: () => void;
-  onMessage?: () => void;
-  canMessage?: boolean;
+  onP2P?: () => void;
+  canP2P?: boolean;
 };
 
 export default function ViewProfileCard({
@@ -23,14 +23,28 @@ export default function ViewProfileCard({
   isOnline = false,
   onClose,
   onCopyId,
-  onMessage,
-  canMessage = false,
+  onP2P,
+  canP2P = false,
 }: ViewProfileCardProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const scale = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+  const isAnimating = useRef(false);
+
+  const handleP2PPress = () => {
+    if (!canP2P || !onP2P || isAnimating.current) return;
+    isAnimating.current = true;
+    Animated.parallel([
+      Animated.timing(scale, { toValue: 0.96, duration: 120, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 0.85, duration: 120, useNativeDriver: true }),
+    ]).start(() => {
+      onP2P();
+    });
+  };
 
   return (
-    <View style={styles.card}>
+    <Animated.View style={[styles.card, { transform: [{ scale }], opacity }]}>
       <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.7}>
         <MaterialCommunityIcons name="close" size={20} color={colors.muted} />
       </TouchableOpacity>
@@ -57,24 +71,24 @@ export default function ViewProfileCard({
 
       <View style={styles.actionsRow}>
         <TouchableOpacity
-          style={[styles.actionButton, !canMessage && styles.actionDisabled]}
+          style={[styles.actionButton, styles.actionSecondary, !canP2P && styles.actionDisabled]}
           activeOpacity={0.8}
-          onPress={onMessage}
-          disabled={!canMessage}
+          onPress={handleP2PPress}
+          disabled={!canP2P}
         >
           <MaterialCommunityIcons
-            name="message-text-outline"
+            name="signal"
             size={20}
-            color={canMessage ? colors.accentText : colors.muted}
+            color={canP2P ? colors.text : colors.muted}
           />
-          <Text style={[styles.actionText, !canMessage && styles.actionTextDisabled]}>Message</Text>
+          <Text style={[styles.actionText, styles.actionTextSecondary, !canP2P && styles.actionTextDisabled]}>P2P DM</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.actionButton, styles.actionSecondary]} activeOpacity={0.8}>
           <MaterialCommunityIcons name="account-plus-outline" size={20} color={colors.text} />
           <Text style={[styles.actionText, styles.actionTextSecondary]}>Add Friend</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -168,11 +182,12 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     },
     actionsRow: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       gap: 12,
       width: '100%',
     },
     actionButton: {
-      flex: 1,
+      flexBasis: '48%',
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',

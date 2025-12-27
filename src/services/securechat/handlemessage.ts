@@ -120,6 +120,7 @@ export const createSendMessageHandler = ({
   selectedChat,
   draft,
   pendingImageUri,
+  pendingFile,
   editingMessage,
   messagesByChat,
   setMessagesByChat,
@@ -127,15 +128,19 @@ export const createSendMessageHandler = ({
   setDraft,
   setEditingMessage,
   setAttachment,
+  setFileAttachment,
   sendText,
   sendImage,
+  sendFile,
   resolveAuthorName,
   showAlert,
   sendingImageUriRef,
+  sendingFileUriRef,
 }: {
   selectedChat: ChatThread | null;
   draft: string;
   pendingImageUri: string | null;
+  pendingFile?: HandleMessageTypes.PendingFile | null;
   editingMessage: ChatMessage | null;
   messagesByChat: Record<string, ChatMessage[]>;
   setMessagesByChat: HandleMessageTypes.SetState<Record<string, ChatMessage[]>>;
@@ -143,16 +148,20 @@ export const createSendMessageHandler = ({
   setDraft: (value: string) => void;
   setEditingMessage: (value: ChatMessage | null) => void;
   setAttachment: (value: string | null) => void;
+  setFileAttachment?: (value: HandleMessageTypes.PendingFile | null) => void;
   sendText: (args: { chatId: string; content: string; isDM: boolean }) => Promise<{ sent: boolean; error?: string }>;
   sendImage: (args: { chatId: string; imageUri: string; isDM: boolean }) => Promise<{ sent: boolean; error?: string }>;
+  sendFile?: (args: { chatId: string; file: HandleMessageTypes.PendingFile; isDM: boolean }) => Promise<{ sent: boolean; error?: string }>;
   resolveAuthorName: (message: ChatMessage) => string;
   showAlert: HandleMessageTypes.AlertFn;
   sendingImageUriRef: { current: string | null };
+  sendingFileUriRef?: { current: string | null };
 }) => async () => {
   if (!selectedChat) return;
   const trimmed = draft.trim();
   const hasText = trimmed.length > 0;
   const hasImage = Boolean(pendingImageUri);
+  const hasFile = Boolean(pendingFile);
   const isDM = selectedChat.id.startsWith('dm:');
 
   if (editingMessage && selectedChat.id === editingMessage.chatId) {
@@ -189,7 +198,7 @@ export const createSendMessageHandler = ({
     return;
   }
 
-  if (!hasText && !hasImage) return;
+  if (!hasText && !hasImage && !hasFile) return;
 
   if (hasText) {
     setDraft('');
@@ -218,18 +227,56 @@ export const createSendMessageHandler = ({
       }
     }
   }
+
+  if (hasFile && pendingFile) {
+    if (!sendFile) {
+      showAlert('File upload error', 'File sending is only available for P2P chats.');
+      return;
+    }
+    const fileUri = pendingFile.uri;
+    if (sendingFileUriRef?.current === fileUri) return;
+    if (sendingFileUriRef) {
+      sendingFileUriRef.current = fileUri;
+    }
+    setFileAttachment?.(null);
+    try {
+      const result = await sendFile({ chatId: selectedChat.id, file: pendingFile, isDM });
+      if (!result.sent && result.error) {
+        showAlert('File upload error', result.error);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to send file.';
+      showAlert('File upload error', message);
+    } finally {
+      if (sendingFileUriRef?.current === fileUri) {
+        sendingFileUriRef.current = null;
+      }
+    }
+  }
 };
 
 export const createCopyMessageHandler =
   (setClipboard: HandleMessageTypes.ClipboardFn, showToast: HandleMessageTypes.ToastFn) =>
   async (message: ChatMessage) => {
-    const text = message.type === 'image' ? message.imageUri ?? '' : message.content;
+    const text =
+      message.type === 'image'
+        ? message.imageUri ?? ''
+        : message.type === 'file'
+          ? message.fileUri ?? message.content
+          : message.content;
     if (!text) return;
     await setClipboard(text);
     showToast({
       type: 'chat',
       text1: 'Copied to clipboard',
-      text2: message.type === 'image' ? 'Image link copied.' : text.length > 80 ? `${text.slice(0, 80)}...` : text,
+      text2:
+        message.type === 'image'
+          ? 'Image link copied.'
+          : message.type === 'file'
+            ? 'File link copied.'
+            : text.length > 80
+              ? `${text.slice(0, 80)}...`
+              : text,
       position: 'top',
       visibilityTime: 2000,
     });
@@ -246,7 +293,7 @@ export const createEditMessageHandler =
   (isOwnMessage: (message: ChatMessage) => boolean, setEditingMessage: (value: ChatMessage | null) => void, setDraft: (value: string) => void) =>
   (message: ChatMessage) => {
     if (!isOwnMessage(message)) return;
-    if (message.type === 'image') return;
+    if (message.type === 'image' || message.type === 'file') return;
     setEditingMessage(message);
     setDraft(message.content);
   };

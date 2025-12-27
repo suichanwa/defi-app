@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { availableLanguages, setLanguage as setI18nLanguage } from '@i18n';
 import type { AvatarType, LanguageCode, ThemePreference } from '@app-types/profile';
 import { createProfileStyles } from '@styles/ProfileStyles';

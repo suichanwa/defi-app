@@ -2,6 +2,7 @@ import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createWalletStyles } from '@styles/WalletStyles';
+import FlowMessage from './FlowMessage';
 
 type WalletSuccessCardProps = {
   styles: ReturnType<typeof createWalletStyles>;
@@ -42,7 +43,7 @@ export default function WalletSuccessCard({
           {backupSkipped ? 'Recovery phrase skipped' : 'Recovery phrase confirmed'}
         </Text>
       </View>
-      {flowMessage && <Text style={styles.successText}>{flowMessage}</Text>}
+      <FlowMessage styles={styles} message={flowMessage} />
       <TouchableOpacity style={styles.primaryButton} onPress={onFinishSetup} activeOpacity={0.9}>
         <Text style={styles.primaryButtonText}>Go to wallet</Text>
       </TouchableOpacity>

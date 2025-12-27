@@ -182,13 +182,7 @@ export function useDirectMessages({
         }
 
         if (!selectedChatId.startsWith('dm:')) return;
-        const activityAt = nextHeads[selectedChatId];
         const lastSeen = lastDmFetchRef.current[selectedChatId];
-        const shouldFetch =
-          Boolean(activityAt) &&
-          (!lastSeen || Date.parse(activityAt as string) > Date.parse(lastSeen));
-        if (!shouldFetch) return;
-
         const newMessages = lastSeen
           ? await getDMMessagesSince(selectedChatId, effectiveUserId, lastSeen)
           : await getDMMessages(selectedChatId, effectiveUserId);

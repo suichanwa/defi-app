@@ -3,8 +3,9 @@ import { Alert, BackHandler, Platform, useWindowDimensions } from 'react-native'
 import type { ChatMessage, ChatThread, ServerInfo } from '@app-types/securechat-types/secureChat';
 import type { SecureChatMessageRow, SecureChatScreenProps } from '@app-types/securechat-types/secureChatScreen';
 import * as date from 'date-and-time';
-import Toast from 'react-native-toast-message';
+import { Toast } from 'toastify-react-native';
 import * as Clipboard from 'expo-clipboard';
+import * as DocumentPicker from 'expo-document-picker';
 import SecureChatContent from './components/SecureChatContent';
 import SecureChatLayout from './components/SecureChatLayout';
 import * as SecureChatConstants from '@constants/secureChatScreen';
@@ -12,12 +13,13 @@ import { useSecureChatIdentity } from '@hooks/useSecureChatIdentity';
 import { useSecureChatImageAttachment } from '@hooks/useSecureChatImageAttachment';
 import { useSecureChatUIState } from '@hooks/secureChat/useSecureChatUIState';
 import { useDirectMessages } from '@hooks/secureChat/useDirectMessages';
-import { useRealtimeRoom } from '@hooks/secureChat/useRealtimeRoom';
+import { useRealtimeRoom, type TypingPayload } from '@hooks/secureChat/useRealtimeRoom';
 import { useChatTransport } from '@hooks/secureChat/useChatTransport';
 import { useTickingClock } from '@hooks/useTickingClock';
 import { useRoomHistory } from '@hooks/useRoomHistory';
+import { useP2PDirectMessages } from '@hooks/secureChat/useP2PDirectMessages';
 import { resolveChatImageMessages } from '@utils/secureChatImages';
-import { mapRowToMessage } from '@utils/secureChatUtils';
+import { isUuid, mapRowToMessage } from '@utils/secureChatUtils';
 import {
   createCopyMessageHandler,
   createDeleteMessageHandler,
@@ -28,10 +30,16 @@ import {
   createReplyMessageHandler,
   createSendMessageHandler,
 } from '@services/securechat/handlemessage';
-import { ensureNotificationReady, notifyChatMessage } from '@services/notifications';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import { useChatAvatar } from '../../hooks/useChatAvatar';
 import { useChatProfiles } from '../../hooks/useChatProfiles';
+
+type PendingFile = {
+  uri: string;
+  name: string;
+  size: number;
+  mime: string;
+};
 
 export default function SecureChatScreen({ isActive = false }: SecureChatScreenProps) {
   const [chats, setChats] = useState<ChatThread[]>([
@@ -53,6 +61,8 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
   const [roomId, setRoomId] = useState<string>(SecureChatConstants.DEFAULT_GLOBAL_CHAT_ID);
   const [mutedChatIds, setMutedChatIds] = useState<Set<string>>(() => new Set());
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
+  const [typingByChatId, setTypingByChatId] = useState<Record<string, string | null>>({});
+  const [pendingFile, setPendingFile] = useState<PendingFile | null>(null);
   const { width } = useWindowDimensions();
   const isCompact = width < SecureChatConstants.CHAT_COMPACT_WIDTH;
   const timeLabel = useTickingClock();
@@ -79,8 +89,12 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
   const { pickImage, clearImage } = useSecureChatImageAttachment(setAttachment);
 
   const devicePublicKey = useMemo(() => `user:${displayLabel}`, [displayLabel]);
+  const [p2pRemoteOffer, setP2pRemoteOffer] = useState('');
+  const [p2pRemoteAnswer, setP2pRemoteAnswer] = useState('');
+  const [p2pRemoteCandidates, setP2pRemoteCandidates] = useState('');
 
   const handlePickImage = useCallback(async () => {
+    setPendingFile(null);
     await pickImage();
   }, [pickImage]);
 
@@ -88,12 +102,37 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     clearImage();
   }, [clearImage]);
 
+  const handlePickFile = useCallback(async () => {
+    const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    if (!asset?.uri) return;
+    setAttachment(null);
+    setPendingFile({
+      uri: asset.uri,
+      name: asset.name ?? `file-${Date.now()}`,
+      size: asset.size ?? 0,
+      mime: asset.mimeType ?? 'application/octet-stream',
+    });
+  }, [setAttachment]);
+
+  const handleClearFile = useCallback(() => {
+    setPendingFile(null);
+  }, []);
+
   const notifyIncomingRef = useRef<(chatId: string, message: ChatMessage) => void>(() => undefined);
   const notifyIncoming = useCallback(
     (chatId: string, message: ChatMessage) => notifyIncomingRef.current(chatId, message),
     [],
   );
   const sendingImageUriRef = useRef<string | null>(null);
+  const sendingFileUriRef = useRef<string | null>(null);
+  const typingTimersRef = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({});
+  const typingSentRef = useRef<{ chatId: string | null; isTyping: boolean; lastSentAt: number }>({
+    chatId: null,
+    isTyping: false,
+    lastSentAt: 0,
+  });
 
   const mapRow = useCallback(
     (row: SecureChatMessageRow) =>
@@ -115,6 +154,77 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
         setConnectionLog((prev) => [`History error: ${message}`, ...prev]);
       },
     });
+
+  const appendMessageToChat = useCallback(
+    (chatId: string, message: ChatMessage) => {
+      setMessagesByChat((prev) => {
+        const existing = prev[chatId] ?? [];
+        if (existing.some((m) => m.id === message.id)) return prev;
+        return { ...prev, [chatId]: [...existing, message] };
+      });
+      setChats((prev) => {
+        const next = prev.map((chat) =>
+          chat.id === chatId
+            ? {
+                ...chat,
+                lastMessage: {
+                  text: message.type === 'image' ? 'Photo' : message.content,
+                  ts: message.timestamp,
+                  from: message.author,
+                  authorId: message.authorId,
+                },
+              }
+            : chat,
+        );
+        if (next.some((chat) => chat.id === chatId)) return next;
+        const fallbackName = message.author || 'P2P Peer';
+        return [
+          {
+            id: chatId,
+            name: fallbackName,
+            participants: [displayLabel, fallbackName],
+            peerAddress: 'p2p',
+            isOnline: true,
+            isDM: true,
+            lastMessage: {
+              text: message.type === 'image' ? 'Photo' : message.content,
+              ts: message.timestamp,
+              from: message.author,
+              authorId: message.authorId,
+            },
+          },
+          ...next,
+        ];
+      });
+    },
+    [displayLabel, setChats, setMessagesByChat],
+  );
+
+  const {
+    status: p2pStatus,
+    chatId: p2pChatId,
+    peerLabel: p2pPeerLabel,
+    localOffer: p2pLocalOffer,
+    localAnswer: p2pLocalAnswer,
+    localCandidates: p2pLocalCandidates,
+    createOffer: p2pCreateOffer,
+    createAnswer: p2pCreateAnswer,
+    acceptAnswer: p2pAcceptAnswer,
+    addRemoteCandidates: p2pAddRemoteCandidates,
+    reset: p2pReset,
+    sendText: p2pSendText,
+    sendFile: p2pSendFile,
+  } = useP2PDirectMessages({
+    displayLabel,
+    authorId: authorId ?? effectiveUserId,
+    onMessage: (message, chatId) => {
+      appendMessageToChat(chatId, message);
+      notifyIncoming(chatId, message);
+    },
+    onLog: (line) => {
+      setConnectionLog((prev) => [line, ...prev]);
+    },
+  });
 
   const loadInitialRef = useRef(loadInitial);
   useEffect(() => {
@@ -160,6 +270,37 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     return getChatById(selectedChatId);
   }, [getChatById, selectedChatId]);
 
+  useEffect(() => {
+    if (!p2pChatId || p2pStatus !== 'connected') return;
+    const peerName = p2pPeerLabel ?? 'P2P Peer';
+    setChats((prev) => {
+      const existing = prev.find((chat) => chat.id === p2pChatId);
+      if (existing) {
+        return prev.map((chat) => (chat.id === p2pChatId ? { ...chat, name: peerName } : chat));
+      }
+      return [
+        {
+          id: p2pChatId,
+          name: peerName,
+          participants: [displayLabel, peerName],
+          peerAddress: 'p2p',
+          isOnline: true,
+          isDM: true,
+          lastMessage: {
+            text: 'P2P session connected',
+            ts: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            from: 'System',
+          },
+        },
+        ...prev,
+      ];
+    });
+    if (selectedChatId !== p2pChatId) {
+      selectChat(p2pChatId);
+      setTab('chats');
+    }
+  }, [displayLabel, p2pChatId, p2pPeerLabel, p2pStatus, selectChat, selectedChatId, setTab]);
+
   const notifyIncomingMessage = useMemo(
     () =>
       createNotifyIncomingMessage({
@@ -171,22 +312,9 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
         selectedChatId,
         getChatById,
         showToast: Toast.show,
-        notifyNative: (chatId, message) => {
-          if (!chatId.startsWith('dm:')) return;
-          const chatName = getChatById(chatId)?.name ?? message.author ?? 'New message';
-          const body = message.type === 'image' ? 'Sent a photo.' : message.content;
-          return notifyChatMessage({ title: chatName, body, data: { chatId } });
-        },
       }),
     [chatView, displayLabel, effectiveUserId, getChatById, mutedChatIds, secureTab, selectedChatId],
   );
-
-  useEffect(() => {
-    if (!isActive || Platform.OS !== 'android') return;
-    ensureNotificationReady().catch((error) => {
-      console.warn('Notification setup failed:', error);
-    });
-  }, [isActive]);
 
   useEffect(() => {
     notifyIncomingRef.current = notifyIncomingMessage;
@@ -260,6 +388,7 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
 
   useEffect(() => {
     setEditingMessage(null);
+    setPendingFile(null);
   }, [selectedChatId]);
 
   const isOwnMessage = useMemo(
@@ -310,17 +439,54 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     [setChats, setMessagesByChat],
   );
 
-  const { participantCount, sendBroadcast } = useRealtimeRoom({
+  const { participantCount, sendBroadcast, sendTyping } = useRealtimeRoom({
     roomId,
     presenceKey: authorId ?? displayLabel,
     presencePayload,
     onIncomingMessage: handleIncomingRoomMessage,
+    onTyping: (payload: TypingPayload) => {
+      const safePayload = payload as unknown as Record<string, unknown>;
+      const readString = (key: string) => {
+        const value = safePayload[key];
+        return typeof value === 'string' ? value : undefined;
+      };
+      const readBoolean = (key: string) => {
+        const value = safePayload[key];
+        return typeof value === 'boolean' ? value : undefined;
+      };
+      const payloadChatId = readString('chatId');
+      if (!payloadChatId) return;
+      const payloadAuthorId = readString('authorId');
+      const payloadAuthor = readString('author');
+      const payloadIsTyping = readBoolean('isTyping') === true;
+
+      if (payloadAuthorId && payloadAuthorId === effectiveUserId) return;
+      if (!payloadAuthorId && payloadAuthor === displayLabel) return;
+
+      if (payloadIsTyping) {
+        const label = payloadAuthor ?? 'Someone';
+        setTypingByChatId((prev) => ({ ...prev, [payloadChatId]: `${label} is typing...` }));
+        if (typingTimersRef.current[payloadChatId]) {
+          clearTimeout(typingTimersRef.current[payloadChatId] as ReturnType<typeof setTimeout>);
+        }
+        typingTimersRef.current[payloadChatId] = setTimeout(() => {
+          setTypingByChatId((prev) => ({ ...prev, [payloadChatId]: null }));
+          typingTimersRef.current[payloadChatId] = null;
+        }, 2500);
+      } else {
+        if (typingTimersRef.current[payloadChatId]) {
+          clearTimeout(typingTimersRef.current[payloadChatId] as ReturnType<typeof setTimeout>);
+          typingTimersRef.current[payloadChatId] = null;
+        }
+        setTypingByChatId((prev) => ({ ...prev, [payloadChatId]: null }));
+      }
+    },
     onSubscribed: handleRealtimeSubscribed,
     onError: handleRealtimeError,
     onPresenceChange: handlePresenceChange,
   });
 
-  const { sendText, sendImage } = useChatTransport({
+  const { sendText: transportSendText, sendImage: transportSendImage } = useChatTransport({
     displayLabel,
     authorId,
     effectiveUserId,
@@ -338,9 +504,75 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     markDmFetched,
   });
 
+  const inferMimeFromName = useCallback((name: string) => {
+    const ext = name.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'gif':
+        return 'image/gif';
+      case 'pdf':
+        return 'application/pdf';
+      default:
+        return 'application/octet-stream';
+    }
+  }, []);
+
+  const sendText = useCallback(
+    async ({ chatId, content, isDM }: { chatId: string; content: string; isDM: boolean }) => {
+      if (chatId.startsWith('p2p:')) {
+        const message = p2pSendText(content);
+        if (!message) return { sent: false, error: 'P2P channel not connected.' };
+        appendMessageToChat(chatId, message);
+        return { sent: true };
+      }
+      return transportSendText({ chatId, content, isDM });
+    },
+    [appendMessageToChat, p2pSendText, transportSendText],
+  );
+
+  const sendImage = useCallback(
+    async ({ chatId, imageUri, isDM }: { chatId: string; imageUri: string; isDM: boolean }) => {
+      if (chatId.startsWith('p2p:')) {
+        const name = imageUri.split('/').pop() ?? `image-${Date.now()}.jpg`;
+        const file = {
+          uri: imageUri,
+          name,
+          size: 0,
+          mime: inferMimeFromName(name),
+        };
+        const message = await p2pSendFile({ ...file, isImage: true });
+        if (!message) return { sent: false, error: 'P2P channel not connected.' };
+        appendMessageToChat(chatId, message);
+        return { sent: true };
+      }
+      return transportSendImage({ chatId, imageUri, isDM });
+    },
+    [appendMessageToChat, inferMimeFromName, p2pSendFile, transportSendImage],
+  );
+
+  const sendFile = useCallback(
+    async ({ chatId, file, isDM }: { chatId: string; file: PendingFile; isDM: boolean }) => {
+      if (!chatId.startsWith('p2p:')) {
+        return { sent: false, error: 'File sending only works in P2P chats.' };
+      }
+      const message = await p2pSendFile({ ...file, isImage: false });
+      if (!message) return { sent: false, error: 'P2P channel not connected.' };
+      appendMessageToChat(chatId, message);
+      return { sent: true };
+    },
+    [appendMessageToChat, p2pSendFile],
+  );
+
   const handleLoadMoreMessages = useCallback(() => {
     if (!selectedChat) return;
     if (selectedChat.id.startsWith('dm:')) return;
+    if (selectedChat.id.startsWith('p2p:')) return;
     loadOlder(selectedChat.id);
   }, [loadOlder, selectedChat]);
 
@@ -353,6 +585,24 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
   // Handle starting a DM from profile view
   const handleStartDM = useCallback(async (otherUserId: string, otherUserName: string) => {
     try {
+      const requiresSupabase =
+        !isSupabaseConfigured || !isUuid(effectiveUserId) || !isUuid(otherUserId);
+      if (requiresSupabase) {
+        setTab('connect');
+        setView('list');
+        setConnectionLog((prev) => [
+          'Local-only accounts cannot sync DMs. Use P2P DM in the Connect tab (offer/answer + ICE).',
+          ...prev,
+        ]);
+        Toast.show({
+          type: 'chat',
+          text1: 'P2P DM required',
+          text2: 'Open Connect tab to exchange offer/answer for this DM.',
+          position: 'top',
+          visibilityTime: 3500,
+        });
+        return;
+      }
       const channelId = await startDM(otherUserId, otherUserName);
       selectChat(channelId);
       setRoomId(channelId);
@@ -364,11 +614,29 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     }
   }, [selectChat, setTab, startDM]);
 
+  const handleStartP2P = useCallback((otherUserId: string, otherUserName: string) => {
+    setTab('connect');
+    setView('list');
+    setConnectionLog((prev) => [
+      `Start a P2P DM with ${otherUserName}. Exchange offer/answer + ICE.`,
+      ...prev,
+    ]);
+    Toast.show({
+      type: 'chat',
+      text1: 'P2P DM',
+      text2: 'Use the Connect tab to exchange offer/answer.',
+      position: 'top',
+      visibilityTime: 3000,
+    });
+  }, [setTab, setView]);
+
   // Update handleSelectChat to load DM messages
   const handleSelectChat = useCallback(async (chatId: string) => {
     selectChat(chatId);
+    if (chatId.startsWith('p2p:')) {
+      return;
+    }
     setRoomId(chatId);
-    
     if (chatId.startsWith('dm:')) {
       await loadThread(chatId);
     } else {
@@ -377,12 +645,55 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     }
   }, [ensureChatInitialized, loadInitial, loadThread, selectChat]);
 
+  const allowFileAttachment = Boolean(selectedChat?.id.startsWith('p2p:'));
+
+  useEffect(() => {
+    if (!selectedChat) return;
+    if (selectedChat.id.startsWith('p2p:')) return;
+    if (!draft.trim()) {
+      if (typingSentRef.current.isTyping && typingSentRef.current.chatId === selectedChat.id) {
+        typingSentRef.current.isTyping = false;
+        sendTyping({
+          chatId: selectedChat.id,
+          authorId,
+          author: displayLabel,
+          isTyping: false,
+        }).catch(() => undefined);
+      }
+      return;
+    }
+
+    const now = Date.now();
+    const isSameChat = typingSentRef.current.chatId === selectedChat.id;
+    const throttleMs = 2000;
+    if (!typingSentRef.current.isTyping || !isSameChat || now - typingSentRef.current.lastSentAt > throttleMs) {
+      typingSentRef.current.chatId = selectedChat.id;
+      typingSentRef.current.isTyping = true;
+      typingSentRef.current.lastSentAt = now;
+      sendTyping({
+        chatId: selectedChat.id,
+        authorId,
+        author: displayLabel,
+        isTyping: true,
+      }).catch(() => undefined);
+    }
+  }, [authorId, displayLabel, draft, selectedChat, sendTyping]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(typingTimersRef.current).forEach((timer) => {
+        if (timer) clearTimeout(timer);
+      });
+    };
+  }, []);
+
   const handleSendMessage = useMemo(
     () =>
       createSendMessageHandler({
         selectedChat,
         draft,
         pendingImageUri,
+        pendingFile,
         editingMessage,
         messagesByChat,
         setMessagesByChat,
@@ -390,16 +701,20 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
         setDraft,
         setEditingMessage,
         setAttachment,
+        setFileAttachment: setPendingFile,
         sendText,
         sendImage,
+        sendFile,
         resolveAuthorName,
         showAlert: Alert.alert,
         sendingImageUriRef,
+        sendingFileUriRef,
       }),
     [
       selectedChat,
       draft,
       pendingImageUri,
+      pendingFile,
       editingMessage,
       messagesByChat,
       setMessagesByChat,
@@ -407,8 +722,10 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
       setDraft,
       setEditingMessage,
       setAttachment,
+      setPendingFile,
       sendText,
       sendImage,
+      sendFile,
       resolveAuthorName,
     ],
   );
@@ -532,6 +849,53 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     }, 650);
   };
 
+  const handleCreateP2POffer = useCallback(async () => {
+    try {
+      await p2pCreateOffer();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to create offer.';
+      setConnectionLog((prev) => [`P2P offer error: ${message}`, ...prev]);
+    }
+  }, [p2pCreateOffer]);
+
+  const handleCreateP2PAnswer = useCallback(async () => {
+    if (!p2pRemoteOffer.trim()) return;
+    try {
+      await p2pCreateAnswer(p2pRemoteOffer);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to create answer.';
+      setConnectionLog((prev) => [`P2P answer error: ${message}`, ...prev]);
+    }
+  }, [p2pCreateAnswer, p2pRemoteOffer]);
+
+  const handleAcceptP2PAnswer = useCallback(async () => {
+    if (!p2pRemoteAnswer.trim()) return;
+    try {
+      await p2pAcceptAnswer(p2pRemoteAnswer);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to accept answer.';
+      setConnectionLog((prev) => [`P2P answer error: ${message}`, ...prev]);
+    }
+  }, [p2pAcceptAnswer, p2pRemoteAnswer]);
+
+  const handleAddP2PCandidates = useCallback(async () => {
+    if (!p2pRemoteCandidates.trim()) return;
+    try {
+      await p2pAddRemoteCandidates(p2pRemoteCandidates);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to add ICE candidates.';
+      setConnectionLog((prev) => [`P2P ICE error: ${message}`, ...prev]);
+    }
+  }, [p2pAddRemoteCandidates, p2pRemoteCandidates]);
+
+  const handleResetP2P = useCallback(() => {
+    p2pReset();
+    setP2pRemoteOffer('');
+    setP2pRemoteAnswer('');
+    setP2pRemoteCandidates('');
+    setConnectionLog((prev) => ['P2P session reset.', ...prev]);
+  }, [p2pReset]);
+
   const handleTabChange = (tab: 'chats' | 'connect') => {
     setTab(tab);
   };
@@ -569,6 +933,24 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
           onConnectNameChange: setConnectName,
           onConnectPress: handleConnectPeer,
           onStartServer: handleStartServer,
+          p2p: {
+            status: p2pStatus,
+            peerLabel: p2pPeerLabel,
+            localOffer: p2pLocalOffer,
+            localAnswer: p2pLocalAnswer,
+            localCandidates: p2pLocalCandidates,
+            remoteOffer: p2pRemoteOffer,
+            remoteAnswer: p2pRemoteAnswer,
+            remoteCandidates: p2pRemoteCandidates,
+            onRemoteOfferChange: setP2pRemoteOffer,
+            onRemoteAnswerChange: setP2pRemoteAnswer,
+            onRemoteCandidatesChange: setP2pRemoteCandidates,
+            onCreateOffer: handleCreateP2POffer,
+            onCreateAnswer: handleCreateP2PAnswer,
+            onAcceptAnswer: handleAcceptP2PAnswer,
+            onAddCandidates: handleAddP2PCandidates,
+            onReset: handleResetP2P,
+          },
         }}
         thread={{
           chat: selectedChat,
@@ -582,18 +964,22 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
           onDraftChange: setDraft,
           onSend: handleSendMessage,
           onPickImage: handlePickImage,
+          onPickFile: allowFileAttachment ? handlePickFile : undefined,
           onClearAttachment: handleClearAttachment,
+          onClearFile: allowFileAttachment ? handleClearFile : undefined,
           onLoadMore: handleLoadMoreMessages,
           isLoadingMore: selectedHistoryState?.loading ?? false,
           hasMoreMessages: selectedHistoryState?.hasMore ?? false,
           attachmentUri: pendingImageUri,
+          fileAttachment: allowFileAttachment && pendingFile ? { uri: pendingFile.uri, name: pendingFile.name } : null,
+          typingLabel: selectedChatId ? typingByChatId[selectedChatId] : null,
           resolveAvatar,
           resolveAuthorName,
           onCopyMessage: handleCopyMessage,
           onReplyMessage: handleReplyMessage,
           onEditMessage: handleEditMessage,
           onDeleteMessage: handleDeleteMessage,
-          onStartDM: handleStartDM,
+          onStartP2P: handleStartP2P,
           isMuted: selectedChat ? mutedChatIds.has(selectedChat.id) : false,
           onToggleMute: handleToggleMute,
         }}

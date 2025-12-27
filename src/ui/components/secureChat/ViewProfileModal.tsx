@@ -16,7 +16,7 @@ type ViewProfileModalProps = {
   isOnline?: boolean;
   onClose: () => void;
   onCopied?: () => void;
-  onStartDM?: (userId: string, userName: string) => void;
+  onStartP2P?: (userId: string, userName: string) => void;
 };
 
 export default function ViewProfileModal({
@@ -27,7 +27,7 @@ export default function ViewProfileModal({
   isOnline = false,
   onClose,
   onCopied,
-  onStartDM,
+  onStartP2P,
 }: ViewProfileModalProps) {
   const handleCopyId = async () => {
     if (userId) {
@@ -36,9 +36,9 @@ export default function ViewProfileModal({
     }
   };
 
-  const handleMessage = () => {
-    if (userId && onStartDM) {
-      onStartDM(userId, name);
+  const handleP2P = () => {
+    if (userId && onStartP2P) {
+      onStartP2P(userId, name);
       onClose();
     }
   };
@@ -59,8 +59,8 @@ export default function ViewProfileModal({
             isOnline={isOnline}
             onClose={onClose}
             onCopyId={handleCopyId}
-            onMessage={handleMessage}
-            canMessage={Boolean(userId && onStartDM)}
+            onP2P={handleP2P}
+            canP2P={Boolean(userId && onStartP2P)}
           />
         </Pressable>
       </Pressable>

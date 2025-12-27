@@ -449,6 +449,7 @@ export default function WalletScreen() {
       return;
     }
     if (biometricInFlightRef.current) return;
+    setFlowMessage('Authenticating... this can take a few seconds.');
     setIsSubmitting(true);
     startSlowMessage('Yeah, this might take a moment...');
     try {

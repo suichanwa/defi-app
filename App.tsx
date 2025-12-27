@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import Toast, { BaseToast, type ToastConfigParams } from 'react-native-toast-message';
+import ToastManager from 'toastify-react-native';
 import WalletScreen from './src/screens/WalletScreen';
 import SecureChatScreen from './src/screens/secureChat/SecureChatScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
@@ -14,19 +14,17 @@ import { useWalletSession, WalletSessionProvider } from './src/context/WalletSes
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState<TabName>('wallet');
+  const [lastNonChatTab, setLastNonChatTab] = useState<TabName>('wallet');
   const { status, backupCompleted } = useWalletSession();
   const secureTransition = useSharedValue(0);
   const insets = useSafeAreaInsets();
   const { colors, resolved } = useTheme();
   const isSetupMode = status === 'missing' || status === 'loading' || (status === 'unlocked' && !backupCompleted);
 
-  const toastConfig = useMemo(
-    () => ({
-      chat: ({ text1, text2, onPress }: ToastConfigParams<unknown>) => (
-        <BaseToast
-          onPress={onPress}
-          text1={text1}
-          text2={text2}
+  const toastConfig = useMemo(() => {
+    return {
+      chat: ({ text1, text2 }: { text1?: string; text2?: string }) => (
+        <View
           style={[
             toastStyles.toast,
             {
@@ -36,22 +34,31 @@ function AppContent() {
               shadowColor: colors.accent,
             },
           ]}
-          contentContainerStyle={toastStyles.toastContent}
-          text1Style={[toastStyles.toastTitle, { color: colors.text }]}
-          text2Style={[toastStyles.toastMessage, { color: colors.muted }]}
-          text1NumberOfLines={1}
-          text2NumberOfLines={2}
-        />
+        >
+          <Text numberOfLines={1} style={[toastStyles.toastTitle, { color: colors.text }]}>
+            {text1 ?? ''}
+          </Text>
+          {text2 ? (
+            <Text numberOfLines={2} style={[toastStyles.toastMessage, { color: colors.muted }]}>
+              {text2}
+            </Text>
+          ) : null}
+        </View>
       ),
-    }),
-    [colors],
-  );
+    };
+  }, [colors]);
 
   useEffect(() => {
     if (isSetupMode && activeTab !== 'wallet') {
       setActiveTab('wallet');
     }
   }, [activeTab, isSetupMode]);
+
+  useEffect(() => {
+    if (activeTab !== 'secureChat') {
+      setLastNonChatTab(activeTab);
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     secureTransition.value = withTiming(activeTab === 'secureChat' ? 1 : 0, { duration: 280 });
@@ -72,10 +79,11 @@ function AppContent() {
   const chatPointerEvents = activeTab === 'secureChat' ? 'auto' : 'none';
 
   const renderWalletLayer = () => {
-    if (activeTab === 'profile') {
+    const tabToRender = activeTab === 'secureChat' ? lastNonChatTab : activeTab;
+    if (tabToRender === 'profile') {
       return <ProfileScreen />;
     }
-    if (activeTab === 'wallet') {
+    if (tabToRender === 'wallet') {
       return <WalletScreen />;
     }
     return null;
@@ -118,7 +126,14 @@ function AppContent() {
           <BottomNavBar activeTab={activeTab} onTabChange={setActiveTab} />
         )}
 
-        <Toast config={toastConfig} topOffset={insets.top + 12} />
+        <ToastManager
+          config={toastConfig}
+          position="top"
+          topOffset={insets.top + 12}
+          duration={3500}
+          showProgressBar
+          useModal={false}
+        />
       </View>
     </View>
   );
@@ -140,9 +155,12 @@ const toastStyles = StyleSheet.create({
   toast: {
     borderWidth: 1,
     borderLeftWidth: 4,
-  },
-  toastContent: {
+    borderRadius: 12,
+    paddingVertical: 10,
     paddingHorizontal: 12,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
   },
   toastTitle: {
     fontSize: 14,

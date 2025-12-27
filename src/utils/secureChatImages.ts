@@ -1,6 +1,13 @@
 import type { ChatMessage } from '@app-types/securechat-types/secureChat';
-import { CHAT_IMAGE_CONTENT_PREFIX } from '@constants/chatImages';
+import { CHAT_IMAGE_CONTENT_PREFIX, CHAT_IMAGE_SIGNED_URL_TTL_SECONDS } from '@constants/chatImages';
 import { createSignedChatImageUrl } from '@services/chatImageStorage';
+
+type SignedUrlCacheEntry = {
+  url: string;
+  expiresAt: number;
+};
+
+const signedUrlCache = new Map<string, SignedUrlCacheEntry>();
 
 export const encodeChatImageContent = (path: string) => `${CHAT_IMAGE_CONTENT_PREFIX}${path}`;
 
@@ -12,7 +19,18 @@ export const resolveChatImageMessage = async (message: ChatMessage): Promise<Cha
   if (!imagePath) return message;
 
   try {
-    const imageUri = message.imageUri ?? (await createSignedChatImageUrl(imagePath));
+    const cached = signedUrlCache.get(imagePath);
+    const now = Date.now();
+    const cachedUrl = cached && cached.expiresAt > now ? cached.url : null;
+    const imageUri =
+      message.imageUri ??
+      cachedUrl ??
+      (await createSignedChatImageUrl(imagePath));
+    if (!cachedUrl && imageUri) {
+      // Cache slightly under the TTL to avoid edge expiration.
+      const ttlMs = Math.max(CHAT_IMAGE_SIGNED_URL_TTL_SECONDS - 60, 30) * 1000;
+      signedUrlCache.set(imagePath, { url: imageUri, expiresAt: now + ttlMs });
+    }
     return {
       ...message,
       type: 'image',

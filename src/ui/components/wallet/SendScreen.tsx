@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { ActivityIndicator, Animated, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { createWalletStyles } from '@styles/WalletStyles';
+import FlowMessage from './FlowMessage';
 import { useTheme } from '@theme/ThemeProvider';
 import { useWalletCardAnimation } from '../../../animations/walletAnimations';
 
@@ -65,7 +66,7 @@ export default function SendScreen({
             style={styles.input}
             keyboardType="decimal-pad"
           />
-          {flowError && <Text style={styles.errorText}>{flowError}</Text>}
+          <FlowMessage styles={styles} error={flowError} />
           {isSubmitting && (
             <View style={styles.loadingRow}>
               <ActivityIndicator size="small" color="#4f46e5" />
@@ -109,7 +110,7 @@ export default function SendScreen({
               {sendFeeNative ? `${Number(sendFeeNative).toFixed(6)} ${nativeSymbol}` : '-'}
             </Text>
           </View>
-          {flowError && <Text style={styles.errorText}>{flowError}</Text>}
+          <FlowMessage styles={styles} error={flowError} />
           {isSubmitting && (
             <View style={styles.loadingRow}>
               <ActivityIndicator size="small" color="#4f46e5" />
@@ -141,7 +142,7 @@ export default function SendScreen({
             <ActivityIndicator size="small" color="#4f46e5" />
             <Text style={styles.loadingText}>Waiting for confirmation...</Text>
           </View>
-          {flowMessage && <Text style={styles.successText}>{flowMessage}</Text>}
+          <FlowMessage styles={styles} message={flowMessage} />
         </>
       )}
     </Animated.View>

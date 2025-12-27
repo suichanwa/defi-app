@@ -1,7 +1,9 @@
 import React, { useMemo, useRef } from 'react';
 import { PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import PulseBadge from '@components/PulseBadge';
 import type { ChatThread } from '@app-types/securechat-types/secureChat';
+import { DEFAULT_GLOBAL_CHAT_ID } from '@constants/secureChatScreen';
 import { useTheme } from '@theme/ThemeProvider';
 
 type Props = {
@@ -28,6 +30,17 @@ export default function ChatListScreen({ chats, selectedChatId, onSelectChat, on
     }),
   ).current;
 
+  const orderedChats = useMemo(() => {
+    const next = [...chats];
+    next.sort((a, b) => {
+      const aPinned = a.id === DEFAULT_GLOBAL_CHAT_ID ? 0 : 1;
+      const bPinned = b.id === DEFAULT_GLOBAL_CHAT_ID ? 0 : 1;
+      if (aPinned !== bPinned) return aPinned - bPinned;
+      return a.name.localeCompare(b.name);
+    });
+    return next;
+  }, [chats]);
+
   return (
     <View style={styles.container} {...panResponder.panHandlers}>
       <View style={styles.headerRow}>
@@ -38,8 +51,9 @@ export default function ChatListScreen({ chats, selectedChatId, onSelectChat, on
       </View>
 
       <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-        {chats.map((chat) => {
+        {orderedChats.map((chat) => {
           const isActive = chat.id === selectedChatId;
+          const isPinned = chat.id === DEFAULT_GLOBAL_CHAT_ID;
           const lastMessage = chat.lastMessage;
           const previewText = lastMessage
             ? `${lastMessage.from ? `${lastMessage.from}: ` : ''}${lastMessage.text}`
@@ -53,7 +67,12 @@ export default function ChatListScreen({ chats, selectedChatId, onSelectChat, on
             >
               <View style={styles.chatRow}>
                 <View style={styles.chatMeta}>
-                  <Text style={styles.chatName}>{chat.name}</Text>
+                  <View style={styles.chatNameRow}>
+                    <Text style={styles.chatName}>{chat.name}</Text>
+                    {isPinned ? (
+                      <MaterialCommunityIcons name="pin" size={14} color={colors.muted} />
+                    ) : null}
+                  </View>
                   <Text style={styles.chatPreview}>{previewText}</Text>
                 </View>
                 <View style={styles.chatStatus}>
@@ -121,6 +140,11 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     chatName: {
       fontWeight: '600',
       color: colors.text,
+    },
+    chatNameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
     },
     chatPreview: {
       marginTop: 4,

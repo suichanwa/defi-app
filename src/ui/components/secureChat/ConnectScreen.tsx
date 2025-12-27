@@ -2,6 +2,8 @@ import React from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import PulseBadge from '@components/PulseBadge';
+import * as Clipboard from 'expo-clipboard';
+import QRCode from 'react-native-qrcode-svg';
 import type { ServerInfo } from '@app-types/securechat-types/secureChat';
 
 type Props = {
@@ -14,6 +16,24 @@ type Props = {
   onConnectNameChange: (value: string) => void;
   onConnectPress: () => void;
   onStartServer: () => void;
+  p2p: {
+    status: string;
+    peerLabel?: string | null;
+    localOffer: string;
+    localAnswer: string;
+    localCandidates: string;
+    remoteOffer: string;
+    remoteAnswer: string;
+    remoteCandidates: string;
+    onRemoteOfferChange: (value: string) => void;
+    onRemoteAnswerChange: (value: string) => void;
+    onRemoteCandidatesChange: (value: string) => void;
+    onCreateOffer: () => void;
+    onCreateAnswer: () => void;
+    onAcceptAnswer: () => void;
+    onAddCandidates: () => void;
+    onReset: () => void;
+  };
 };
 
 export default function ConnectScreen({
@@ -26,6 +46,7 @@ export default function ConnectScreen({
   onConnectNameChange,
   onConnectPress,
   onStartServer,
+  p2p,
 }: Props) {
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -94,6 +115,135 @@ export default function ConnectScreen({
       </View>
 
       <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>P2P Direct Message</Text>
+          <MaterialCommunityIcons name="signal" size={22} color="#0f172a" />
+        </View>
+        <Text style={styles.cardSubtitle}>
+          Manual offer/answer + ICE exchange. No server required.
+        </Text>
+        <View style={styles.statusRow}>
+          <PulseBadge size={10} color={p2p.status === 'connected' ? '#22c55e' : '#f97316'} />
+          <Text style={styles.statusText}>
+            {p2p.status === 'connected' ? `Connected to ${p2p.peerLabel ?? 'peer'}` : `Status: ${p2p.status}`}
+          </Text>
+        </View>
+
+        <View style={styles.sectionRow}>
+          <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={p2p.onCreateOffer} activeOpacity={0.9}>
+            <MaterialCommunityIcons name="qrcode-scan" size={18} color="#ffffff" />
+            <Text style={styles.primaryButtonText}>Create offer</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={p2p.onReset} activeOpacity={0.9}>
+            <MaterialCommunityIcons name="restart" size={18} color="#ffffff" />
+            <Text style={styles.primaryButtonText}>Reset</Text>
+          </TouchableOpacity>
+        </View>
+        <TextInput
+          placeholder="Local offer JSON"
+          placeholderTextColor="#9ca3af"
+          style={[styles.input, styles.monoInput]}
+          value={p2p.localOffer}
+          editable={false}
+          multiline
+        />
+        {p2p.localOffer ? (
+          <View style={styles.qrRow}>
+            <QRCode value={p2p.localOffer} size={120} />
+            <TouchableOpacity
+              style={[styles.button, styles.secondaryButton]}
+              onPress={() => Clipboard.setStringAsync(p2p.localOffer)}
+              activeOpacity={0.9}
+            >
+              <MaterialCommunityIcons name="content-copy" size={18} color="#ffffff" />
+              <Text style={styles.primaryButtonText}>Copy offer</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
+        <Text style={styles.hint}>Paste remote offer to generate an answer.</Text>
+        <TextInput
+          placeholder="Remote offer JSON"
+          placeholderTextColor="#9ca3af"
+          style={[styles.input, styles.monoInput]}
+          value={p2p.remoteOffer}
+          onChangeText={p2p.onRemoteOfferChange}
+          multiline
+        />
+        <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={p2p.onCreateAnswer} activeOpacity={0.9}>
+          <MaterialCommunityIcons name="reply" size={18} color="#ffffff" />
+          <Text style={styles.primaryButtonText}>Create answer</Text>
+        </TouchableOpacity>
+        <TextInput
+          placeholder="Local answer JSON"
+          placeholderTextColor="#9ca3af"
+          style={[styles.input, styles.monoInput]}
+          value={p2p.localAnswer}
+          editable={false}
+          multiline
+        />
+        {p2p.localAnswer ? (
+          <View style={styles.qrRow}>
+            <QRCode value={p2p.localAnswer} size={120} />
+            <TouchableOpacity
+              style={[styles.button, styles.secondaryButton]}
+              onPress={() => Clipboard.setStringAsync(p2p.localAnswer)}
+              activeOpacity={0.9}
+            >
+              <MaterialCommunityIcons name="content-copy" size={18} color="#ffffff" />
+              <Text style={styles.primaryButtonText}>Copy answer</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
+        <Text style={styles.hint}>Paste remote answer if you created the offer.</Text>
+        <TextInput
+          placeholder="Remote answer JSON"
+          placeholderTextColor="#9ca3af"
+          style={[styles.input, styles.monoInput]}
+          value={p2p.remoteAnswer}
+          onChangeText={p2p.onRemoteAnswerChange}
+          multiline
+        />
+        <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={p2p.onAcceptAnswer} activeOpacity={0.9}>
+          <MaterialCommunityIcons name="check" size={18} color="#ffffff" />
+          <Text style={styles.primaryButtonText}>Accept answer</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.hint}>Exchange ICE candidates if the connection does not establish.</Text>
+        <TextInput
+          placeholder="Local ICE candidates JSON"
+          placeholderTextColor="#9ca3af"
+          style={[styles.input, styles.monoInput]}
+          value={p2p.localCandidates}
+          editable={false}
+          multiline
+        />
+        {p2p.localCandidates ? (
+          <TouchableOpacity
+            style={[styles.button, styles.secondaryButton]}
+            onPress={() => Clipboard.setStringAsync(p2p.localCandidates)}
+            activeOpacity={0.9}
+          >
+            <MaterialCommunityIcons name="content-copy" size={18} color="#ffffff" />
+            <Text style={styles.primaryButtonText}>Copy ICE</Text>
+          </TouchableOpacity>
+        ) : null}
+        <TextInput
+          placeholder="Remote ICE candidates JSON"
+          placeholderTextColor="#9ca3af"
+          style={[styles.input, styles.monoInput]}
+          value={p2p.remoteCandidates}
+          onChangeText={p2p.onRemoteCandidatesChange}
+          multiline
+        />
+        <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={p2p.onAddCandidates} activeOpacity={0.9}>
+          <MaterialCommunityIcons name="plus" size={18} color="#ffffff" />
+          <Text style={styles.primaryButtonText}>Add ICE candidates</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.card}>
         <Text style={styles.cardTitle}>Connection activity</Text>
         <Text style={styles.cardSubtitle}>Recent events from transport / clipboard helpers</Text>
         <ScrollView style={styles.logList} showsVerticalScrollIndicator={false}>
@@ -146,6 +296,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     color: '#0f172a',
   },
+  monoInput: {
+    fontSize: 12,
+    fontFamily: 'monospace',
+  },
   hint: {
     marginTop: 8,
     fontSize: 12,
@@ -161,6 +315,9 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     backgroundColor: '#4f46e5',
+  },
+  secondaryButton: {
+    backgroundColor: '#111827',
   },
   primaryButtonText: {
     marginLeft: 8,
@@ -209,5 +366,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 12,
     color: '#0f172a',
+  },
+  sectionRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  qrRow: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
 });

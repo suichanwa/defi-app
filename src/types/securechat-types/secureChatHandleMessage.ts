@@ -1,13 +1,8 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { ChatMessage, ChatThread } from '@app-types/securechat-types/secureChat';
+import type { ToastShowParams } from 'toastify-react-native';
 
-export type ToastFn = (options: {
-  type: string;
-  text1: string;
-  text2?: string;
-  position?: 'top' | 'bottom';
-  visibilityTime?: number;
-}) => void;
+export type ToastFn = (options: ToastShowParams) => void;
 
 export type AlertFn = (title: string, message: string) => void;
 
@@ -22,6 +17,15 @@ export type ResolveAuthorRef = {
 };
 
 export type GetChatById = (chatId: string) => ChatThread | null;
+
+export type NotifyNativeFn = (chatId: string, message: ChatMessage) => void | Promise<void>;
+
+export type PendingFile = {
+  uri: string;
+  name: string;
+  size: number;
+  mime: string;
+};
 
 export type SetState<T> = Dispatch<SetStateAction<T>>;
 
