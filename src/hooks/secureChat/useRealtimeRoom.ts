@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import type { ChatMessage } from '@app-types/secureChat';
+import type { ChatMessage } from '@app-types/securechat-types/secureChat';
 import { isSupabaseConfigured, supabase } from '@services/supabaseClient';
 
 type RealtimeArgs = {

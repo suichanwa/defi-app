@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ChatMessage, ChatThread } from '@app-types/secureChat';
+import type { ChatMessage, ChatThread } from '@app-types/securechat-types/secureChat';
 import {
   getOrCreateDMChannel,
   getDMMessages,

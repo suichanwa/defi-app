@@ -1,7 +1,7 @@
 import React, { useMemo, useRef } from 'react';
 import { PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import PulseBadge from '@components/PulseBadge';
-import type { ChatThread } from '@app-types/secureChat';
+import type { ChatThread } from '@app-types/securechat-types/secureChat';
 import { useTheme } from '@theme/ThemeProvider';
 
 type Props = {

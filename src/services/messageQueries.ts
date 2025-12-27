@@ -1,4 +1,4 @@
-import type { SecureChatMessageRow } from '@app-types/secureChatScreen';
+import type { SecureChatMessageRow } from '@app-types/securechat-types/secureChatScreen';
 import { isSupabaseConfigured, supabase } from './supabaseClient';
 
 type SelectMessagesPageArgs = {

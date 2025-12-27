@@ -1,6 +1,6 @@
-import type { ChatMessage } from '@app-types/secureChat';
+import type { ChatMessage } from '@app-types/securechat-types/secureChat';
 import type { AvatarType } from '@app-types/profile';
-import type { SecureChatMessageRow } from '@app-types/secureChatScreen';
+import type { SecureChatMessageRow } from '@app-types/securechat-types/secureChatScreen';
 import { UUID_REGEX } from '@constants/secureChatScreen';
 import { decodeChatImageContent } from '@utils/secureChatImages';
 

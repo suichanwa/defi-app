@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-import type { ChatMessage, ChatThread } from '@app-types/secureChat';
+import type { ChatMessage, ChatThread } from '@app-types/securechat-types/secureChat';
 
 export type ToastFn = (options: {
   type: string;

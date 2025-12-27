@@ -1,9 +1,9 @@
-import type { ChatMessage, ChatThread } from '@app-types/secureChat';
+import type { ChatMessage, ChatThread } from '@app-types/securechat-types/secureChat';
 import { decodeChatImageContent, resolveChatImageMessage } from '@utils/secureChatImages';
 import { CHAT_IMAGE_BUCKET } from '@constants/chatImages';
 import { isSupabaseConfigured, supabase } from '@services/supabaseClient';
 
-import type * as HandleMessageTypes from '@app-types/secureChatHandleMessage';
+import type * as HandleMessageTypes from '@app-types/securechat-types/secureChatHandleMessage';
 
 export const createIsOwnMessage = (displayLabel: string, effectiveUserId: string) => (message: ChatMessage) => {
   if (message.outgoing === true) return true;

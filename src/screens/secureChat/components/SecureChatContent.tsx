@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import ChatListScreen from '@components/secureChat/ChatListScreen';
 import ChatThreadScreen from '@components/secureChat/ChatThreadScreen';
 import ConnectScreen from '@components/secureChat/ConnectScreen';
-import type { SecureChatContentProps } from '@app-types/secureChatContent';
+import type { SecureChatContentProps } from '@app-types/securechat-types/secureChatContent';
 
 export default function SecureChatContent({ secureTab, chatView, connect, thread, list }: SecureChatContentProps) {
   if (secureTab === 'connect') {

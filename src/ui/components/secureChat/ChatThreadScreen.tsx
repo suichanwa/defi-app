@@ -21,7 +21,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import type { ChatAvatarSource, ChatMessage, ChatThread, ServerInfo } from '@app-types/secureChat';
+import type { ChatAvatarSource, ChatMessage, ChatThread, ServerInfo } from '@app-types/securechat-types/secureChat';
 import { useTheme } from '@theme/ThemeProvider';
 import { CHAT_HISTORY_SCROLL_THRESHOLD } from '@constants/secureChatScreen';
 import ChatAvatar from '@components/secureChat/ChatAvatar';

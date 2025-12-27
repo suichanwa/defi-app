@@ -3,7 +3,7 @@ import { Image, Platform, StyleSheet, TouchableOpacity, View, type StyleProp, ty
 import Svg, { Rect } from 'react-native-svg';
 import { useTheme } from '@theme/ThemeProvider';
 import { buildIdenticon } from '@utils/identicon';
-import type { ChatAvatarSource } from '@app-types/secureChat';
+import type { ChatAvatarSource } from '@app-types/securechat-types/secureChat';
 
 type ChatAvatarProps = {
   source: ChatAvatarSource;

@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
-import type { ChatMessage } from '@app-types/secureChat';
-import type { SecureChatMessageRow } from '@app-types/secureChatScreen';
+import type { ChatMessage } from '@app-types/securechat-types/secureChat';
+import type { SecureChatMessageRow } from '@app-types/securechat-types/secureChatScreen';
 import { selectMessagesPage } from '@services/messageQueries';
 
 type HistoryState = {

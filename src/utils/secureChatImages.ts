@@ -1,4 +1,4 @@
-import type { ChatMessage } from '@app-types/secureChat';
+import type { ChatMessage } from '@app-types/securechat-types/secureChat';
 import { CHAT_IMAGE_CONTENT_PREFIX } from '@constants/chatImages';
 import { createSignedChatImageUrl } from '@services/chatImageStorage';
 

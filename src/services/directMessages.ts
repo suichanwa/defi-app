@@ -1,5 +1,5 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import type { ChatMessage, ChatThread } from '../types/secureChat';
+import type { ChatMessage, ChatThread } from '../types/securechat-types/secureChat';
 import { resolveChatImageMessage, resolveChatImageMessages, decodeChatImageContent, encodeChatImageContent } from '@utils/secureChatImages';
 import { isSupabaseConfigured, supabase } from './supabaseClient';
 import { getJson, setJson } from './storage';

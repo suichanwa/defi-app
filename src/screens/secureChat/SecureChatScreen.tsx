@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, BackHandler, Platform, useWindowDimensions } from 'react-native';
-import type { ChatMessage, ChatThread, ServerInfo } from '@app-types/secureChat';
-import type { SecureChatMessageRow, SecureChatScreenProps } from '@app-types/secureChatScreen';
+import type { ChatMessage, ChatThread, ServerInfo } from '@app-types/securechat-types/secureChat';
+import type { SecureChatMessageRow, SecureChatScreenProps } from '@app-types/securechat-types/secureChatScreen';
 import * as date from 'date-and-time';
 import Toast from 'react-native-toast-message';
 import * as Clipboard from 'expo-clipboard';

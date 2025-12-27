@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import type { AvatarType } from '../types/profile';
-import type { ChatAuthorProfile, ChatAvatarSource, ChatMessage } from '../types/secureChat';
+import type { ChatAuthorProfile, ChatAvatarSource, ChatMessage } from '../types/securechat-types/secureChat';
 
 type UseChatAvatarArgs = {
   currentUserId?: string;

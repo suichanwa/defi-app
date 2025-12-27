@@ -3,7 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@theme/ThemeProvider';
 import ChatAvatar from '@components/secureChat/ChatAvatar';
-import type { ChatAvatarSource } from '@app-types/secureChat';
+import type { ChatAvatarSource } from '@app-types/securechat-types/secureChat';
 
 type ViewProfileCardProps = {
   name: string;

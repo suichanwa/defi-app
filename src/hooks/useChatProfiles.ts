@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AvatarType } from '../types/profile';
-import type { ChatAuthorProfile } from '../types/secureChat';
+import type { ChatAuthorProfile } from '../types/securechat-types/secureChat';
 import { isSupabaseConfigured, supabase } from '../services/supabaseClient';
 
 type ProfileRow = {

@@ -1,4 +1,4 @@
-import type { AvatarType } from './profile';
+import type { AvatarType } from '../profile';
 
 export type ChatMessage = {
   id: string;

@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import PulseBadge from '@components/PulseBadge';
-import type { ChatThread } from '@app-types/secureChat';
+import type { ChatThread } from '@app-types/securechat-types/secureChat';
 import { useTheme } from '@theme/ThemeProvider';
 import PrivateChatSettingsMenu from '@components/secureChat/PrivateChatSettingsMenu';
 

@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import ViewProfileCard from '@components/secureChat/ViewProfileCard';
-import type { ChatAvatarSource } from '@app-types/secureChat';
+import type { ChatAvatarSource } from '@app-types/securechat-types/secureChat';
 
 type ViewProfileModalProps = {
   visible: boolean;

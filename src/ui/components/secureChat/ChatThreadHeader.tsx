@@ -4,7 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@theme/ThemeProvider';
 import PulseBadge from '@components/PulseBadge';
 import PrivateChatHeader from '@components/secureChat/PrivateChatHeader';
-import type { ChatThread, ServerInfo } from '@app-types/secureChat';
+import type { ChatThread, ServerInfo } from '@app-types/securechat-types/secureChat';
 
 type Props = {
   chat: ChatThread;

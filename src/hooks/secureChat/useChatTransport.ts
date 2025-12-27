@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { ChatMessage } from '@app-types/secureChat';
+import type { ChatMessage } from '@app-types/securechat-types/secureChat';
 import type { AvatarType } from '@app-types/profile';
 import { createOutgoingImageMessage, createOutgoingTextMessage, isUuid } from '@utils/secureChatUtils';
 import { encodeChatImageContent } from '@utils/secureChatImages';
