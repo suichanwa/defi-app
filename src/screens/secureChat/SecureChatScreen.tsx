@@ -16,8 +16,18 @@ import { useRealtimeRoom } from '@hooks/secureChat/useRealtimeRoom';
 import { useChatTransport } from '@hooks/secureChat/useChatTransport';
 import { useTickingClock } from '@hooks/useTickingClock';
 import { useRoomHistory } from '@hooks/useRoomHistory';
-import { resolveChatImageMessage, resolveChatImageMessages } from '@utils/secureChatImages';
+import { resolveChatImageMessages } from '@utils/secureChatImages';
 import { mapRowToMessage } from '@utils/secureChatUtils';
+import {
+  createCopyMessageHandler,
+  createDeleteMessageHandler,
+  createEditMessageHandler,
+  createIncomingRoomMessageHandler,
+  createIsOwnMessage,
+  createNotifyIncomingMessage,
+  createReplyMessageHandler,
+  createSendMessageHandler,
+} from '@services/securechat/handlemessage';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import { useChatAvatar } from '../../hooks/useChatAvatar';
 import { useChatProfiles } from '../../hooks/useChatProfiles';
@@ -82,6 +92,7 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     (chatId: string, message: ChatMessage) => notifyIncomingRef.current(chatId, message),
     [],
   );
+  const sendingImageUriRef = useRef<string | null>(null);
 
   const mapRow = useCallback(
     (row: SecureChatMessageRow) =>
@@ -148,24 +159,18 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     return getChatById(selectedChatId);
   }, [getChatById, selectedChatId]);
 
-  const notifyIncomingMessage = useCallback(
-    (chatId: string, message: ChatMessage) => {
-      if (message.type === 'system') return;
-      if (message.outgoing === true) return;
-      if (message.authorId && message.authorId === effectiveUserId) return;
-      if (!message.authorId && message.author === displayLabel) return;
-      if (mutedChatIds.has(chatId)) return;
-      if (secureTab === 'chats' && chatView === 'thread' && selectedChatId === chatId) return;
-
-      const chatName = getChatById(chatId)?.name ?? message.author ?? 'New message';
-      Toast.show({
-        type: 'chat',
-        text1: chatName,
-        text2: message.content,
-        position: 'top',
-        visibilityTime: 3500,
-      });
-    },
+  const notifyIncomingMessage = useMemo(
+    () =>
+      createNotifyIncomingMessage({
+        effectiveUserId,
+        displayLabel,
+        mutedChatIds,
+        secureTab,
+        chatView,
+        selectedChatId,
+        getChatById,
+        showToast: Toast.show,
+      }),
     [chatView, displayLabel, effectiveUserId, getChatById, mutedChatIds, secureTab, selectedChatId],
   );
 
@@ -243,13 +248,8 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     setEditingMessage(null);
   }, [selectedChatId]);
 
-  const isOwnMessage = useCallback(
-    (message: ChatMessage) => {
-      if (message.outgoing === true) return true;
-      if (message.authorId && effectiveUserId && message.authorId === effectiveUserId) return true;
-      if (!message.authorId && message.author === displayLabel) return true;
-      return false;
-    },
+  const isOwnMessage = useMemo(
+    () => createIsOwnMessage(displayLabel, effectiveUserId),
     [displayLabel, effectiveUserId],
   );
 
@@ -285,59 +285,14 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     });
   }, []);
 
-  const handleIncomingRoomMessage = useCallback(
-    (msg: ChatMessage) => {
-      resolveChatImageMessage(msg)
-        .then((resolved) => {
-          setMessagesByChat((prev) => {
-            const existing = prev[resolved.chatId] ?? [];
-            const seen = existing.some((m) => m.id === resolved.id);
-            if (seen) return prev;
-            notifyIncomingRef.current(resolved.chatId, resolved);
-            return { ...prev, [resolved.chatId]: [...existing, resolved] };
-          });
-          setChats((prev) =>
-            prev.map((chat) =>
-              chat.id === resolved.chatId
-                ? {
-                    ...chat,
-                    lastMessage: {
-                      text: resolved.content,
-                      ts: resolved.timestamp,
-                      from: resolveAuthorNameRef.current(resolved),
-                      authorId: resolved.authorId,
-                    },
-                  }
-                : chat,
-            ),
-          );
-        })
-        .catch((error) => {
-          console.warn('Failed to resolve chat image URL:', error);
-          setMessagesByChat((prev) => {
-            const existing = prev[msg.chatId] ?? [];
-            const seen = existing.some((m) => m.id === msg.id);
-            if (seen) return prev;
-            notifyIncomingRef.current(msg.chatId, msg);
-            return { ...prev, [msg.chatId]: [...existing, msg] };
-          });
-          setChats((prev) =>
-            prev.map((chat) =>
-              chat.id === msg.chatId
-                ? {
-                    ...chat,
-                    lastMessage: {
-                      text: msg.content,
-                      ts: msg.timestamp,
-                      from: resolveAuthorNameRef.current(msg),
-                      authorId: msg.authorId,
-                    },
-                  }
-                : chat,
-            ),
-          );
-        });
-    },
+  const handleIncomingRoomMessage = useMemo(
+    () =>
+      createIncomingRoomMessageHandler({
+        setMessagesByChat,
+        setChats,
+        notifyIncomingRef,
+        resolveAuthorNameRef,
+      }),
     [setChats, setMessagesByChat],
   );
 
@@ -408,132 +363,67 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     }
   }, [ensureChatInitialized, loadInitial, loadThread, selectChat]);
 
-  const handleSendMessage = async () => {
-    if (!selectedChat) return;
-    const trimmed = draft.trim();
-    const hasText = trimmed.length > 0;
-    const hasImage = Boolean(pendingImageUri);
-    const isDM = selectedChat.id.startsWith('dm:');
+  const handleSendMessage = useMemo(
+    () =>
+      createSendMessageHandler({
+        selectedChat,
+        draft,
+        pendingImageUri,
+        editingMessage,
+        messagesByChat,
+        setMessagesByChat,
+        setChats,
+        setDraft,
+        setEditingMessage,
+        setAttachment,
+        sendText,
+        sendImage,
+        resolveAuthorName,
+        showAlert: Alert.alert,
+        sendingImageUriRef,
+      }),
+    [
+      selectedChat,
+      draft,
+      pendingImageUri,
+      editingMessage,
+      messagesByChat,
+      setMessagesByChat,
+      setChats,
+      setDraft,
+      setEditingMessage,
+      setAttachment,
+      sendText,
+      sendImage,
+      resolveAuthorName,
+    ],
+  );
 
-    if (editingMessage && selectedChat.id === editingMessage.chatId) {
-      if (!hasText) {
-        Alert.alert('Edit message', 'Message cannot be empty.');
-        return;
-      }
-      const currentList = messagesByChat[selectedChat.id] ?? [];
-      const isLastMessage = currentList[currentList.length - 1]?.id === editingMessage.id;
-      const nextList = currentList.map((message) =>
-        message.id === editingMessage.id ? { ...message, content: trimmed } : message,
-      );
-      setMessagesByChat((prev) => ({ ...prev, [selectedChat.id]: nextList }));
-      if (isLastMessage) {
-        const updatedAuthor = resolveAuthorName(editingMessage);
-        setChats((prev) =>
-          prev.map((chat) =>
-            chat.id === selectedChat.id
-              ? {
-                  ...chat,
-                  lastMessage: {
-                    text: trimmed,
-                    ts: editingMessage.timestamp,
-                    from: updatedAuthor,
-                    authorId: editingMessage.authorId,
-                  },
-                }
-              : chat,
-          ),
-        );
-      }
-      setDraft('');
-      setEditingMessage(null);
-      return;
-    }
+  const handleCopyMessage = useMemo(
+    () => createCopyMessageHandler(Clipboard.setStringAsync, Toast.show),
+    [],
+  );
 
-    if (!hasText && !hasImage) return;
-
-    if (hasText) {
-      const result = await sendText({ chatId: selectedChat.id, content: trimmed, isDM });
-      if (!result.sent && result.error) {
-        Alert.alert(isDM ? 'Direct message unavailable' : 'Supabase not configured', result.error);
-      } else {
-        setDraft('');
-      }
-    }
-
-    if (hasImage && pendingImageUri) {
-      try {
-        const result = await sendImage({ chatId: selectedChat.id, imageUri: pendingImageUri, isDM });
-        if (!result.sent && result.error) {
-          Alert.alert('Image upload error', result.error);
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to send image.';
-        Alert.alert('Image upload error', message);
-      } finally {
-        setAttachment(null);
-      }
-    }
-  };
-
-  const handleCopyMessage = useCallback(async (message: ChatMessage) => {
-    const text = message.type === 'image' ? message.imageUri ?? '' : message.content;
-    if (!text) return;
-    await Clipboard.setStringAsync(text);
-    Toast.show({
-      type: 'chat',
-      text1: 'Copied to clipboard',
-      text2: message.type === 'image' ? 'Image link copied.' : text.length > 80 ? `${text.slice(0, 80)}...` : text,
-      position: 'top',
-      visibilityTime: 2000,
-    });
-  }, []);
-
-  const handleReplyMessage = useCallback(
-    (message: ChatMessage) => {
-      const author = resolveAuthorName(message);
-      setDraft(`@${author} `);
-    },
+  const handleReplyMessage = useMemo(
+    () => createReplyMessageHandler(resolveAuthorName, setDraft),
     [resolveAuthorName, setDraft],
   );
 
-  const handleEditMessage = useCallback(
-    (message: ChatMessage) => {
-      if (!isOwnMessage(message)) return;
-      if (message.type === 'image') return;
-      setEditingMessage(message);
-      setDraft(message.content);
-    },
+  const handleEditMessage = useMemo(
+    () => createEditMessageHandler(isOwnMessage, setEditingMessage, setDraft),
     [isOwnMessage, setDraft, setEditingMessage],
   );
 
-  const handleDeleteMessage = useCallback(
-    (message: ChatMessage) => {
-      if (!isOwnMessage(message)) return;
-      const currentList = messagesByChat[message.chatId] ?? [];
-      const isLastMessage = currentList[currentList.length - 1]?.id === message.id;
-      const nextList = currentList.filter((item) => item.id !== message.id);
-      setMessagesByChat((prev) => ({ ...prev, [message.chatId]: nextList }));
-      if (isLastMessage) {
-        const last = nextList[nextList.length - 1];
-        setChats((prev) =>
-          prev.map((chat) =>
-            chat.id === message.chatId
-              ? {
-                  ...chat,
-                  lastMessage: last
-                    ? {
-                        text: last.content,
-                        ts: last.timestamp,
-                        from: resolveAuthorName(last),
-                        authorId: last.authorId,
-                      }
-                    : undefined,
-                }
-              : chat,
-          ),
-        );
-      }
-    },
+  const handleDeleteMessage = useMemo(
+    () =>
+      createDeleteMessageHandler(
+        isOwnMessage,
+        messagesByChat,
+        setMessagesByChat,
+        setChats,
+        resolveAuthorName,
+        Toast.show,
+      ),
     [isOwnMessage, messagesByChat, resolveAuthorName, setMessagesByChat, setChats],
   );
 

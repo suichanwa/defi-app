@@ -1,4 +1,5 @@
-import * as FileSystem from 'expo-file-system';
+import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
 import { CHAT_IMAGE_BUCKET, CHAT_IMAGE_SIGNED_URL_TTL_SECONDS } from '@constants/chatImages';
 import { isSupabaseConfigured, supabase } from './supabaseClient';
 
@@ -47,21 +48,49 @@ const base64ToBytes = (base64: string) => {
   throw new Error('Base64 decoding is not supported in this environment.');
 };
 
-const readFileAsBlob = async (fileUri: string) => {
-  if (fileUri.startsWith('file:') || fileUri.startsWith('content:')) {
+const parseDataUrl = (dataUrl: string) => {
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+  return { mimeType: match[1], base64: match[2] };
+};
+
+type UploadPayload = {
+  body: Uint8Array;
+  contentType: string;
+  extension: string;
+};
+
+const readFileAsUploadPayload = async (fileUri: string): Promise<UploadPayload> => {
+  const isLocalUri = fileUri.startsWith('file:') || fileUri.startsWith('content:');
+
+  if (isLocalUri && Platform.OS !== 'web') {
     const extension = getExtension(fileUri);
     const contentType = getContentType(extension);
     const base64 = await FileSystem.readAsStringAsync(fileUri, {
-      encoding: FileSystem.EncodingType.Base64,
+      encoding: 'base64',
     });
+    if (!base64) {
+      throw new Error('Unable to read image data.');
+    }
     const bytes = base64ToBytes(base64);
-    return { blob: new Blob([bytes], { type: contentType }), extension };
+    return { body: bytes, contentType, extension };
+  }
+
+  if (fileUri.startsWith('data:')) {
+    const parsed = parseDataUrl(fileUri);
+    if (!parsed) {
+      throw new Error('Unsupported data URL format.');
+    }
+    const extension = parsed.mimeType.split('/')[1] || 'jpg';
+    const bytes = base64ToBytes(parsed.base64);
+    return { body: bytes, contentType: parsed.mimeType, extension };
   }
 
   const response = await fetch(fileUri);
-  const blob = await response.blob();
-  const extension = blob.type?.split('/')[1] || getExtension(fileUri);
-  return { blob, extension };
+  const contentType = response.headers.get('content-type') || getContentType(getExtension(fileUri));
+  const extension = contentType.split('/')[1] || getExtension(fileUri);
+  const buffer = await response.arrayBuffer();
+  return { body: new Uint8Array(buffer), contentType, extension };
 };
 
 export async function uploadChatImage({ fileUri, chatId, authorId }: UploadChatImageArgs) {
@@ -69,13 +98,14 @@ export async function uploadChatImage({ fileUri, chatId, authorId }: UploadChatI
     throw new Error('Supabase is not configured for chat image uploads.');
   }
 
-  const { blob, extension } = await readFileAsBlob(fileUri);
+  const { body, contentType, extension } = await readFileAsUploadPayload(fileUri);
   const owner = authorId ? authorId.replace(/[^a-zA-Z0-9-_]/g, '-') : 'anonymous';
   const path = `${chatId}/${owner}/${Date.now()}.${extension}`;
 
-  const { error } = await supabase.storage.from(CHAT_IMAGE_BUCKET).upload(path, blob, {
+  const { error } = await supabase.storage.from(CHAT_IMAGE_BUCKET).upload(path, body, {
     cacheControl: '3600',
     upsert: false,
+    contentType,
   });
 
   if (error) {
