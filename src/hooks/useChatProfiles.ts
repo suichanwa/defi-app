@@ -44,7 +44,8 @@ export function useChatProfiles({ authorIds, enabled = true }: UseChatProfilesAr
   }, [authorIds]);
 
   useEffect(() => {
-    if (!enabled || !isSupabaseConfigured || !supabase) return;
+    const supabaseClient = supabase;
+    if (!enabled || !isSupabaseConfigured || !supabaseClient) return;
     const missing = uniqueIds.filter((id) => !profilesById[id] && !inFlight.current.has(id));
     if (missing.length === 0) return;
 
@@ -54,7 +55,7 @@ export function useChatProfiles({ authorIds, enabled = true }: UseChatProfilesAr
     const fetchProfiles = async () => {
       for (const ids of batches) {
         ids.forEach((id) => inFlight.current.add(id));
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
           .from('user_profiles')
           .select('id, alias, avatar_type, avatar_url, avatar_seed, updated_at')
           .in('id', ids);

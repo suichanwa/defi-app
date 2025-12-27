@@ -101,6 +101,13 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
   const [state, setState] = useState<ProfilePreferencesState>(initialState);
   const [status, setStatus] = useState<ProfilePreferencesStatus>(initialStatus);
   const applyThemePreference = theme.setPreference;
+  const didInitRef = useRef(false);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevProfileRef = useRef({
+    alias: initialState.alias,
+    avatarType: initialState.avatarType,
+    avatarUri: initialState.avatarUri,
+  });
 
   const updateStatus = (next: Partial<ProfilePreferencesStatus>) =>
     setStatus((prev) => ({ ...prev, ...next }));
@@ -123,6 +130,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
   const loadProfile = useCallback(
     async (isActive: () => boolean) => {
       if (!isActive()) return;
+      didInitRef.current = false;
       updateStatus({ loading: true, error: null });
       try {
         const [settings, key] = await Promise.all([loadProfileSettings(), loadEncryptedWalletKey()]);
@@ -153,6 +161,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
         }
         if (!isActive()) return;
         updateStatus({ loading: false });
+        didInitRef.current = true;
       } catch (error) {
         if (!isActive()) return;
         updateStatus({
@@ -271,6 +280,62 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
       setStatus({ loading: false, message: null, error: normalizeProfileError(error, 'Unable to save profile.') });
     }
   }, [state, session]);
+
+  useEffect(() => {
+    if (!didInitRef.current) {
+      prevProfileRef.current = {
+        alias: state.alias,
+        avatarType: state.avatarType,
+        avatarUri: state.avatarUri,
+      };
+      return;
+    }
+
+    const prev = prevProfileRef.current;
+    const aliasChanged = prev.alias !== state.alias;
+    const avatarTypeChanged = prev.avatarType !== state.avatarType;
+    const avatarUriChanged = prev.avatarUri !== state.avatarUri;
+    if (!aliasChanged && !avatarTypeChanged && !avatarUriChanged) return;
+
+    prevProfileRef.current = {
+      alias: state.alias,
+      avatarType: state.avatarType,
+      avatarUri: state.avatarUri,
+    };
+
+    if (aliasChanged) {
+      const aliasError = validateAlias(state.alias);
+      if (aliasError) {
+        updateStatus({ loading: false, message: null, error: aliasError });
+        return;
+      }
+    }
+
+    const avatarBecameRemote =
+      Boolean(prev.avatarUri) &&
+      !prev.avatarUri?.startsWith('http') &&
+      Boolean(state.avatarUri) &&
+      state.avatarUri?.startsWith('http');
+
+    if (avatarBecameRemote && !aliasChanged && !avatarTypeChanged) {
+      return;
+    }
+
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
+    const delayMs = avatarTypeChanged || avatarUriChanged ? 0 : 600;
+    autoSaveTimerRef.current = setTimeout(() => {
+      save();
+    }, delayMs);
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [save, state.alias, state.avatarType, state.avatarUri]);
 
   useEffect(() => {
     let mounted = true;

@@ -28,6 +28,7 @@ import {
   createReplyMessageHandler,
   createSendMessageHandler,
 } from '@services/securechat/handlemessage';
+import { ensureNotificationReady, notifyChatMessage } from '@services/notifications';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import { useChatAvatar } from '../../hooks/useChatAvatar';
 import { useChatProfiles } from '../../hooks/useChatProfiles';
@@ -170,9 +171,22 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
         selectedChatId,
         getChatById,
         showToast: Toast.show,
+        notifyNative: (chatId, message) => {
+          if (!chatId.startsWith('dm:')) return;
+          const chatName = getChatById(chatId)?.name ?? message.author ?? 'New message';
+          const body = message.type === 'image' ? 'Sent a photo.' : message.content;
+          return notifyChatMessage({ title: chatName, body, data: { chatId } });
+        },
       }),
     [chatView, displayLabel, effectiveUserId, getChatById, mutedChatIds, secureTab, selectedChatId],
   );
+
+  useEffect(() => {
+    if (!isActive || Platform.OS !== 'android') return;
+    ensureNotificationReady().catch((error) => {
+      console.warn('Notification setup failed:', error);
+    });
+  }, [isActive]);
 
   useEffect(() => {
     notifyIncomingRef.current = notifyIncomingMessage;

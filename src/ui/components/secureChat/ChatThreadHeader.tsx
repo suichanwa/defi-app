@@ -12,9 +12,17 @@ type Props = {
   onBack: () => void;
   isMuted?: boolean;
   onToggleMute?: () => void;
+  typingLabel?: string;
 };
 
-export default function ChatThreadHeader({ chat, serverInfo, onBack, isMuted, onToggleMute }: Props) {
+export default function ChatThreadHeader({
+  chat,
+  serverInfo,
+  onBack,
+  isMuted,
+  onToggleMute,
+  typingLabel,
+}: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -32,7 +40,7 @@ export default function ChatThreadHeader({ chat, serverInfo, onBack, isMuted, on
         <View style={styles.statusRow}>
           <PulseBadge size={10} color={serverInfo ? colors.accent : '#f97316'} />
         </View>
-        <Text style={styles.participantText}></Text>
+        <Text style={styles.participantText}>{typingLabel ?? ''}</Text>
       </View>
     </View>
   );

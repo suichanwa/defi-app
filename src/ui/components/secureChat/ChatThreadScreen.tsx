@@ -336,6 +336,8 @@ export default function ChatThreadScreen({
   // Calculate keyboard offset for iOS
   const keyboardVerticalOffset = isIOS ? BOTTOM_NAV_HEIGHT + insets.bottom : 0;
 
+  const typingLabel = draft.trim().length > 0 ? 'Typing...' : '';
+
   return (
     <KeyboardAvoidingView
       style={styles.outerContainer}
@@ -350,6 +352,7 @@ export default function ChatThreadScreen({
           onBack={onBack}
           isMuted={isMuted}
           onToggleMute={onToggleMute}
+          typingLabel={typingLabel}
         />
 
         {/* Messages */}

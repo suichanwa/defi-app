@@ -21,6 +21,7 @@ export const createNotifyIncomingMessage = ({
   selectedChatId,
   getChatById,
   showToast,
+  notifyNative,
 }: {
   effectiveUserId: string;
   displayLabel: string;
@@ -30,6 +31,7 @@ export const createNotifyIncomingMessage = ({
   selectedChatId: string;
   getChatById: HandleMessageTypes.GetChatById;
   showToast: HandleMessageTypes.ToastFn;
+  notifyNative?: HandleMessageTypes.NotifyNativeFn;
 }) => (chatId: string, message: ChatMessage) => {
   if (message.type === 'system') return;
   if (message.outgoing === true) return;
@@ -46,6 +48,9 @@ export const createNotifyIncomingMessage = ({
     position: 'top',
     visibilityTime: 3500,
   });
+  if (notifyNative) {
+    void notifyNative(chatId, message);
+  }
 };
 
 export const createIncomingRoomMessageHandler = ({
@@ -187,11 +192,10 @@ export const createSendMessageHandler = ({
   if (!hasText && !hasImage) return;
 
   if (hasText) {
+    setDraft('');
     const result = await sendText({ chatId: selectedChat.id, content: trimmed, isDM });
     if (!result.sent && result.error) {
       showAlert(isDM ? 'Direct message unavailable' : 'Supabase not configured', result.error);
-    } else {
-      setDraft('');
     }
   }
 

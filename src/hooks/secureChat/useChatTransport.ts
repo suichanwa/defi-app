@@ -138,6 +138,21 @@ export function useChatTransport({
           return { sent: false, error: 'Sign in with a Supabase account to send synced DMs.' };
         }
         const outgoingAvatarUri = userAvatarType === 'custom' ? userAvatarUri : undefined;
+        const optimistic = createOutgoingTextMessage({
+          chatId,
+          authorId: effectiveUserId,
+          author: displayLabel,
+          content,
+          avatarUri: outgoingAvatarUri,
+        });
+        const optimisticId = `pending-${optimistic.id}`;
+        const optimisticMessage = { ...optimistic, id: optimisticId };
+        setMessagesByChat((prev) => {
+          const existing = prev[chatId] ?? [];
+          const seen = existing.some((m) => m.id === optimisticId);
+          if (seen) return prev;
+          return { ...prev, [chatId]: [...existing, optimisticMessage] };
+        });
         const message = await sendDMMessage(chatId, {
           chatId,
           authorId: effectiveUserId,
@@ -151,9 +166,18 @@ export function useChatTransport({
         if (message) {
           setMessagesByChat((prev) => {
             const existing = prev[chatId] ?? [];
-            const seen = existing.some((m) => m.id === message.id);
-            if (seen) return prev;
-            return { ...prev, [chatId]: [...existing, message] };
+            const withoutPending = existing.filter(
+              (m) =>
+                !(
+                  m.id?.startsWith('pending-') &&
+                  m.outgoing === true &&
+                  m.authorId === effectiveUserId &&
+                  m.content === content
+                ),
+            );
+            const seen = withoutPending.some((m) => m.id === message.id);
+            if (seen) return { ...prev, [chatId]: withoutPending };
+            return { ...prev, [chatId]: [...withoutPending, message] };
           });
           markDmFetched(chatId, message.createdAt ?? null);
           await refreshDmChannels();
