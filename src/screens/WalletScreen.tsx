@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { createStackNavigator, StackNavigationProp } from '@react-navigation/stack';
+import { NavigationContainer } from '@react-navigation/native';
 import PulseBadge from '@components/PulseBadge';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '../theme/ThemeProvider';
@@ -23,10 +25,18 @@ import ReceiveScreen from './walletScreens/ReceiveScreen';
 import SendScreen from './walletScreens/SendScreen';
 import SwapScreen from './walletScreens/SwapScreen';
 
+type WalletStackParamList = {
+  WalletHome: undefined;
+  Add: undefined;
+  Send: undefined;
+  Receive: { address: string };
+  Swap: undefined;
+};
+
 type WalletAction = {
   label: string;
   icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
-  screen: 'add' | 'send' | 'receive' | 'swap';
+  screen: keyof WalletStackParamList;
 };
 
 type TokenBalance = {
@@ -39,10 +49,10 @@ type TokenBalance = {
 };
 
 const walletActions: WalletAction[] = [
-  { label: 'Add', icon: 'plus-circle', screen: 'add' },
-  { label: 'Send', icon: 'send', screen: 'send' },
-  { label: 'Receive', icon: 'qrcode-scan', screen: 'receive' },
-  { label: 'Swap', icon: 'swap-horizontal', screen: 'swap' },
+  { label: 'Add', icon: 'plus-circle', screen: 'Add' },
+  { label: 'Send', icon: 'send', screen: 'Send' },
+  { label: 'Receive', icon: 'qrcode-scan', screen: 'Receive' },
+  { label: 'Swap', icon: 'swap-horizontal', screen: 'Swap' },
 ];
 
 const defaultTokens: TokenBalance[] = [
@@ -64,20 +74,12 @@ const defaultTokens: TokenBalance[] = [
     : []),
 ];
 
-export default function WalletScreen() {
+const Stack = createStackNavigator<WalletStackParamList>();
+
+function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<WalletStackParamList, 'WalletHome'> }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
-  const {
-    status,
-    address,
-    wallet,
-    recoveryPhrase,
-    backupCompleted,
-    unlock,
-    createWallet,
-    importWallet,
-    confirmBackup,
-  } = useWalletSession();
+  const { status, address } = useWalletSession();
 
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
@@ -85,34 +87,10 @@ export default function WalletScreen() {
   const [rpcError, setRpcError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [chainTokens, setChainTokens] = useState<TokenBalance[]>(defaultTokens);
-  const [flow, setFlow] = useState<
-    'menu' | 'create-passcode' | 'create-recovery' | 'create-success' | 'unlock' | 'add' | 'send' | 'receive' | 'swap'
-  >('menu');
-  const [walletPassword, setWalletPassword] = useState('');
-  const [walletPasswordConfirm, setWalletPasswordConfirm] = useState('');
-  const [unlockPassword, setUnlockPassword] = useState('');
-  const [mnemonicInput, setMnemonicInput] = useState('');
-  const [backupMnemonic, setBackupMnemonic] = useState<string | null>(null);
-  const [backupAcknowledged, setBackupAcknowledged] = useState(false);
-  const [backupSkipped, setBackupSkipped] = useState(false);
-  const [confirmWord1, setConfirmWord1] = useState('');
-  const [confirmWord2, setConfirmWord2] = useState('');
-  const [confirmIndices, setConfirmIndices] = useState<[number, number]>([1, 5]);
-  const [flowError, setFlowError] = useState<string | null>(null);
-  const [flowMessage, setFlowMessage] = useState<string | null>(null);
   const [fetchingChain, setFetchingChain] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showErrorDialog, setShowErrorDialog] = useState(false);
-  const [biometricsAvailable, setBiometricsAvailable] = useState(false);
 
   const totalValueAnimated = useRef(new Animated.Value(0)).current;
   const [displayTotal, setDisplayTotal] = useState(0);
-  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const biometricInFlightRef = useRef(false);
-
-  // Animation for screen transitions
-  const screenOpacity = useRef(new Animated.Value(1)).current;
-  const screenTranslateX = useRef(new Animated.Value(0)).current;
 
   const trackedPairs = useMemo(() => chainTokens.filter((t) => t.pair).map((t) => t.pair as string), [chainTokens]);
 
@@ -185,6 +163,194 @@ export default function WalletScreen() {
   }, [totalValueUSD, totalValueAnimated]);
 
   useEffect(() => {
+    const loadOnChain = async () => {
+      if (status !== 'unlocked' || !address) return;
+      setFetchingChain(true);
+      try {
+        if (CHAIN.kind === 'solana') {
+          const native = await fetchSolBalance(address);
+          const nextTokens: TokenBalance[] = defaultTokens.map((token) =>
+            token.symbol === CHAIN.nativeToken.symbol ? { ...token, amount: Number(native) } : token,
+          );
+          setChainTokens(nextTokens);
+        } else {
+          const [native, erc20] = await Promise.all([
+            fetchNativeBalance(address),
+            fetchTokenBalances(address, ERC20_TOKENS),
+          ]);
+          const nextTokens: TokenBalance[] = defaultTokens.map((token) => {
+            if (token.symbol === CHAIN.nativeToken.symbol) {
+              return { ...token, amount: Number(native) };
+            }
+            const match = erc20[token.symbol];
+            return { ...token, amount: match ? Number(match) : 0 };
+          });
+          setChainTokens(nextTokens);
+        }
+        setRpcError(null);
+      } catch (error) {
+        const rpcMessage = rpcErrorMessage(error);
+        setRpcError(rpcMessage ?? 'Unable to load on-chain balances.');
+      } finally {
+        setFetchingChain(false);
+      }
+    };
+    loadOnChain();
+  }, [status, address]);
+
+  return (
+    <ScrollView contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}>
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={styles.headerTitle}>Wallet</Text>
+          <Text style={styles.headerSubtitle}>On-chain balances with live pricing.</Text>
+        </View>
+        <View style={styles.headerPills}>
+          <NetworkBadge />
+          <View style={styles.statusPill}>
+            <PulseBadge size={8} color={fetchingChain ? '#f97316' : '#22c55e'} durationMs={1400} />
+            <Text style={styles.statusText}>{fetchingChain ? 'Syncing' : 'Live'}</Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.cardWrapper}>
+        <View style={styles.walletCard}>
+          <View style={styles.walletHeader}>
+            <Text style={styles.pill}>Primary</Text>
+            <Text style={styles.walletTitle}>Main Wallet</Text>
+          </View>
+          <Text style={styles.balanceLabel}>Total value</Text>
+          <Text style={styles.balance}>{formatCurrency(displayTotal)}</Text>
+          {address && <Text style={styles.addressText}>{address}</Text>}
+
+          <View style={styles.actionsRow}>
+            {walletActions.map((action) => (
+              <TouchableOpacity
+                key={action.label}
+                style={styles.actionButton}
+                activeOpacity={0.7}
+                onPress={() => {
+                  if (action.screen === 'Receive' && address) {
+                    navigation.navigate('Receive', { address });
+                  } else {
+                    navigation.navigate(action.screen as any);
+                  }
+                }}
+              >
+                <View style={styles.actionIcon}>
+                  <MaterialCommunityIcons name={action.icon} size={22} color="#ffffff" />
+                </View>
+                <Text style={styles.actionLabel}>{action.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.searchContainer}>
+        <MaterialCommunityIcons name="magnify" size={20} color={colors.muted} style={styles.searchIcon} />
+        <TextInput 
+          placeholder="Search tokens..." 
+          placeholderTextColor={colors.muted}
+          style={styles.searchInput} 
+        />
+        <MaterialCommunityIcons name="link-variant" size={20} color={colors.muted} style={styles.searchIcon} />
+      </View>
+
+      {error ? (
+        <Text style={styles.errorText}>{error}</Text>
+      ) : (
+        <View style={styles.metaRow}>
+          <Text style={styles.metaText}>Prices: {lastUpdated ? `Updated ${lastUpdated}` : 'Loading...'}</Text>
+        </View>
+      )}
+      {rpcError && <Text style={styles.errorText}>{rpcError}</Text>}
+
+      <View style={styles.tabRow}>
+        <TouchableOpacity style={[styles.tabBase, styles.tabActive]}>
+          <Text style={styles.tabActiveText}>Tokens</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.tabBase, styles.tabInactive]}>
+          <Text style={styles.tabInactiveText}>NFTs</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.tabBase, styles.tabInactive]}>
+          <Text style={styles.tabInactiveText}>Activity</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.listCard}>
+        {chainTokens.map((token, index) => (
+          <View key={token.symbol} style={[styles.tokenRow, index !== chainTokens.length - 1 && styles.tokenRowSpacing]}>
+            <View style={[styles.tokenIcon, { backgroundColor: `${token.color}22`, borderColor: token.color }]}>
+              <Ionicons name="ellipse" size={16} color={token.color} />
+            </View>
+            <View style={styles.tokenInfo}>
+              <Text style={styles.tokenName}>{token.name}</Text>
+              <Text style={styles.tokenSymbol}>{token.symbol}</Text>
+            </View>
+            <View style={styles.tokenAmounts}>
+              <Text style={styles.tokenBalance}>
+                {token.amount.toFixed(token.amount < 1 ? 6 : 4)} {token.symbol}
+              </Text>
+              <Text style={styles.tokenValue}>
+                {(() => {
+                  const livePrice =
+                    token.pair && typeof prices[token.pair] === 'number'
+                      ? prices[token.pair]
+                      : token.fixedPrice !== undefined
+                      ? token.fixedPrice
+                      : undefined;
+                  if (typeof livePrice !== 'number') return loading ? 'Updating prices...' : '-';
+                  return formatCurrency(livePrice * token.amount);
+                })()}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
+export default function WalletScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createWalletStyles(colors), [colors]);
+  const {
+    status,
+    address,
+    wallet,
+    recoveryPhrase,
+    backupCompleted,
+    unlock,
+    createWallet,
+    importWallet,
+    confirmBackup,
+  } = useWalletSession();
+
+  const [flow, setFlow] = useState<
+    'menu' | 'create-passcode' | 'create-recovery' | 'create-success' | 'unlock'
+  >('menu');
+  const [walletPassword, setWalletPassword] = useState('');
+  const [walletPasswordConfirm, setWalletPasswordConfirm] = useState('');
+  const [unlockPassword, setUnlockPassword] = useState('');
+  const [mnemonicInput, setMnemonicInput] = useState('');
+  const [backupMnemonic, setBackupMnemonic] = useState<string | null>(null);
+  const [backupAcknowledged, setBackupAcknowledged] = useState(false);
+  const [backupSkipped, setBackupSkipped] = useState(false);
+  const [confirmWord1, setConfirmWord1] = useState('');
+  const [confirmWord2, setConfirmWord2] = useState('');
+  const [confirmIndices, setConfirmIndices] = useState<[number, number]>([1, 5]);
+  const [flowError, setFlowError] = useState<string | null>(null);
+  const [flowMessage, setFlowMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
+  const [biometricsAvailable, setBiometricsAvailable] = useState(false);
+
+  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const biometricInFlightRef = useRef(false);
+
+  useEffect(() => {
     if (status === 'missing') {
       setFlow('menu');
     } else if (status === 'locked') {
@@ -226,42 +392,6 @@ export default function WalletScreen() {
     if (!recoveryPhrase) return;
     startBackupConfirm(normalizeMnemonic(recoveryPhrase));
   }, [status, backupCompleted, backupMnemonic, recoveryPhrase]);
-
-  useEffect(() => {
-    const loadOnChain = async () => {
-      if (status !== 'unlocked' || !address) return;
-      setFetchingChain(true);
-      try {
-        if (CHAIN.kind === 'solana') {
-          const native = await fetchSolBalance(address);
-          const nextTokens: TokenBalance[] = defaultTokens.map((token) =>
-            token.symbol === CHAIN.nativeToken.symbol ? { ...token, amount: Number(native) } : token,
-          );
-          setChainTokens(nextTokens);
-        } else {
-          const [native, erc20] = await Promise.all([
-            fetchNativeBalance(address),
-            fetchTokenBalances(address, ERC20_TOKENS),
-          ]);
-          const nextTokens: TokenBalance[] = defaultTokens.map((token) => {
-            if (token.symbol === CHAIN.nativeToken.symbol) {
-              return { ...token, amount: Number(native) };
-            }
-            const match = erc20[token.symbol];
-            return { ...token, amount: match ? Number(match) : 0 };
-          });
-          setChainTokens(nextTokens);
-        }
-        setRpcError(null);
-      } catch (error) {
-        const rpcMessage = rpcErrorMessage(error);
-        setRpcError(rpcMessage ?? 'Unable to load on-chain balances.');
-      } finally {
-        setFetchingChain(false);
-      }
-    };
-    loadOnChain();
-  }, [status, address]);
 
   const resetFlowMessages = () => {
     setFlowError(null);
@@ -515,67 +645,7 @@ export default function WalletScreen() {
     canUseBiometrics().then(setBiometricsAvailable).catch(() => setBiometricsAvailable(false));
   }, []);
 
-  const handleNavigateToScreen = (screen: 'add' | 'send' | 'receive' | 'swap') => {
-    Animated.parallel([
-      Animated.timing(screenOpacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(screenTranslateX, {
-        toValue: -20,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setFlow(screen);
-      screenTranslateX.setValue(20);
-      Animated.parallel([
-        Animated.timing(screenOpacity, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-        Animated.timing(screenTranslateX, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    });
-  };
-
-  const handleBackToMenu = () => {
-    Animated.parallel([
-      Animated.timing(screenOpacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(screenTranslateX, {
-        toValue: 20,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setFlow('menu');
-      screenTranslateX.setValue(-20);
-      Animated.parallel([
-        Animated.timing(screenOpacity, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-        Animated.timing(screenTranslateX, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    });
-  };
-
-  if (status !== 'unlocked' || backupMnemonic || !['menu', 'add', 'send', 'receive', 'swap'].includes(flow)) {
+  if (status !== 'unlocked' || backupMnemonic) {
     return (
       <ScrollView contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}>
         <ErrorDialog
@@ -634,144 +704,33 @@ export default function WalletScreen() {
     );
   }
 
-  // Render wallet action screens
-  if (flow === 'add') {
-    return (
-      <Animated.View style={{ flex: 1, opacity: screenOpacity, transform: [{ translateX: screenTranslateX }] }}>
-        <AddScreen onBack={handleBackToMenu} />
-      </Animated.View>
-    );
-  }
-
-  if (flow === 'send') {
-    return (
-      <Animated.View style={{ flex: 1, opacity: screenOpacity, transform: [{ translateX: screenTranslateX }] }}>
-        <SendScreen onBack={handleBackToMenu} />
-      </Animated.View>
-    );
-  }
-
-  if (flow === 'receive') {
-    return (
-      <Animated.View style={{ flex: 1, opacity: screenOpacity, transform: [{ translateX: screenTranslateX }] }}>
-        <ReceiveScreen address={address} onBack={handleBackToMenu} />
-      </Animated.View>
-    );
-  }
-
-  if (flow === 'swap') {
-    return (
-      <Animated.View style={{ flex: 1, opacity: screenOpacity, transform: [{ translateX: screenTranslateX }] }}>
-        <SwapScreen onBack={handleBackToMenu} />
-      </Animated.View>
-    );
-  }
-
   return (
-    <ScrollView contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}>
-      <View style={styles.headerRow}>
-        <View>
-          <Text style={styles.headerTitle}>Wallet</Text>
-          <Text style={styles.headerSubtitle}>On-chain balances with live pricing.</Text>
-        </View>
-        <View style={styles.headerPills}>
-          <NetworkBadge />
-          <View style={styles.statusPill}>
-            <PulseBadge size={8} color={fetchingChain ? '#f97316' : '#22c55e'} durationMs={1400} />
-            <Text style={styles.statusText}>{fetchingChain ? 'Syncing' : 'Live'}</Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.cardWrapper}>
-        <View style={styles.walletCard}>
-          <View style={styles.walletHeader}>
-            <Text style={styles.pill}>Primary</Text>
-            <Text style={styles.walletTitle}>Main Wallet</Text>
-          </View>
-          <Text style={styles.balanceLabel}>Total value</Text>
-          <Text style={styles.balance}>{formatCurrency(displayTotal)}</Text>
-          {address && <Text style={styles.addressText}>{address}</Text>}
-
-          <View style={styles.actionsRow}>
-            {walletActions.map((action) => (
-              <TouchableOpacity
-                key={action.label}
-                style={styles.actionButton}
-                activeOpacity={0.7}
-                onPress={() => handleNavigateToScreen(action.screen)}
-              >
-                <View style={styles.actionIcon}>
-                  <MaterialCommunityIcons name={action.icon} size={22} color="#ffffff" />
-                </View>
-                <Text style={styles.actionLabel}>{action.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.searchContainer}>
-        <MaterialCommunityIcons name="magnify" size={20} color={colors.muted} style={styles.searchIcon} />
-        <TextInput 
-          placeholder="Search tokens..." 
-          placeholderTextColor={colors.muted}
-          style={styles.searchInput} 
-        />
-        <MaterialCommunityIcons name="link-variant" size={20} color={colors.muted} style={styles.searchIcon} />
-      </View>
-
-      {error ? (
-        <Text style={styles.errorText}>{error}</Text>
-      ) : (
-        <View style={styles.metaRow}>
-          <Text style={styles.metaText}>Prices: {lastUpdated ? `Updated ${lastUpdated}` : 'Loading...'}</Text>
-        </View>
-      )}
-      {rpcError && <Text style={styles.errorText}>{rpcError}</Text>}
-
-      <View style={styles.tabRow}>
-        <TouchableOpacity style={[styles.tabBase, styles.tabActive]}>
-          <Text style={styles.tabActiveText}>Tokens</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.tabBase, styles.tabInactive]}>
-          <Text style={styles.tabInactiveText}>NFTs</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.tabBase, styles.tabInactive]}>
-          <Text style={styles.tabInactiveText}>Activity</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.listCard}>
-        {chainTokens.map((token, index) => (
-          <View key={token.symbol} style={[styles.tokenRow, index !== chainTokens.length - 1 && styles.tokenRowSpacing]}>
-            <View style={[styles.tokenIcon, { backgroundColor: `${token.color}22`, borderColor: token.color }]}>
-              <Ionicons name="ellipse" size={16} color={token.color} />
-            </View>
-            <View style={styles.tokenInfo}>
-              <Text style={styles.tokenName}>{token.name}</Text>
-              <Text style={styles.tokenSymbol}>{token.symbol}</Text>
-            </View>
-            <View style={styles.tokenAmounts}>
-              <Text style={styles.tokenBalance}>
-                {token.amount.toFixed(token.amount < 1 ? 6 : 4)} {token.symbol}
-              </Text>
-              <Text style={styles.tokenValue}>
-                {(() => {
-                  const livePrice =
-                    token.pair && typeof prices[token.pair] === 'number'
-                      ? prices[token.pair]
-                      : token.fixedPrice !== undefined
-                      ? token.fixedPrice
-                      : undefined;
-                  if (typeof livePrice !== 'number') return loading ? 'Updating prices...' : '-';
-                  return formatCurrency(livePrice * token.amount);
-                })()}
-              </Text>
-            </View>
-          </View>
-        ))}
-      </View>
-    </ScrollView>
+    <NavigationContainer>
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+          gestureEnabled: true,
+          gestureDirection: 'horizontal',
+          cardStyleInterpolator: ({ current, layouts }) => ({
+            cardStyle: {
+              transform: [
+                {
+                  translateX: current.progress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [layouts.screen.width, 0],
+                  }),
+                },
+              ],
+            },
+          }),
+        }}
+      >
+        <Stack.Screen name="WalletHome" component={WalletHomeScreen} />
+        <Stack.Screen name="Add" component={AddScreen} />
+        <Stack.Screen name="Send" component={SendScreen} />
+        <Stack.Screen name="Receive" component={ReceiveScreen} />
+        <Stack.Screen name="Swap" component={SwapScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }

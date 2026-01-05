@@ -25,7 +25,7 @@ export default function FlowMessage({ styles, error, message }: Props) {
       {message ? (
         <View style={[localStyles.messageBox, localStyles.successBox]}>
           <MaterialCommunityIcons name="information" size={18} color="#3b82f6" />
-          <Text style={[styles.successText, localStyles.messageText]}>{message}</Text>
+          <Text style={localStyles.messageText}>{message}</Text>
         </View>
       ) : null}
     </View>

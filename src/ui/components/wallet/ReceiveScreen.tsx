@@ -12,10 +12,9 @@ type Props = {
   flowMessage: string | null;
   onCopy: () => void;
   onShare: () => void;
-  onBack: () => void;
 };
 
-export default function ReceiveScreen({ chainName, address, flowMessage, onCopy, onShare, onBack }: Props) {
+export default function ReceiveScreen({ chainName, address, flowMessage, onCopy, onShare }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const { animatedStyle } = useWalletCardAnimation([address]);
@@ -38,9 +37,6 @@ export default function ReceiveScreen({ chainName, address, flowMessage, onCopy,
       </TouchableOpacity>
       <TouchableOpacity style={styles.secondaryButton} onPress={onShare} activeOpacity={0.9}>
         <Text style={styles.secondaryButtonText}>Share</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.secondaryButton} onPress={onBack} activeOpacity={0.9}>
-        <Text style={styles.secondaryButtonText}>Back</Text>
       </TouchableOpacity>
     </Animated.View>
   );

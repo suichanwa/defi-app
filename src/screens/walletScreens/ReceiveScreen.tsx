@@ -1,18 +1,23 @@
 import React, { useRef } from 'react';
 import { Animated, PanResponder, ScrollView, Text, View, StyleSheet, TouchableOpacity } from 'react-native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { Share } from 'react-native';
 import { useTheme } from '@theme/ThemeProvider';
 import { CHAIN } from '../../config/chain';
 
-type ReceiveScreenProps = {
-  address: string | null;
-  onBack: () => void;
+type WalletStackParamList = {
+  Receive: { address: string };
 };
 
-export default function ReceiveScreen({ address, onBack }: ReceiveScreenProps) {
+type ReceiveRouteProp = RouteProp<WalletStackParamList, 'Receive'>;
+
+export default function ReceiveScreen() {
   const { colors } = useTheme();
+  const navigation = useNavigation();
+  const route = useRoute<ReceiveRouteProp>();
+  const address = route.params?.address ?? null;
   const translateX = useRef(new Animated.Value(0)).current;
 
   const panResponder = useRef(
@@ -32,7 +37,7 @@ export default function ReceiveScreen({ address, onBack }: ReceiveScreenProps) {
             duration: 200,
             useNativeDriver: true,
           }).start(() => {
-            onBack();
+            navigation.goBack();
           });
         } else {
           Animated.spring(translateX, {

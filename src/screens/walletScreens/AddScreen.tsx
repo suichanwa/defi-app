@@ -1,13 +1,11 @@
 import React, { useRef } from 'react';
 import { Animated, PanResponder, ScrollView, Text, View, StyleSheet } from 'react-native';
 import { useTheme } from '@theme/ThemeProvider';
+import { useNavigation } from '@react-navigation/native';
 
-type AddScreenProps = {
-  onBack: () => void;
-};
-
-export default function AddScreen({ onBack }: AddScreenProps) {
+export default function AddScreen() {
   const { colors } = useTheme();
+  const navigation = useNavigation();
   const translateX = useRef(new Animated.Value(0)).current;
 
   const panResponder = useRef(
@@ -30,7 +28,7 @@ export default function AddScreen({ onBack }: AddScreenProps) {
             duration: 200,
             useNativeDriver: true,
           }).start(() => {
-            onBack();
+            navigation.goBack();
           });
         } else {
           // Snap back to original position

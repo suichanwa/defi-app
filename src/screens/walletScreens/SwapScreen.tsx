@@ -1,13 +1,11 @@
 import React, { useRef } from 'react';
 import { Animated, PanResponder, ScrollView, Text, View, StyleSheet } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '@theme/ThemeProvider';
 
-type SwapScreenProps = {
-  onBack: () => void;
-};
-
-export default function SwapScreen({ onBack }: SwapScreenProps) {
+export default function SwapScreen() {
   const { colors } = useTheme();
+  const navigation = useNavigation();
   const translateX = useRef(new Animated.Value(0)).current;
 
   const panResponder = useRef(
@@ -27,7 +25,7 @@ export default function SwapScreen({ onBack }: SwapScreenProps) {
             duration: 200,
             useNativeDriver: true,
           }).start(() => {
-            onBack();
+            navigation.goBack();
           });
         } else {
           Animated.spring(translateX, {

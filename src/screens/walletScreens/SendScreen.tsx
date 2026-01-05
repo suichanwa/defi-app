@@ -1,14 +1,12 @@
 import React, { useRef, useState } from 'react';
 import { Animated, PanResponder, ScrollView, Text, View, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '@theme/ThemeProvider';
 import { CHAIN } from '../../config/chain';
 
-type SendScreenProps = {
-  onBack: () => void;
-};
-
-export default function SendScreen({ onBack }: SendScreenProps) {
+export default function SendScreen() {
   const { colors } = useTheme();
+  const navigation = useNavigation();
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   const translateX = useRef(new Animated.Value(0)).current;
@@ -30,7 +28,7 @@ export default function SendScreen({ onBack }: SendScreenProps) {
             duration: 200,
             useNativeDriver: true,
           }).start(() => {
-            onBack();
+            navigation.goBack();
           });
         } else {
           Animated.spring(translateX, {

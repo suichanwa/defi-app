@@ -20,7 +20,6 @@ type Props = {
   onReview: () => void;
   onSend: () => void;
   onEdit: () => void;
-  onBack: () => void;
 };
 
 export default function SendScreen({
@@ -38,7 +37,6 @@ export default function SendScreen({
   onReview,
   onSend,
   onEdit,
-  onBack,
 }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
@@ -80,14 +78,6 @@ export default function SendScreen({
             disabled={isSubmitting}
           >
             <Text style={styles.primaryButtonText}>Review send</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.secondaryButton, isSubmitting && styles.buttonDisabled]}
-            onPress={onBack}
-            activeOpacity={0.9}
-            disabled={isSubmitting}
-          >
-            <Text style={styles.secondaryButtonText}>Back</Text>
           </TouchableOpacity>
         </>
       )}

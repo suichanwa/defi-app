@@ -13,6 +13,7 @@ import { ThemeProvider, useTheme } from './src/theme/ThemeProvider';
 import { useWalletSession, WalletSessionProvider } from './src/context/WalletSessionProvider';
 import * as Sentry from '@sentry/react-native';
 import Toast from 'react-native-toast-message';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 Sentry.init({
   dsn: 'https://005462e44419a10cf92b86000ff8c484@o4510659003940864.ingest.de.sentry.io/4510659569778768',
@@ -181,14 +182,10 @@ export default Sentry.wrap(function App() {
   
   return (
     <ThemeProvider>
-      <WalletSessionProvider>
+      <WalletSessionProvider isWalletActive={activeTab === 'wallet'}>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <SafeAreaProvider>
-            <NavigationContainer>
-              <Stack.Navigator screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="Home" component={Home} />
-              </Stack.Navigator>
-            </NavigationContainer>
+            <AppContent activeTab={activeTab} onTabChange={setActiveTab} />
             <Toast />
           </SafeAreaProvider>
         </GestureHandlerRootView>
@@ -196,10 +193,6 @@ export default Sentry.wrap(function App() {
     </ThemeProvider>
   );
 });
-
-function AppContentWrapper({ activeTab, setActiveTab }: { activeTab: TabName; setActiveTab: (tab: TabName) => void }) {
-  return <AppContent activeTab={activeTab} onTabChange={setActiveTab} />;
-}
 
 const toastStyles = StyleSheet.create({
   toast: {
