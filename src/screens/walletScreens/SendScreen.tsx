@@ -1,57 +1,15 @@
-import React, { useRef, useState } from 'react';
-import { Animated, PanResponder, ScrollView, Text, View, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import React, { useState } from 'react';
+import { ScrollView, Text, View, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import { useTheme } from '@theme/ThemeProvider';
 import { CHAIN } from '../../config/chain';
 
 export default function SendScreen() {
   const { colors } = useTheme();
-  const navigation = useNavigation();
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
-  const translateX = useRef(new Animated.Value(0)).current;
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gesture) => {
-        return Math.abs(gesture.dx) > 20 && Math.abs(gesture.dx) > Math.abs(gesture.dy);
-      },
-      onPanResponderMove: (_, gesture) => {
-        if (gesture.dx > 0) {
-          translateX.setValue(gesture.dx);
-        }
-      },
-      onPanResponderRelease: (_, gesture) => {
-        if (gesture.dx > 100) {
-          Animated.timing(translateX, {
-            toValue: 400,
-            duration: 200,
-            useNativeDriver: true,
-          }).start(() => {
-            navigation.goBack();
-          });
-        } else {
-          Animated.spring(translateX, {
-            toValue: 0,
-            useNativeDriver: true,
-            tension: 65,
-            friction: 10,
-          }).start();
-        }
-      },
-    }),
-  ).current;
 
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        {
-          transform: [{ translateX }],
-        },
-      ]}
-      {...panResponder.panHandlers}
-    >
+    <View style={styles.container}>
       <ScrollView contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}>
         <Text style={[styles.title, { color: colors.text }]}>Send {CHAIN.nativeToken.symbol}</Text>
         <Text style={[styles.subtitle, { color: colors.muted }]}>Transfer funds to another wallet</Text>
@@ -90,7 +48,7 @@ export default function SendScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </Animated.View>
+    </View>
   );
 }
 
