@@ -399,11 +399,11 @@ export default function WalletScreen() {
     try {
       await unlock(unlockPassword);
       setFlow('menu');
-      setFlowMessage('Wallet unlocked.');
       if (biometricsAvailable) {
         await saveBiometricPassword(unlockPassword);
       }
       setUnlockPassword('');
+      resetFlowMessages();
     } catch (error) {
       setFlowError(walletErrorMessage(error, 'unlock'));
       setShowErrorDialog(true);
@@ -421,7 +421,6 @@ export default function WalletScreen() {
       return;
     }
     if (biometricInFlightRef.current) return;
-    setFlowMessage('Authenticating... this can take a few seconds.');
     setIsSubmitting(true);
     startSlowMessage('Yeah, this might take a moment...');
     try {
@@ -434,7 +433,7 @@ export default function WalletScreen() {
       }
       await unlock(stored);
       setFlow('menu');
-      setFlowMessage('Wallet unlocked.');
+      resetFlowMessages();
     } catch (error) {
       setFlowError(walletErrorMessage(error, 'unlock'));
       setShowErrorDialog(true);

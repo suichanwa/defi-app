@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '@theme/ThemeProvider';
 
@@ -17,11 +18,13 @@ export default function FlowMessage({ styles, error, message }: Props) {
     <View style={localStyles.container}>
       {error ? (
         <View style={[localStyles.messageBox, localStyles.errorBox]}>
+          <MaterialCommunityIcons name="alert-circle" size={18} color="#ef4444" />
           <Text style={[styles.errorText, localStyles.messageText]}>{error}</Text>
         </View>
       ) : null}
       {message ? (
         <View style={[localStyles.messageBox, localStyles.successBox]}>
+          <MaterialCommunityIcons name="information" size={18} color="#3b82f6" />
           <Text style={[styles.successText, localStyles.messageText]}>{message}</Text>
         </View>
       ) : null}
@@ -36,13 +39,20 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       marginTop: 10,
     },
     messageBox: {
-      borderRadius: 10,
-      paddingVertical: 10,
-      paddingHorizontal: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderRadius: 12,
       borderWidth: 1,
+      position: 'relative',
     },
     messageText: {
-      fontSize: 13,
+      flex: 1,
+      fontSize: 14,
+      fontWeight: '600',
+      lineHeight: 20,
     },
     errorBox: {
       backgroundColor: `${colors.warningBackground}`,

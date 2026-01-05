@@ -312,10 +312,6 @@ export default function WalletSetupScreen({
           onChangeWalletPasswordConfirm={handlePasscodeConfirmChange}
           onCreate={onCreate}
           onBackToMenu={onBackToMenu}
-          iconColor={colors.text}
-          onDigit={handleKeypadDigit}
-          onDelete={handleKeypadDelete}
-          onClear={handleKeypadClear}
           isPrimaryActive={effectivePasscodeField === 'primary'}
           isConfirmActive={effectivePasscodeField === 'confirm'}
           onActivatePrimary={() => setActivePasscodeField('primary')}
@@ -356,10 +352,6 @@ export default function WalletSetupScreen({
           isSubmitting={isSubmitting}
           onChangeUnlockPassword={handleUnlockChange}
           onUnlock={onUnlock}
-          iconColor={colors.text}
-          onDigit={handleKeypadDigit}
-          onDelete={handleKeypadDelete}
-          onClear={handleKeypadClear}
           onBiometricUnlock={onBiometricUnlock}
           biometricsAvailable={biometricsAvailable}
           isUnlockActive={effectivePasscodeField === 'unlock'}

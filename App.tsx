@@ -11,6 +11,21 @@ import { appShellStyles as styles } from '@styles/AppShellStyles';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme } from './src/theme/ThemeProvider';
 import { useWalletSession, WalletSessionProvider } from './src/context/WalletSessionProvider';
+import * as Sentry from '@sentry/react-native';
+
+Sentry.init({
+  dsn: 'https://005462e44419a10cf92b86000ff8c484@o4510659003940864.ingest.de.sentry.io/4510659569778768',
+
+  // Adds more context data to events (IP address, cookies, user, etc.)
+  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
+  sendDefaultPii: true,
+
+  // Enable Logs
+  enableLogs: true,
+
+  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
+  // spotlight: __DEV__,
+});
 
 function AppContent({ activeTab, onTabChange }: { activeTab: TabName; onTabChange: (tab: TabName) => void }) {
   const [lastNonChatTab, setLastNonChatTab] = useState<TabName>('wallet');
@@ -160,7 +175,7 @@ function AppContent({ activeTab, onTabChange }: { activeTab: TabName; onTabChang
   );
 }
 
-export default function App() {
+export default Sentry.wrap(function App() {
   const [activeTab, setActiveTab] = useState<TabName>('wallet');
   
   return (
@@ -172,7 +187,7 @@ export default function App() {
       </ThemeProvider>
     </SafeAreaProvider>
   );
-}
+});
 
 function AppContentWrapper({ activeTab, setActiveTab }: { activeTab: TabName; setActiveTab: (tab: TabName) => void }) {
   return <AppContent activeTab={activeTab} onTabChange={setActiveTab} />;
