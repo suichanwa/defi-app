@@ -1,5 +1,5 @@
 import React, { useMemo, useRef } from 'react';
-import { PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import PulseBadge from '@components/PulseBadge';
 import type { ChatThread } from '@app-types/securechat-types/secureChat';
@@ -16,6 +16,9 @@ type Props = {
 export default function ChatListScreen({ chats, selectedChatId, onSelectChat, onOpenSelected }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gesture) => {
@@ -24,7 +27,7 @@ export default function ChatListScreen({ chats, selectedChatId, onSelectChat, on
       },
       onPanResponderRelease: (_, gesture) => {
         if (gesture.dx < -60 && selectedChatId) {
-          onOpenSelected(selectedChatId);
+          handleChatOpen(selectedChatId);
         }
       },
     }),
@@ -41,8 +44,44 @@ export default function ChatListScreen({ chats, selectedChatId, onSelectChat, on
     return next;
   }, [chats]);
 
+  const handleChatOpen = (chatId: string) => {
+    // Parallel animations for slide and fade
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: -50,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onOpenSelected(chatId);
+      // Reset animations for next time
+      slideAnim.setValue(0);
+      fadeAnim.setValue(1);
+    });
+  };
+
+  const handleChatSelect = (chatId: string) => {
+    onSelectChat(chatId);
+    // Trigger opening animation
+    handleChatOpen(chatId);
+  };
+
   return (
-    <View style={styles.container} {...panResponder.panHandlers}>
+    <Animated.View
+      style={[
+        styles.container,
+        {
+          transform: [{ translateX: slideAnim }],
+          opacity: fadeAnim,
+        },
+      ]}
+      {...panResponder.panHandlers}
+    >
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.title}>Chats</Text>
@@ -62,7 +101,7 @@ export default function ChatListScreen({ chats, selectedChatId, onSelectChat, on
             <TouchableOpacity
               key={chat.id}
               style={[styles.chatCard, isActive && styles.chatCardActive]}
-              onPress={() => onSelectChat(chat.id)}
+              onPress={() => handleChatSelect(chat.id)}
               activeOpacity={0.85}
             >
               <View style={styles.chatRow}>
@@ -87,7 +126,7 @@ export default function ChatListScreen({ chats, selectedChatId, onSelectChat, on
           );
         })}
       </ScrollView>
-    </View>
+    </Animated.View>
   );
 }
 

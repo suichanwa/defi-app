@@ -1,20 +1,43 @@
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, StyleSheet, View } from 'react-native';
 import ChatListScreen from '@components/secureChat/ChatListScreen';
 import ChatThreadScreen from '@components/secureChat/ChatThreadScreen';
 import ConnectScreen from '@components/secureChat/ConnectScreen';
 import type { SecureChatContentProps } from '@app-types/securechat-types/secureChatContent';
 
 export default function SecureChatContent({ secureTab, chatView, connect, thread, list }: SecureChatContentProps) {
+  const slideAnim = useRef(new Animated.Value(100)).current;
+
+  useEffect(() => {
+    if (chatView === 'thread') {
+      // Slide in from right
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      // Reset position when going back to list
+      slideAnim.setValue(100);
+    }
+  }, [chatView, slideAnim]);
+
   if (secureTab === 'connect') {
     return <ConnectScreen {...connect} />;
   }
 
   if (chatView === 'thread') {
     return (
-      <View style={styles.threadWrapper}>
+      <Animated.View
+        style={[
+          styles.threadWrapper,
+          {
+            transform: [{ translateX: slideAnim }],
+          },
+        ]}
+      >
         <ChatThreadScreen {...thread} />
-      </View>
+      </Animated.View>
     );
   }
 

@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, StyleSheet, View } from 'react-native';
 import ChatHeader from '@components/secureChat/ChatHeader';
 import ChatTabs from '@components/secureChat/ChatTabs';
 import { useTheme } from '@theme/ThemeProvider';
@@ -23,15 +23,63 @@ export default function SecureChatLayout({
 }: Props) {
   const { colors } = useTheme();
   const showNav = chatView !== 'thread';
+  const navOpacity = useRef(new Animated.Value(1)).current;
+  const navTranslateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (chatView === 'thread') {
+      // Animate navbar out: fade and slide up
+      Animated.parallel([
+        Animated.timing(navOpacity, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.timing(navTranslateY, {
+          toValue: -20,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      // Animate navbar in: fade and slide down
+      Animated.parallel([
+        Animated.timing(navOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(navTranslateY, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [chatView, navOpacity, navTranslateY]);
 
   return (
-    <View style={[styles.container, isCompact && styles.containerCompact, { backgroundColor: colors.background }]}>
-      {showNav ? (
-        <>
-          <ChatHeader isCompact={isCompact} />
-          <ChatTabs activeTab={secureTab} onTabChange={onTabChange} timeLabel={timeLabel} />
-        </>
-      ) : null}
+    <View
+      style={[
+        styles.container,
+        isCompact && styles.containerCompact,
+        !showNav && styles.containerNoNav,
+        { backgroundColor: colors.background },
+      ]}
+    >
+      <Animated.View
+        style={[
+          styles.navWrapper,
+          {
+            opacity: navOpacity,
+            transform: [{ translateY: navTranslateY }],
+          },
+        ]}
+        pointerEvents={showNav ? 'auto' : 'none'}
+      >
+        <ChatHeader isCompact={isCompact} />
+        <ChatTabs activeTab={secureTab} onTabChange={onTabChange} timeLabel={timeLabel} />
+      </Animated.View>
       {children}
     </View>
   );
@@ -48,5 +96,12 @@ const styles = StyleSheet.create({
   containerCompact: {
     paddingHorizontal: 16,
     paddingTop: 20,
+  },
+  containerNoNav: {
+    paddingTop: 10,
+    paddingBottom: 20,
+  },
+  navWrapper: {
+    overflow: 'hidden',
   },
 });
