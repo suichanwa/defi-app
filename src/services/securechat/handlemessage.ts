@@ -150,7 +150,12 @@ export const createSendMessageHandler = ({
   setAttachment: (value: string | null) => void;
   setFileAttachment?: (value: HandleMessageTypes.PendingFile | null) => void;
   sendText: (args: { chatId: string; content: string; isDM: boolean }) => Promise<{ sent: boolean; error?: string }>;
-  sendImage: (args: { chatId: string; imageUri: string; isDM: boolean }) => Promise<{ sent: boolean; error?: string }>;
+  sendImage: (args: {
+    chatId: string;
+    imageUri: string;
+    isDM: boolean;
+    content?: string;
+  }) => Promise<{ sent: boolean; error?: string }>;
   sendFile?: (args: { chatId: string; file: HandleMessageTypes.PendingFile; isDM: boolean }) => Promise<{ sent: boolean; error?: string }>;
   resolveAuthorName: (message: ChatMessage) => string;
   showAlert: HandleMessageTypes.AlertFn;
@@ -200,21 +205,21 @@ export const createSendMessageHandler = ({
 
   if (!hasText && !hasImage && !hasFile) return;
 
-  if (hasText) {
-    setDraft('');
-    const result = await sendText({ chatId: selectedChat.id, content: trimmed, isDM });
-    if (!result.sent && result.error) {
-      showAlert(isDM ? 'Direct message unavailable' : 'Supabase not configured', result.error);
-    }
-  }
-
   if (hasImage && pendingImageUri) {
     const imageUri = pendingImageUri;
     if (sendingImageUriRef.current === imageUri) return;
     sendingImageUriRef.current = imageUri;
     setAttachment(null);
+    if (hasText) {
+      setDraft('');
+    }
     try {
-      const result = await sendImage({ chatId: selectedChat.id, imageUri, isDM });
+      const result = await sendImage({
+        chatId: selectedChat.id,
+        imageUri,
+        isDM,
+        content: hasText ? trimmed : undefined,
+      });
       if (!result.sent && result.error) {
         showAlert('Image upload error', result.error);
       }
@@ -225,6 +230,14 @@ export const createSendMessageHandler = ({
       if (sendingImageUriRef.current === imageUri) {
         sendingImageUriRef.current = null;
       }
+    }
+  }
+
+  if (hasText && !hasImage) {
+    setDraft('');
+    const result = await sendText({ chatId: selectedChat.id, content: trimmed, isDM });
+    if (!result.sent && result.error) {
+      showAlert(isDM ? 'Direct message unavailable' : 'Supabase not configured', result.error);
     }
   }
 

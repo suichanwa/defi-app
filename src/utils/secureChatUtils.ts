@@ -27,6 +27,7 @@ type OutgoingImageArgs = {
   avatarUri?: string;
   imageUri: string;
   imagePath?: string;
+  content?: string;
   now?: Date;
 };
 
@@ -84,13 +85,14 @@ export const createOutgoingImageMessage = ({
   avatarUri,
   imageUri,
   imagePath,
+  content,
   now = new Date(),
 }: OutgoingImageArgs): ChatMessage => ({
   id: `${now.getTime()}-image`,
   chatId,
   authorId,
   author,
-  content: 'Photo',
+  content: content?.trim() ? content : 'Photo',
   timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
   createdAt: now.toISOString(),
   avatarUri,

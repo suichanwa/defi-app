@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Platform, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Platform, Text, TextInput, View } from 'react-native';
 import { createWalletStyles } from '@styles/WalletStyles';
 
 const PASSCODE_LENGTH = 6;
@@ -19,31 +19,16 @@ export default function PasscodeField({
   value,
   onChange,
   autoFocus,
-  isActive,
-  onActivate,
   styles,
 }: PasscodeFieldProps) {
   const inputRef = useRef<TextInput>(null);
-  const prevAutoFocus = useRef(false);
-  const digits = value.split('');
-  const activeIndex = Math.min(value.length, PASSCODE_LENGTH - 1);
-  const isWeb = Platform.OS === 'web';
 
   useEffect(() => {
-    if (!autoFocus || prevAutoFocus.current) {
-      prevAutoFocus.current = Boolean(autoFocus);
-      return;
+    if (autoFocus) {
+      const id = setTimeout(() => inputRef.current?.focus(), 100);
+      return () => clearTimeout(id);
     }
-    prevAutoFocus.current = true;
-    onActivate?.();
-    const id = setTimeout(() => inputRef.current?.focus(), 0);
-    return () => clearTimeout(id);
-  }, [autoFocus, onActivate]);
-
-  const handleActivate = () => {
-    onActivate?.();
-    inputRef.current?.focus();
-  };
+  }, [autoFocus]);
 
   const handleChangeText = (nextValue: string) => {
     const sanitized = nextValue.replace(/\D/g, '').slice(0, PASSCODE_LENGTH);
@@ -53,27 +38,6 @@ export default function PasscodeField({
   return (
     <View style={styles.passcodeField}>
       <Text style={styles.passcodeLabel}>{label}</Text>
-      <TouchableOpacity
-        style={[styles.passcodeRow, isActive && styles.passcodeRowActive]}
-        onPress={handleActivate}
-        activeOpacity={0.9}
-      >
-        {Array.from({ length: PASSCODE_LENGTH }).map((_, index) => {
-          const isCellActive = value.length < PASSCODE_LENGTH && index === activeIndex;
-          return (
-            <View
-              key={`passcode-${index}`}
-              style={[
-                styles.passcodeCell,
-                index < PASSCODE_LENGTH - 1 && styles.passcodeCellSpacing,
-                isCellActive && styles.passcodeCellActive,
-              ]}
-            >
-              <View style={[styles.passcodeDot, digits[index] ? styles.passcodeDotFilled : styles.passcodeDotEmpty]} />
-            </View>
-          );
-        })}
-      </TouchableOpacity>
       <TextInput
         ref={inputRef}
         value={value}
@@ -83,13 +47,29 @@ export default function PasscodeField({
         maxLength={PASSCODE_LENGTH}
         autoFocus={autoFocus}
         secureTextEntry
-        style={styles.passcodeHiddenInput}
-        {...(!isWeb && {
-          showSoftInputOnFocus: false,
-          caretHidden: true,
-          contextMenuHidden: true,
-        })}
+        placeholder="••••••"
+        placeholderTextColor="#94a3b8"
+        style={{
+          borderWidth: 2,
+          borderColor: value.length > 0 ? '#4f46e5' : '#e2e8f0',
+          borderRadius: 16,
+          paddingHorizontal: 20,
+          paddingVertical: 18,
+          fontSize: 24,
+          fontWeight: '600',
+          color: '#0f172a',
+          backgroundColor: '#f8fafc',
+          marginTop: 12,
+          textAlign: 'center',
+          letterSpacing: 12,
+          shadowColor: '#4f46e5',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: value.length > 0 ? 0.1 : 0,
+          shadowRadius: 8,
+          elevation: value.length > 0 ? 2 : 0,
+        }}
         autoCorrect={false}
+        autoComplete="off"
       />
     </View>
   );

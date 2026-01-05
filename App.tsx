@@ -12,15 +12,17 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { ThemeProvider, useTheme } from './src/theme/ThemeProvider';
 import { useWalletSession, WalletSessionProvider } from './src/context/WalletSessionProvider';
 
-function AppContent() {
-  const [activeTab, setActiveTab] = useState<TabName>('wallet');
+function AppContent({ activeTab, onTabChange }: { activeTab: TabName; onTabChange: (tab: TabName) => void }) {
   const [lastNonChatTab, setLastNonChatTab] = useState<TabName>('wallet');
   const [isChatThreadOpen, setIsChatThreadOpen] = useState(false);
   const { status, backupCompleted } = useWalletSession();
   const secureTransition = useSharedValue(0);
+  const navbarOpacity = useSharedValue(1);
+  const navbarTranslateY = useSharedValue(0);
   const insets = useSafeAreaInsets();
   const { colors, resolved } = useTheme();
   const isSetupMode = status === 'missing' || status === 'loading' || (status === 'unlocked' && !backupCompleted);
+  const showNavbar = status === 'unlocked' && backupCompleted && !(activeTab === 'secureChat' && isChatThreadOpen);
 
   const toastConfig = useMemo(() => {
     return {
@@ -51,9 +53,9 @@ function AppContent() {
 
   useEffect(() => {
     if (isSetupMode && activeTab !== 'wallet') {
-      setActiveTab('wallet');
+      onTabChange('wallet');
     }
-  }, [activeTab, isSetupMode]);
+  }, [activeTab, isSetupMode, onTabChange]);
 
   useEffect(() => {
     if (activeTab !== 'secureChat') {
@@ -65,9 +67,20 @@ function AppContent() {
     secureTransition.value = withTiming(activeTab === 'secureChat' ? 1 : 0, { duration: 280 });
   }, [activeTab, secureTransition]);
 
+  useEffect(() => {
+    const shouldHideNavbar = activeTab === 'secureChat' && isChatThreadOpen;
+    navbarOpacity.value = withTiming(shouldHideNavbar ? 0 : 1, { duration: 250 });
+    navbarTranslateY.value = withTiming(shouldHideNavbar ? 20 : 0, { duration: 250 });
+  }, [isChatThreadOpen, activeTab, navbarOpacity, navbarTranslateY]);
+
   const walletAnimatedStyle = useAnimatedStyle(() => ({
     opacity: 1 - secureTransition.value,
     transform: [{ translateX: -12 * secureTransition.value }],
+  }));
+
+  const navbarAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: navbarOpacity.value,
+    transform: [{ translateY: navbarTranslateY.value }],
   }));
 
   const secureChatAnimatedStyle = useAnimatedStyle(() => ({
@@ -126,8 +139,12 @@ function AppContent() {
           />
         </Animated.View>
 
-        {!isSetupMode && !(activeTab === 'secureChat' && isChatThreadOpen) && (
-          <BottomNavBar activeTab={activeTab} onTabChange={setActiveTab} />
+        {showNavbar && (
+          <Animated.View
+            style={[navbarAnimatedStyle, { pointerEvents: activeTab === 'secureChat' && isChatThreadOpen ? 'none' : 'auto' }]}
+          >
+            <BottomNavBar activeTab={activeTab} onTabChange={onTabChange} />
+          </Animated.View>
         )}
 
         <ToastManager
@@ -144,15 +161,21 @@ function AppContent() {
 }
 
 export default function App() {
+  const [activeTab, setActiveTab] = useState<TabName>('wallet');
+  
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <WalletSessionProvider>
-          <AppContent />
+        <WalletSessionProvider isWalletActive={activeTab === 'wallet'}>
+          <AppContentWrapper activeTab={activeTab} setActiveTab={setActiveTab} />
         </WalletSessionProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );
+}
+
+function AppContentWrapper({ activeTab, setActiveTab }: { activeTab: TabName; setActiveTab: (tab: TabName) => void }) {
+  return <AppContent activeTab={activeTab} onTabChange={setActiveTab} />;
 }
 
 const toastStyles = StyleSheet.create({

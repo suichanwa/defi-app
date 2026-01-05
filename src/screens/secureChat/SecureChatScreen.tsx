@@ -537,7 +537,17 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
   );
 
   const sendImage = useCallback(
-    async ({ chatId, imageUri, isDM }: { chatId: string; imageUri: string; isDM: boolean }) => {
+    async ({
+      chatId,
+      imageUri,
+      isDM,
+      content,
+    }: {
+      chatId: string;
+      imageUri: string;
+      isDM: boolean;
+      content?: string;
+    }) => {
       if (chatId.startsWith('p2p:')) {
         const name = imageUri.split('/').pop() ?? `image-${Date.now()}.jpg`;
         const file = {
@@ -546,12 +556,12 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
           size: 0,
           mime: inferMimeFromName(name),
         };
-        const message = await p2pSendFile({ ...file, isImage: true });
+        const message = await p2pSendFile({ ...file, isImage: true, caption: content });
         if (!message) return { sent: false, error: 'P2P channel not connected.' };
         appendMessageToChat(chatId, message);
         return { sent: true };
       }
-      return transportSendImage({ chatId, imageUri, isDM });
+      return transportSendImage({ chatId, imageUri, isDM, content });
     },
     [appendMessageToChat, inferMimeFromName, p2pSendFile, transportSendImage],
   );

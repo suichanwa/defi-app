@@ -289,6 +289,7 @@ export default function ChatThreadScreen({
     const avatarSource = resolveAvatar(msg);
     const authorLabel = resolveAuthorName(msg);
     const isImage = msg.type === 'image' && msg.imageUri;
+    const imageCaption = isImage && msg.content && msg.content.trim() !== 'Photo' ? msg.content : '';
     const canManage = canManageMessage(msg);
     const iconColor = isOutgoing ? colors.accentText : colors.text;
     const isFile = msg.type === 'file' && msg.fileName;
@@ -328,9 +329,12 @@ export default function ChatThreadScreen({
             />
           </View>
           {isImage ? (
-            <TouchableOpacity onPress={() => setSelectedImageUri(msg.imageUri as string)} activeOpacity={0.8}>
-              <Image source={{ uri: msg.imageUri as string }} style={styles.messageImage} resizeMode="cover" />
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity onPress={() => setSelectedImageUri(msg.imageUri as string)} activeOpacity={0.8}>
+                <Image source={{ uri: msg.imageUri as string }} style={styles.messageImage} resizeMode="cover" />
+              </TouchableOpacity>
+              {imageCaption ? <Text style={bodyStyle}>{imageCaption}</Text> : null}
+            </>
           ) : isFile ? (
             <TouchableOpacity onPress={handleOpenFile} activeOpacity={0.8} style={styles.fileRow}>
               <MaterialCommunityIcons name="file-outline" size={18} color={iconColor} />

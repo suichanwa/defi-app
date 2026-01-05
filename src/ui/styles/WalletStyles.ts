@@ -1,683 +1,512 @@
-import { Platform, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import type { useTheme } from '@theme/ThemeProvider';
 
-export type WalletPalette = {
-  background: string;
-  card: string;
-  text: string;
-  muted: string;
-  border: string;
-  accent: string;
-  accentText: string;
-  success: string;
-  successText: string;
-  successBackground: string;
-  successBorder: string;
-  successCardBackground: string;
-  warning: string;
-  warningText: string;
-  warningBackground: string;
-  warningBorder: string;
-};
-
-const cardShadow = Platform.select({
-  web: {
-    boxShadow: '0px 4px 12px rgba(17, 24, 39, 0.16)',
-  },
-  default: {
-    shadowColor: '#111827',
-    shadowOpacity: 0.16,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
-  },
-});
-
-export const createWalletStyles = (colors: WalletPalette) =>
+export const createWalletStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
   StyleSheet.create({
-    errorText: {
-      color: '#b91c1c',
-      marginTop: 8,
-      fontSize: 13,
-    },
-    successText: {
-      color: '#16a34a',
-      marginTop: 8,
-      fontSize: 13,
-    },
-    metaRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginTop: 8,
-      flexWrap: 'wrap',
-    },
-    metaText: {
-      color: colors.muted,
-      fontSize: 12,
-    },
     scrollContent: {
-      paddingBottom: 120,
+      flexGrow: 1,
       paddingHorizontal: 20,
-      backgroundColor: colors.background,
+      paddingTop: 24,
+      paddingBottom: 120,
     },
-    setupCard: {
-      marginTop: 24,
-      borderRadius: 18,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.card,
-      padding: 18,
-    },
-    setupTitle: {
-      fontSize: 20,
-      fontWeight: '700',
-      color: colors.text,
-    },
-    setupSubtitle: {
-      marginTop: 6,
-      color: colors.muted,
-    },
-    progressContainer: {
-      marginTop: 12,
-    },
-    progressLabel: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: colors.muted,
-      marginBottom: 8,
-    },
-    progressTrack: {
-      height: 6,
-      borderRadius: 999,
-      backgroundColor: colors.border,
-      overflow: 'hidden',
-    },
-    progressFill: {
-      height: '100%',
-      borderRadius: 999,
-      backgroundColor: colors.accent,
-    },
-    loadingRow: {
-      marginTop: 12,
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    loadingText: {
-      marginLeft: 8,
-      color: colors.muted,
-      fontSize: 12,
-      fontWeight: '600',
-    },
-    loadingOverlay: {
-      position: 'absolute',
-      top: 0,
-      right: 0,
-      bottom: 0,
-      left: 0,
-      borderRadius: 18,
-      backgroundColor: 'rgba(15, 23, 42, 0.35)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    loadingOverlayCard: {
-      minWidth: 180,
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.card,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      alignItems: 'center',
-    },
-    loadingOverlayText: {
-      marginTop: 8,
-      color: colors.text,
-      fontSize: 13,
-      fontWeight: '600',
-    },
-    summaryRow: {
-      marginTop: 10,
-    },
-    summaryLabel: {
-      color: colors.muted,
-      fontSize: 12,
-    },
-    summaryValue: {
-      marginTop: 4,
-      color: colors.text,
-      fontWeight: '600',
-    },
-    checkboxRow: {
-      marginTop: 12,
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 10,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.card,
-    },
-    checkboxRowChecked: {
-      borderColor: colors.accent,
-      backgroundColor: `${colors.accent}1A`,
-    },
-    checkboxLabel: {
-      marginLeft: 8,
-      color: colors.text,
-      fontWeight: '600',
-    },
-    checkboxLabelChecked: {
-      color: colors.accent,
-    },
-    mnemonicGrid: {
-      marginTop: 12,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.card,
-      padding: 12,
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-    },
-    mnemonicWord: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      width: '50%',
-      paddingVertical: 4,
-    },
-    mnemonicIndex: {
-      width: 26,
-      color: colors.muted,
-    },
-    mnemonicText: {
-      color: colors.text,
-      fontWeight: '600',
-    },
-    successIconWrap: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      width: 78,
-      height: 78,
-      borderRadius: 39,
-      backgroundColor: colors.successBackground,
-      borderWidth: 1,
-      borderColor: colors.successBorder,
-      alignSelf: 'center',
-      marginBottom: 10,
-      marginTop: 14,
-    },
-    successCard: {
-      borderColor: colors.successBorder,
-      backgroundColor: colors.successCardBackground,
-    },
-    successHero: {
-      alignItems: 'center',
-      marginBottom: 6,
-    },
-    successTitle: {
-      fontSize: 22,
-      fontWeight: '700',
-      color: colors.text,
-      textAlign: 'center',
-    },
-    successSubtitle: {
-      marginTop: 6,
-      color: colors.muted,
-      textAlign: 'center',
-    },
-    successInfoRow: {
-      marginTop: 14,
-      flexDirection: 'row',
-      alignItems: 'center',
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: colors.successBorder,
-      backgroundColor: colors.successBackground,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      gap: 8,
-    },
-    successInfoRowSkipped: {
-      borderColor: colors.warningBorder,
-      backgroundColor: colors.warningBackground,
-    },
-    successInfoText: {
-      color: colors.successText,
-      fontWeight: '600',
-    },
-    successInfoTextSkipped: {
-      color: colors.warningText,
-    },
-    qrWrap: {
-      marginTop: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    addressPill: {
-      marginTop: 12,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      fontSize: 12,
-      color: colors.text,
-      backgroundColor: colors.card,
-    },
-    deviceCutout: {
-      alignSelf: 'center',
-      height: 36,
-      width: 160,
-      borderRadius: 18,
-      backgroundColor: colors.text,
-      marginTop: 12,
-      marginBottom: 16,
-    },
+    
+    // Header styles
     headerRow: {
-      marginTop: 8,
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'flex-start',
       justifyContent: 'space-between',
+      marginBottom: 24,
+    },
+    headerTitle: {
+      fontSize: 32,
+      fontWeight: '800',
+      color: colors.text,
+      letterSpacing: -0.5,
+    },
+    headerSubtitle: {
+      fontSize: 14,
+      color: colors.muted,
+      marginTop: 4,
+      fontWeight: '500',
     },
     headerPills: {
       flexDirection: 'row',
-      alignItems: 'center',
       gap: 8,
-    },
-    headerTitle: {
-      fontSize: 24,
-      fontWeight: '700',
-      color: colors.text,
-    },
-    headerSubtitle: {
-      marginTop: 4,
-      color: colors.muted,
+      alignItems: 'center',
     },
     statusPill: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.border,
-      borderRadius: 999,
-      paddingHorizontal: 10,
+      gap: 6,
+      paddingHorizontal: 12,
       paddingVertical: 6,
-    },
-    networkBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.border,
-      borderRadius: 999,
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-    },
-    networkBadgeText: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: colors.text,
-    },
-    statusText: {
-      marginLeft: 6,
-      fontSize: 12,
-      fontWeight: '600',
-      color: colors.text,
-    },
-    cardWrapper: {
-      marginTop: 16,
-    },
-    walletCard: {
-      flex: 1,
+      borderRadius: 20,
       backgroundColor: colors.card,
-      borderRadius: 22,
       borderWidth: 1,
       borderColor: colors.border,
-      padding: 20,
-      ...(cardShadow ?? {}),
+    },
+    statusText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.text,
+    },
+
+    // Card wrapper with better shadow
+    cardWrapper: {
+      marginBottom: 24,
+      shadowColor: colors.accent,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.1,
+      shadowRadius: 16,
+      elevation: 8,
+    },
+    
+    // Main wallet card
+    walletCard: {
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      padding: 24,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     walletHeader: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: 12,
+      gap: 10,
+      marginBottom: 20,
     },
     pill: {
-      backgroundColor: `${colors.accent}1A`,
+      fontSize: 11,
+      fontWeight: '700',
       color: colors.accent,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 999,
-      fontSize: 12,
-      fontWeight: '600',
-      marginRight: 12,
+      backgroundColor: `${colors.accent}15`,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
+      overflow: 'hidden',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
     },
     walletTitle: {
+      fontSize: 18,
+      fontWeight: '700',
       color: colors.text,
-      fontSize: 14,
     },
     balanceLabel: {
+      fontSize: 13,
+      fontWeight: '600',
       color: colors.muted,
-      fontSize: 12,
+      marginBottom: 8,
       textTransform: 'uppercase',
-      letterSpacing: 1.1,
+      letterSpacing: 0.5,
     },
     balance: {
+      fontSize: 40,
+      fontWeight: '800',
       color: colors.text,
-      fontSize: 32,
-      fontWeight: '700',
-      marginTop: 6,
       marginBottom: 12,
+      letterSpacing: -1,
     },
     addressText: {
-      color: colors.muted,
       fontSize: 12,
-      marginBottom: 16,
+      color: colors.muted,
+      fontFamily: 'monospace',
+      marginBottom: 24,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      backgroundColor: colors.background,
+      borderRadius: 8,
+      overflow: 'hidden',
     },
+
+    // Action buttons - completely redesigned
     actionsRow: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
-      gap: 10,
+      gap: 12,
+      marginTop: 8,
     },
     actionButton: {
       flex: 1,
-      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
+      paddingVertical: 16,
+      paddingHorizontal: 12,
+      borderRadius: 16,
       backgroundColor: colors.background,
-      borderWidth: 1,
+      borderWidth: 1.5,
       borderColor: colors.border,
-      borderRadius: 14,
-      paddingVertical: 10,
-      gap: 6,
+      shadowColor: colors.accent,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+      elevation: 2,
     },
     actionIcon: {
-      backgroundColor: `${colors.accent}1A`,
-      borderRadius: 12,
-      padding: 6,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 10,
+      shadowColor: colors.accent,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 4,
     },
     actionLabel: {
-      color: colors.text,
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: '700',
+      color: colors.text,
+      marginTop: 4,
     },
+
+    // Search container
     searchContainer: {
       flexDirection: 'row',
       alignItems: 'center',
+      backgroundColor: colors.card,
+      borderRadius: 14,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      marginBottom: 20,
+      gap: 12,
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: 16,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      marginTop: 20,
-      backgroundColor: colors.card,
     },
     searchInput: {
       flex: 1,
       fontSize: 15,
+      fontWeight: '500',
       color: colors.text,
+      padding: 0,
     },
     searchIcon: {
-      marginLeft: 8,
-      color: colors.text,
+      color: colors.muted,
+      opacity: 0.6,
     },
+
+    // Meta row
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 16,
+      paddingHorizontal: 4,
+    },
+    metaText: {
+      fontSize: 12,
+      color: colors.muted,
+      fontWeight: '500',
+    },
+
+    // Error text
+    errorText: {
+      fontSize: 13,
+      color: '#ef4444',
+      marginBottom: 16,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: '#ef444410',
+      borderRadius: 12,
+      borderLeftWidth: 3,
+      borderLeftColor: '#ef4444',
+      fontWeight: '600',
+    },
+
+    // Tabs
     tabRow: {
       flexDirection: 'row',
-      marginTop: 16,
+      marginBottom: 16,
+      gap: 8,
     },
     tabBase: {
-      flex: 1,
-      paddingVertical: 12,
-      borderRadius: 14,
-      alignItems: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+      borderRadius: 12,
+      borderWidth: 1.5,
     },
     tabActive: {
-      backgroundColor: colors.text,
+      backgroundColor: colors.accent,
+      borderColor: colors.accent,
     },
     tabInactive: {
-      backgroundColor: colors.border,
+      backgroundColor: 'transparent',
+      borderColor: colors.border,
     },
     tabSpacing: {
-      marginRight: 12,
+      marginRight: 0,
     },
     tabActiveText: {
-      color: colors.background,
+      fontSize: 14,
       fontWeight: '700',
+      color: '#ffffff',
     },
     tabInactiveText: {
-      color: colors.text,
-      fontWeight: '700',
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.muted,
     },
+
+    // Token list card
     listCard: {
       backgroundColor: colors.card,
-      borderRadius: 18,
-      padding: 12,
-      marginTop: 16,
+      borderRadius: 16,
+      padding: 16,
       borderWidth: 1,
       borderColor: colors.border,
     },
     tokenRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.background,
-      borderRadius: 14,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      borderWidth: 1,
-      borderColor: colors.border,
+      paddingVertical: 14,
     },
     tokenRowSpacing: {
-      marginBottom: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
     },
     tokenIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 12,
-      justifyContent: 'center',
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       alignItems: 'center',
-      borderWidth: 1,
-      borderColor: colors.border,
+      justifyContent: 'center',
+      marginRight: 14,
+      borderWidth: 2,
     },
     tokenInfo: {
       flex: 1,
-      marginLeft: 12,
     },
     tokenName: {
-      color: colors.text,
-      fontSize: 16,
+      fontSize: 15,
       fontWeight: '700',
+      color: colors.text,
+      marginBottom: 4,
     },
     tokenSymbol: {
+      fontSize: 13,
+      fontWeight: '600',
       color: colors.muted,
-      fontSize: 12,
-      marginTop: 2,
     },
     tokenAmounts: {
       alignItems: 'flex-end',
     },
     tokenBalance: {
-      color: colors.text,
+      fontSize: 15,
       fontWeight: '700',
-      fontSize: 14,
+      color: colors.text,
+      marginBottom: 4,
     },
     tokenValue: {
+      fontSize: 13,
+      fontWeight: '600',
       color: colors.muted,
-      fontSize: 12,
-      marginTop: 2,
     },
-    input: {
-      marginTop: 12,
-      borderRadius: 12,
+
+    // Setup screen styles
+    setupCard: {
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      padding: 24,
+      marginTop: 24,
       borderWidth: 1,
       borderColor: colors.border,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
+      shadowColor: colors.accent,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.1,
+      shadowRadius: 16,
+      elevation: 8,
+    },
+    setupTitle: {
+      fontSize: 28,
+      fontWeight: '800',
       color: colors.text,
-      backgroundColor: colors.card,
-    },
-    passcodeField: {
-      marginTop: 12,
-    },
-    passcodeLabel: {
-      fontSize: 12,
-      fontWeight: '700',
-      textTransform: 'uppercase',
-      letterSpacing: 0.8,
-      color: colors.muted,
       marginBottom: 8,
+      letterSpacing: -0.5,
     },
-    passcodeRow: {
-      flexDirection: 'row',
-      alignSelf: 'center',
-      padding: 4,
+    setupSubtitle: {
+      fontSize: 15,
+      color: colors.muted,
+      marginBottom: 32,
+      lineHeight: 22,
+      fontWeight: '500',
+    },
+    primaryButton: {
+      backgroundColor: colors.accent,
+      paddingVertical: 18,
+      paddingHorizontal: 24,
       borderRadius: 16,
-      borderWidth: 1,
-      borderColor: 'transparent',
-    },
-    passcodeRowActive: {
-      borderColor: colors.accent,
-      backgroundColor: `${colors.accent}12`,
-    },
-    passcodeCell: {
-      width: 44,
-      height: 52,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.card,
       alignItems: 'center',
       justifyContent: 'center',
+      marginBottom: 12,
+      shadowColor: colors.accent,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 4,
     },
-    passcodeCellSpacing: {
-      marginRight: 8,
+    primaryButtonText: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: '#ffffff',
+      letterSpacing: 0.3,
     },
-    passcodeCellActive: {
+    secondaryButton: {
+      backgroundColor: 'transparent',
+      paddingVertical: 18,
+      paddingHorizontal: 24,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: colors.border,
+    },
+    secondaryButtonText: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.text,
+      letterSpacing: 0.3,
+    },
+    buttonDisabled: {
+      opacity: 0.5,
+    },
+
+    // Progress indicator
+    progressContainer: {
+      marginBottom: 24,
+    },
+    progressLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.muted,
+      marginBottom: 8,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    progressTrack: {
+      height: 6,
+      backgroundColor: colors.border,
+      borderRadius: 3,
+      overflow: 'hidden',
+    },
+    progressFill: {
+      height: '100%',
+      backgroundColor: colors.accent,
+      borderRadius: 3,
+    },
+
+    // Loading styles
+    loadingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 12,
+      paddingVertical: 20,
+    },
+    loadingText: {
+      fontSize: 14,
+      color: colors.muted,
+      fontWeight: '600',
+    },
+
+    // Input styles
+    input: {
+      backgroundColor: colors.card,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      fontSize: 15,
+      color: colors.text,
+      fontWeight: '500',
+      marginBottom: 16,
+    },
+    inputFocused: {
       borderColor: colors.accent,
-      backgroundColor: `${colors.accent}12`,
+      backgroundColor: colors.background,
+    },
+    inputError: {
+      borderColor: '#ef4444',
+    },
+
+    // Message styles
+    messageText: {
+      fontSize: 13,
+      marginBottom: 16,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderRadius: 12,
+      fontWeight: '600',
+    },
+    messageSuccess: {
+      color: '#22c55e',
+      backgroundColor: '#22c55e10',
+      borderLeftWidth: 3,
+      borderLeftColor: '#22c55e',
+    },
+    messageWarning: {
+      color: '#f59e0b',
+      backgroundColor: '#f59e0b10',
+      borderLeftWidth: 3,
+      borderLeftColor: '#f59e0b',
+    },
+    messageError: {
+      color: '#ef4444',
+      backgroundColor: '#ef444410',
+      borderLeftWidth: 3,
+      borderLeftColor: '#ef4444',
+    },
+    messageInfo: {
+      color: colors.accent,
+      backgroundColor: `${colors.accent}10`,
+      borderLeftWidth: 3,
+      borderLeftColor: colors.accent,
+    },
+
+    // Passcode display
+    passcodeDisplay: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: 12,
+      marginBottom: 32,
     },
     passcodeDot: {
-      width: 10,
-      height: 10,
-      borderRadius: 5,
-      backgroundColor: colors.text,
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      borderWidth: 2,
+      borderColor: colors.border,
     },
     passcodeDotFilled: {
-      opacity: 1,
+      backgroundColor: colors.accent,
+      borderColor: colors.accent,
     },
-    passcodeDotEmpty: {
-      opacity: 0.15,
-    },
-    passcodeHiddenInput: {
-      position: 'absolute',
-      opacity: 0,
-      width: 1,
-      height: 1,
-      left: 0,
-      top: 0,
-    },
+
+    // Keypad
     keypad: {
-      marginTop: 16,
+      gap: 12,
     },
     keypadRow: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
       gap: 12,
-      marginBottom: 12,
     },
-    keypadRowLast: {
-      marginBottom: 0,
-    },
-    keypadKey: {
+    keypadButton: {
       flex: 1,
-      height: 56,
+      aspectRatio: 1,
       borderRadius: 16,
+      backgroundColor: colors.card,
       borderWidth: 1.5,
-      borderColor: colors.text,
-      backgroundColor: colors.card,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    keypadKeyAlt: {
-      borderRadius: 22,
-      borderColor: colors.accent,
-      backgroundColor: `${colors.accent}12`,
-    },
-    keypadKeyAction: {
-      borderColor: colors.border,
-      backgroundColor: colors.background,
-    },
-    keypadKeyText: {
-      fontSize: 20,
+    keypadButtonText: {
+      fontSize: 24,
       fontWeight: '700',
       color: colors.text,
     },
-    keypadKeySpacer: {
-      borderColor: 'transparent',
-      backgroundColor: 'transparent',
-    },
-    modalInput: {
-      minHeight: 88,
-      textAlignVertical: 'top',
-    },
-    primaryButton: {
-      marginTop: 12,
-      borderRadius: 12,
-      backgroundColor: colors.accent,
-      paddingVertical: 12,
-      alignItems: 'center',
-    },
-    primaryButtonText: {
-      fontWeight: '600',
-      color: colors.accentText,
-    },
-    secondaryButton: {
-      marginTop: 12,
-      borderRadius: 12,
-      backgroundColor: colors.border,
-      paddingVertical: 12,
-      alignItems: 'center',
-    },
-    secondaryButtonText: {
-      fontWeight: '600',
+    keypadButtonIcon: {
       color: colors.text,
-    },
-    buttonDisabled: {
-      opacity: 0.7,
-    },
-    fingerprintButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    fingerprintIcon: {
-      marginRight: 8,
-    },
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.4)',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 20,
-    },
-    modalScroll: {
-      width: '100%',
-      maxHeight: '90%',
-    },
-    modalCard: {
-      width: '100%',
-      borderRadius: 18,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.card,
-      padding: 18,
-    },
-    modalHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 8,
-    },
-    modalTitle: {
-      fontSize: 18,
-      fontWeight: '700',
-      color: colors.text,
-    },
-    modalSubtitle: {
-      color: colors.muted,
-      marginBottom: 6,
     },
   });

@@ -38,6 +38,7 @@ type P2PFileMeta = {
   size: number;
   totalChunks: number;
   isImage: boolean;
+  caption?: string;
   author: string;
   authorId?: string;
   createdAt: string;
@@ -264,12 +265,13 @@ export function useP2PDirectMessages({ displayLabel, authorId, onMessage, onLog 
               } else {
                 fileUri = await writeBase64ToFile(base64, meta.name);
               }
+              const caption = meta.caption?.trim();
               const message: ChatMessage = {
                 id: meta.id,
                 chatId,
                 author: meta.author,
                 authorId: meta.authorId,
-                content: 'Photo',
+                content: caption ? caption : 'Photo',
                 timestamp: new Date(meta.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 createdAt: meta.createdAt,
                 outgoing: false,
@@ -421,7 +423,14 @@ export function useP2PDirectMessages({ displayLabel, authorId, onMessage, onLog 
   );
 
   const sendFile = useCallback(
-    async (args: { uri: string; name: string; mime: string; size: number; isImage: boolean }) => {
+    async (args: {
+      uri: string;
+      name: string;
+      mime: string;
+      size: number;
+      isImage: boolean;
+      caption?: string;
+    }) => {
       if (!chatId) return null;
       const createdAt = new Date().toISOString();
       const id = createId();
@@ -437,6 +446,7 @@ export function useP2PDirectMessages({ displayLabel, authorId, onMessage, onLog 
         size: args.size,
         totalChunks: chunks.length,
         isImage: args.isImage,
+        caption: args.caption?.trim() || undefined,
         author: displayLabel,
         authorId,
         createdAt,
@@ -447,12 +457,13 @@ export function useP2PDirectMessages({ displayLabel, authorId, onMessage, onLog 
         sendControl({ kind: 'file-chunk', id, index, data: chunk });
       });
       if (args.isImage) {
+        const caption = args.caption?.trim();
         const message: ChatMessage = {
           id,
           chatId,
           author: displayLabel,
           authorId,
-          content: 'Photo',
+          content: caption ? caption : 'Photo',
           timestamp: new Date(createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           createdAt,
           outgoing: true,

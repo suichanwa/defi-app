@@ -1,5 +1,5 @@
-import React from 'react';
-import { TouchableOpacity, View, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { TouchableOpacity, View, StyleSheet, Animated } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@theme/ThemeProvider';
 
@@ -12,6 +12,62 @@ type BottomNavBarProps = {
 
 export default function BottomNavBar({ activeTab, onTabChange }: BottomNavBarProps) {
   const { colors } = useTheme();
+  
+  // Animation values for each tab
+  const walletScale = useRef(new Animated.Value(activeTab === 'wallet' ? 1 : 0.9)).current;
+  const secureChatScale = useRef(new Animated.Value(activeTab === 'secureChat' ? 1 : 0.9)).current;
+  const profileScale = useRef(new Animated.Value(activeTab === 'profile' ? 1 : 0.9)).current;
+  
+  const walletBgOpacity = useRef(new Animated.Value(activeTab === 'wallet' ? 1 : 0)).current;
+  const secureChatBgOpacity = useRef(new Animated.Value(activeTab === 'secureChat' ? 1 : 0)).current;
+  const profileBgOpacity = useRef(new Animated.Value(activeTab === 'profile' ? 1 : 0)).current;
+
+  useEffect(() => {
+    // Animate wallet tab
+    Animated.parallel([
+      Animated.spring(walletScale, {
+        toValue: activeTab === 'wallet' ? 1.1 : 0.9,
+        friction: 4,
+        tension: 80,
+        useNativeDriver: true,
+      }),
+      Animated.timing(walletBgOpacity, {
+        toValue: activeTab === 'wallet' ? 1 : 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Animate secureChat tab
+    Animated.parallel([
+      Animated.spring(secureChatScale, {
+        toValue: activeTab === 'secureChat' ? 1.1 : 0.9,
+        friction: 4,
+        tension: 80,
+        useNativeDriver: true,
+      }),
+      Animated.timing(secureChatBgOpacity, {
+        toValue: activeTab === 'secureChat' ? 1 : 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Animate profile tab
+    Animated.parallel([
+      Animated.spring(profileScale, {
+        toValue: activeTab === 'profile' ? 1.1 : 0.9,
+        friction: 4,
+        tension: 80,
+        useNativeDriver: true,
+      }),
+      Animated.timing(profileBgOpacity, {
+        toValue: activeTab === 'profile' ? 1 : 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [activeTab, walletScale, secureChatScale, profileScale, walletBgOpacity, secureChatBgOpacity, profileBgOpacity]);
 
   return (
     <View
@@ -25,46 +81,82 @@ export default function BottomNavBar({ activeTab, onTabChange }: BottomNavBarPro
       ]}
     >
       <TouchableOpacity
-        style={[
-          styles.navItem,
-          activeTab === 'wallet' && { backgroundColor: `${colors.accent}22` },
-        ]}
+        style={styles.navItem}
         onPress={() => onTabChange('wallet')}
         activeOpacity={0.8}
       >
-        <MaterialCommunityIcons
-          name="wallet-outline"
-          size={26}
-          color={activeTab === 'wallet' ? colors.accent : colors.text}
+        <Animated.View
+          style={[
+            styles.navItemBackground,
+            {
+              backgroundColor: `${colors.accent}22`,
+              opacity: walletBgOpacity,
+            },
+          ]}
         />
+        <Animated.View
+          style={{
+            transform: [{ scale: walletScale }],
+          }}
+        >
+          <MaterialCommunityIcons
+            name="wallet-outline"
+            size={26}
+            color={activeTab === 'wallet' ? colors.accent : colors.text}
+          />
+        </Animated.View>
       </TouchableOpacity>
       <TouchableOpacity
-        style={[
-          styles.navItem,
-          activeTab === 'secureChat' && { backgroundColor: `${colors.accent}22` },
-        ]}
+        style={styles.navItem}
         onPress={() => onTabChange('secureChat')}
         activeOpacity={0.8}
       >
-        <MaterialCommunityIcons
-          name="message-lock-outline"
-          size={26}
-          color={activeTab === 'secureChat' ? colors.accent : colors.text}
+        <Animated.View
+          style={[
+            styles.navItemBackground,
+            {
+              backgroundColor: `${colors.accent}22`,
+              opacity: secureChatBgOpacity,
+            },
+          ]}
         />
+        <Animated.View
+          style={{
+            transform: [{ scale: secureChatScale }],
+          }}
+        >
+          <MaterialCommunityIcons
+            name="message-lock-outline"
+            size={26}
+            color={activeTab === 'secureChat' ? colors.accent : colors.text}
+          />
+        </Animated.View>
       </TouchableOpacity>
       <TouchableOpacity
-        style={[
-          styles.navItem,
-          activeTab === 'profile' && { backgroundColor: `${colors.accent}22` },
-        ]}
+        style={styles.navItem}
         onPress={() => onTabChange('profile')}
         activeOpacity={0.8}
       >
-        <Ionicons
-          name="person-circle-outline"
-          size={28}
-          color={activeTab === 'profile' ? colors.accent : colors.text}
+        <Animated.View
+          style={[
+            styles.navItemBackground,
+            {
+              backgroundColor: `${colors.accent}22`,
+              opacity: profileBgOpacity,
+            },
+          ]}
         />
+        <Animated.View
+          style={{
+            transform: [{ scale: profileScale }],
+          }}
+        >
+          <Ionicons
+            name="person-circle-outline"
+            size={28}
+            color={activeTab === 'profile' ? colors.accent : colors.text}
+          />
+        </Animated.View>
       </TouchableOpacity>
     </View>
   );
@@ -89,6 +181,17 @@ const styles = StyleSheet.create({
   },
   navItem: {
     padding: 12,
+    borderRadius: 20,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navItemBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     borderRadius: 20,
   },
 });

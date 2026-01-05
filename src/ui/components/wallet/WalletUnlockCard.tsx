@@ -1,9 +1,9 @@
 import React from 'react';
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createWalletStyles } from '@styles/WalletStyles';
 import FlowMessage from './FlowMessage';
 import PasscodeField from './PasscodeField';
-import NumericKeyboard from './NumericKeyboard';
 
 type WalletUnlockCardProps = {
   styles: ReturnType<typeof createWalletStyles>;
@@ -32,16 +32,23 @@ export default function WalletUnlockCard({
   onChangeUnlockPassword,
   onUnlock,
   iconColor,
-  onDigit,
-  onDelete,
-  onClear,
   onBiometricUnlock,
   biometricsAvailable,
   isUnlockActive,
-  onActivateUnlock,
 }: WalletUnlockCardProps) {
   return (
     <View style={styles.setupCard}>
+      <View style={{ alignItems: 'center', marginBottom: 24 }}>
+        <Image
+          source={require('../../../../assets/appicon/WalletLogo.png')}
+          style={{
+            width: 80,
+            height: 80,
+            borderRadius: 16,
+          }}
+          resizeMode="contain"
+        />
+      </View>
       <Text style={styles.setupTitle}>Log in</Text>
       <Text style={styles.setupSubtitle}>Enter your 6-digit passcode.</Text>
       <PasscodeField
@@ -49,19 +56,23 @@ export default function WalletUnlockCard({
         value={unlockPassword}
         onChange={onChangeUnlockPassword}
         autoFocus={isUnlockActive}
-        isActive={isUnlockActive}
-        onActivate={onActivateUnlock}
         styles={styles}
       />
-      <NumericKeyboard
-        styles={styles}
-        iconColor={iconColor}
-        onDigit={onDigit}
-        onDelete={onDelete}
-        onClear={onClear}
-        onBiometric={onBiometricUnlock}
-        biometricsAvailable={biometricsAvailable}
-      />
+      {biometricsAvailable && (
+        <TouchableOpacity
+          style={{
+            alignSelf: 'center',
+            marginTop: 16,
+            padding: 12,
+            borderRadius: 12,
+            backgroundColor: '#f1f5f9',
+          }}
+          onPress={onBiometricUnlock}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons name="fingerprint" size={32} color={iconColor} />
+        </TouchableOpacity>
+      )}
       <FlowMessage styles={styles} error={flowError} message={flowMessage} />
       {isSubmitting && (
         <View style={styles.loadingRow}>

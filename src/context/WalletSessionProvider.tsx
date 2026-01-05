@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { Wallet } from 'ethers';
 import type { Keypair } from '@solana/web3.js';
@@ -38,7 +38,7 @@ const WalletSessionContext = createContext<WalletSession | null>(null);
 
 const AUTO_LOCK_MS = 2 * 60 * 1000;
 
-export function WalletSessionProvider({ children }: { children: React.ReactNode }) {
+export function WalletSessionProvider({ children, isWalletActive }: { children: React.ReactNode; isWalletActive: boolean }) {
   const [status, setStatus] = useState<Status>('loading');
   const [address, setAddress] = useState<string | null>(null);
   const [wallet, setWallet] = useState<WalletInstance | null>(null);
@@ -53,14 +53,15 @@ export function WalletSessionProvider({ children }: { children: React.ReactNode 
     }
   };
 
-  const scheduleLock = () => {
+  const scheduleLock = useCallback(() => {
     clearLockTimer();
+    if (!isWalletActive) return;
     lockTimer.current = setTimeout(() => {
       setWallet(null);
       setRecoveryPhrase(null);
       setStatus((prev) => (prev === 'unlocked' ? 'locked' : prev));
     }, AUTO_LOCK_MS);
-  };
+  }, [isWalletActive]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
@@ -73,6 +74,12 @@ export function WalletSessionProvider({ children }: { children: React.ReactNode 
     });
     return () => sub.remove();
   }, []);
+
+  useEffect(() => {
+    if (status === 'unlocked') {
+      scheduleLock();
+    }
+  }, [isWalletActive, status, scheduleLock]);
 
   useEffect(() => {
     const init = async () => {

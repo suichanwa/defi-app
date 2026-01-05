@@ -31,6 +31,7 @@ type SendImageArgs = {
   chatId: string;
   imageUri: string;
   isDM: boolean;
+  content?: string;
 };
 
 export function useChatTransport({
@@ -218,7 +219,7 @@ export function useChatTransport({
   );
 
   const sendImage = useCallback(
-    async ({ chatId, imageUri, isDM }: SendImageArgs) => {
+    async ({ chatId, imageUri, isDM, content }: SendImageArgs) => {
       if (!isSupabaseConfigured || !supabaseClient) {
         return { sent: false, error: 'Supabase not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY to send images.' };
       }
@@ -236,6 +237,7 @@ export function useChatTransport({
         avatarUri: userAvatarType === 'custom' ? userAvatarUri : undefined,
         imagePath: upload.path,
         imageUri: upload.signedUrl,
+        content,
       });
 
       appendLocalMessage(chatId, imagePayload);
