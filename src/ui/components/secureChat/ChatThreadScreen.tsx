@@ -64,8 +64,8 @@ type Props = {
   onToggleMute?: () => void;
 };
 
-// Bottom navigation bar height - should match your App.tsx nav height
-const BOTTOM_NAV_HEIGHT = 70;
+// Bottom navigation is hidden in chat threads, so no offset is needed.
+const BOTTOM_NAV_HEIGHT = 0;
 
 // Spring config for smooth animations
 const SPRING_CONFIG = {

@@ -42,7 +42,7 @@ export const createNotifyIncomingMessage = ({
 
   const chatName = getChatById(chatId)?.name ?? message.author ?? 'New message';
   showToast({
-    type: 'chat',
+    type: 'default',
     text1: chatName,
     text2: message.content,
     position: 'top',
@@ -267,7 +267,7 @@ export const createCopyMessageHandler =
     if (!text) return;
     await setClipboard(text);
     showToast({
-      type: 'chat',
+      type: 'default',
       text1: 'Copied to clipboard',
       text2:
         message.type === 'image'
@@ -334,7 +334,7 @@ export const createDeleteMessageHandler =
       );
     }
     showToast({
-      type: 'chat',
+      type: 'default',
       text1: 'Message successfully deleted',
       position: 'top',
       visibilityTime: 2000,
@@ -357,7 +357,7 @@ export const createDeleteMessageHandler =
       const { error } = await deleteQuery;
       if (error) {
         showToast({
-          type: 'chat',
+          type: 'default',
           text1: 'Delete failed',
           text2: error.message,
           position: 'top',
@@ -369,7 +369,7 @@ export const createDeleteMessageHandler =
         const { error: storageError } = await supabase.storage.from(CHAT_IMAGE_BUCKET).remove([imagePath]);
         if (storageError) {
           showToast({
-            type: 'chat',
+            type: 'default',
             text1: 'Image delete failed',
             text2: storageError.message,
             position: 'top',
@@ -380,7 +380,7 @@ export const createDeleteMessageHandler =
       }
     } catch (error) {
       showToast({
-        type: 'chat',
+        type: 'default',
         text1: 'Delete failed',
         text2: error instanceof Error ? error.message : 'Unknown error.',
         position: 'top',

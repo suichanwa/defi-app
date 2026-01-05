@@ -15,6 +15,7 @@ import { useWalletSession, WalletSessionProvider } from './src/context/WalletSes
 function AppContent() {
   const [activeTab, setActiveTab] = useState<TabName>('wallet');
   const [lastNonChatTab, setLastNonChatTab] = useState<TabName>('wallet');
+  const [isChatThreadOpen, setIsChatThreadOpen] = useState(false);
   const { status, backupCompleted } = useWalletSession();
   const secureTransition = useSharedValue(0);
   const insets = useSafeAreaInsets();
@@ -23,7 +24,7 @@ function AppContent() {
 
   const toastConfig = useMemo(() => {
     return {
-      chat: ({ text1, text2 }: { text1?: string; text2?: string }) => (
+      default: ({ text1, text2 }: { text1?: string; text2?: string }) => (
         <View
           style={[
             toastStyles.toast,
@@ -119,10 +120,13 @@ function AppContent() {
             secureChatAnimatedStyle,
           ]}
         >
-          <SecureChatScreen isActive={activeTab === 'secureChat'} />
+          <SecureChatScreen
+            isActive={activeTab === 'secureChat'}
+            onChatViewChange={(view) => setIsChatThreadOpen(view === 'thread')}
+          />
         </Animated.View>
 
-        {!isSetupMode && (
+        {!isSetupMode && !(activeTab === 'secureChat' && isChatThreadOpen) && (
           <BottomNavBar activeTab={activeTab} onTabChange={setActiveTab} />
         )}
 

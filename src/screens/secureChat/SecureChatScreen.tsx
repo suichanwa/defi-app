@@ -3,7 +3,7 @@ import { Alert, BackHandler, Platform, useWindowDimensions } from 'react-native'
 import type { ChatMessage, ChatThread, ServerInfo } from '@app-types/securechat-types/secureChat';
 import type { SecureChatMessageRow, SecureChatScreenProps } from '@app-types/securechat-types/secureChatScreen';
 import * as date from 'date-and-time';
-import { Toast } from 'toastify-react-native';
+import { showToast } from '@services/toast';
 import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
 import SecureChatContent from './components/SecureChatContent';
@@ -41,7 +41,7 @@ type PendingFile = {
   mime: string;
 };
 
-export default function SecureChatScreen({ isActive = false }: SecureChatScreenProps) {
+export default function SecureChatScreen({ isActive = false, onChatViewChange }: SecureChatScreenProps) {
   const [chats, setChats] = useState<ChatThread[]>([
     {
       id: SecureChatConstants.DEFAULT_GLOBAL_CHAT_ID,
@@ -311,7 +311,7 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
         chatView,
         selectedChatId,
         getChatById,
-        showToast: Toast.show,
+        showToast,
       }),
     [chatView, displayLabel, effectiveUserId, getChatById, mutedChatIds, secureTab, selectedChatId],
   );
@@ -594,8 +594,8 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
           'Local-only accounts cannot sync DMs. Use P2P DM in the Connect tab (offer/answer + ICE).',
           ...prev,
         ]);
-        Toast.show({
-          type: 'chat',
+        showToast({
+          type: 'default',
           text1: 'P2P DM required',
           text2: 'Open Connect tab to exchange offer/answer for this DM.',
           position: 'top',
@@ -621,8 +621,8 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
       `Start a P2P DM with ${otherUserName}. Exchange offer/answer + ICE.`,
       ...prev,
     ]);
-    Toast.show({
-      type: 'chat',
+    showToast({
+      type: 'default',
       text1: 'P2P DM',
       text2: 'Use the Connect tab to exchange offer/answer.',
       position: 'top',
@@ -731,7 +731,7 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
   );
 
   const handleCopyMessage = useMemo(
-    () => createCopyMessageHandler(Clipboard.setStringAsync, Toast.show),
+    () => createCopyMessageHandler(Clipboard.setStringAsync, showToast),
     [],
   );
 
@@ -753,7 +753,7 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
         setMessagesByChat,
         setChats,
         resolveAuthorName,
-        Toast.show,
+        showToast,
       ),
     [isOwnMessage, messagesByChat, resolveAuthorName, setMessagesByChat, setChats],
   );
@@ -913,10 +913,15 @@ export default function SecureChatScreen({ isActive = false }: SecureChatScreenP
     return () => sub.remove();
   }, [chatView, isActive, secureTab]);
 
+  useEffect(() => {
+    onChatViewChange?.(chatView);
+  }, [chatView, onChatViewChange]);
+
   return (
     <SecureChatLayout
       isCompact={isCompact}
       secureTab={secureTab}
+      chatView={chatView}
       timeLabel={timeLabel}
       onTabChange={handleTabChange}
     >

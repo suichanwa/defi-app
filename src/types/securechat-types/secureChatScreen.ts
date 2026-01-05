@@ -1,5 +1,6 @@
 export type SecureChatScreenProps = {
   isActive?: boolean;
+  onChatViewChange?: (view: 'list' | 'thread') => void;
 };
 
 export type SecureChatMessageRow = {

@@ -7,6 +7,7 @@ import { useTheme } from '@theme/ThemeProvider';
 type Props = {
   isCompact: boolean;
   secureTab: 'chats' | 'connect';
+  chatView: 'list' | 'thread';
   timeLabel: string;
   onTabChange: (tab: 'chats' | 'connect') => void;
   children: React.ReactNode;
@@ -15,16 +16,22 @@ type Props = {
 export default function SecureChatLayout({
   isCompact,
   secureTab,
+  chatView,
   timeLabel,
   onTabChange,
   children,
 }: Props) {
   const { colors } = useTheme();
+  const showNav = chatView !== 'thread';
 
   return (
     <View style={[styles.container, isCompact && styles.containerCompact, { backgroundColor: colors.background }]}>
-      <ChatHeader isCompact={isCompact} />
-      <ChatTabs activeTab={secureTab} onTabChange={onTabChange} timeLabel={timeLabel} />
+      {showNav ? (
+        <>
+          <ChatHeader isCompact={isCompact} />
+          <ChatTabs activeTab={secureTab} onTabChange={onTabChange} timeLabel={timeLabel} />
+        </>
+      ) : null}
       {children}
     </View>
   );

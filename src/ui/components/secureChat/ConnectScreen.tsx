@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import PulseBadge from '@components/PulseBadge';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import type { ServerInfo } from '@app-types/securechat-types/secureChat';
+import { useTheme } from '@theme/ThemeProvider';
 
 type Props = {
   connectAddress: string;
@@ -48,40 +49,18 @@ export default function ConnectScreen({
   onStartServer,
   p2p,
 }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  const qrDark = colors.text;
+  const qrLight = colors.card;
+
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>Connect to a peer</Text>
-          <MaterialCommunityIcons name="shield-lock-outline" size={22} color="#4f46e5" />
-        </View>
-        <Text style={styles.cardSubtitle}>Mirror of secureChat ConnectionForm in React Native</Text>
-        <TextInput
-          placeholder="192.168.1.20:8080"
-          placeholderTextColor="#9ca3af"
-          style={styles.input}
-          value={connectAddress}
-          onChangeText={onConnectAddressChange}
-          autoCapitalize="none"
-        />
-        <Text style={styles.hint}>Peer address (IP:Port or hostname)</Text>
-        <TextInput
-          placeholder="Chat name (optional)"
-          placeholderTextColor="#9ca3af"
-          style={styles.input}
-          value={connectName}
-          onChangeText={onConnectNameChange}
-        />
-        <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={onConnectPress} activeOpacity={0.9}>
-          <MaterialCommunityIcons name="access-point-network" size={18} color="#ffffff" />
-          <Text style={styles.primaryButtonText}>Connect securely</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>Host a server</Text>
-          <MaterialCommunityIcons name="server" size={22} color="#111827" />
+          <MaterialCommunityIcons name="server" size={22} color={colors.text} />
         </View>
         <Text style={styles.cardSubtitle}>Adapted from secureChat InfoPanel</Text>
         <View style={styles.statusRow}>
@@ -106,7 +85,7 @@ export default function ConnectScreen({
           <MaterialCommunityIcons
             name={serverInfo?.status === 'running' ? 'check' : 'rocket-launch'}
             size={18}
-            color="#ffffff"
+            color={colors.accentText}
           />
           <Text style={styles.primaryButtonText}>
             {serverInfo?.status === 'running' ? 'Server running' : 'Start server'}
@@ -117,7 +96,7 @@ export default function ConnectScreen({
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>P2P Direct Message</Text>
-          <MaterialCommunityIcons name="signal" size={22} color="#0f172a" />
+          <MaterialCommunityIcons name="signal" size={22} color={colors.text} />
         </View>
         <Text style={styles.cardSubtitle}>
           Manual offer/answer + ICE exchange. No server required.
@@ -128,20 +107,29 @@ export default function ConnectScreen({
             {p2p.status === 'connected' ? `Connected to ${p2p.peerLabel ?? 'peer'}` : `Status: ${p2p.status}`}
           </Text>
         </View>
+        <View style={styles.infoCard}>
+          <Text style={styles.infoTitle}>How it works</Text>
+          <Text style={styles.infoText}>
+            1) Create offer → send to peer{'\n'}
+            2) Peer creates answer → send back{'\n'}
+            3) Paste answer → accept{'\n'}
+            4) If not connected, exchange ICE in the candidates boxes
+          </Text>
+        </View>
 
         <View style={styles.sectionRow}>
           <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={p2p.onCreateOffer} activeOpacity={0.9}>
-            <MaterialCommunityIcons name="qrcode-scan" size={18} color="#ffffff" />
+            <MaterialCommunityIcons name="qrcode" size={18} color={colors.accentText} />
             <Text style={styles.primaryButtonText}>Create offer</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={p2p.onReset} activeOpacity={0.9}>
-            <MaterialCommunityIcons name="restart" size={18} color="#ffffff" />
+            <MaterialCommunityIcons name="refresh" size={18} color={colors.text} />
             <Text style={styles.primaryButtonText}>Reset</Text>
           </TouchableOpacity>
         </View>
         <TextInput
           placeholder="Local offer JSON"
-          placeholderTextColor="#9ca3af"
+          placeholderTextColor={colors.muted}
           style={[styles.input, styles.monoInput]}
           value={p2p.localOffer}
           editable={false}
@@ -149,13 +137,13 @@ export default function ConnectScreen({
         />
         {p2p.localOffer ? (
           <View style={styles.qrRow}>
-            <QRCode value={p2p.localOffer} size={120} />
+            <QRCode value={p2p.localOffer} size={120} color={qrDark} backgroundColor={qrLight} />
             <TouchableOpacity
               style={[styles.button, styles.secondaryButton]}
               onPress={() => Clipboard.setStringAsync(p2p.localOffer)}
               activeOpacity={0.9}
             >
-              <MaterialCommunityIcons name="content-copy" size={18} color="#ffffff" />
+              <MaterialCommunityIcons name="content-copy" size={18} color={colors.accentText} />
               <Text style={styles.primaryButtonText}>Copy offer</Text>
             </TouchableOpacity>
           </View>
@@ -164,19 +152,19 @@ export default function ConnectScreen({
         <Text style={styles.hint}>Paste remote offer to generate an answer.</Text>
         <TextInput
           placeholder="Remote offer JSON"
-          placeholderTextColor="#9ca3af"
+          placeholderTextColor={colors.muted}
           style={[styles.input, styles.monoInput]}
           value={p2p.remoteOffer}
           onChangeText={p2p.onRemoteOfferChange}
           multiline
         />
         <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={p2p.onCreateAnswer} activeOpacity={0.9}>
-          <MaterialCommunityIcons name="reply" size={18} color="#ffffff" />
+          <MaterialCommunityIcons name="reply" size={18} color={colors.accentText} />
           <Text style={styles.primaryButtonText}>Create answer</Text>
         </TouchableOpacity>
         <TextInput
           placeholder="Local answer JSON"
-          placeholderTextColor="#9ca3af"
+          placeholderTextColor={colors.muted}
           style={[styles.input, styles.monoInput]}
           value={p2p.localAnswer}
           editable={false}
@@ -184,13 +172,13 @@ export default function ConnectScreen({
         />
         {p2p.localAnswer ? (
           <View style={styles.qrRow}>
-            <QRCode value={p2p.localAnswer} size={120} />
+            <QRCode value={p2p.localAnswer} size={120} color={qrDark} backgroundColor={qrLight} />
             <TouchableOpacity
               style={[styles.button, styles.secondaryButton]}
               onPress={() => Clipboard.setStringAsync(p2p.localAnswer)}
               activeOpacity={0.9}
             >
-              <MaterialCommunityIcons name="content-copy" size={18} color="#ffffff" />
+              <MaterialCommunityIcons name="content-copy" size={18} color={colors.accentText} />
               <Text style={styles.primaryButtonText}>Copy answer</Text>
             </TouchableOpacity>
           </View>
@@ -199,21 +187,21 @@ export default function ConnectScreen({
         <Text style={styles.hint}>Paste remote answer if you created the offer.</Text>
         <TextInput
           placeholder="Remote answer JSON"
-          placeholderTextColor="#9ca3af"
+          placeholderTextColor={colors.muted}
           style={[styles.input, styles.monoInput]}
           value={p2p.remoteAnswer}
           onChangeText={p2p.onRemoteAnswerChange}
           multiline
         />
         <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={p2p.onAcceptAnswer} activeOpacity={0.9}>
-          <MaterialCommunityIcons name="check" size={18} color="#ffffff" />
+          <MaterialCommunityIcons name="check" size={18} color={colors.accentText} />
           <Text style={styles.primaryButtonText}>Accept answer</Text>
         </TouchableOpacity>
 
         <Text style={styles.hint}>Exchange ICE candidates if the connection does not establish.</Text>
         <TextInput
           placeholder="Local ICE candidates JSON"
-          placeholderTextColor="#9ca3af"
+          placeholderTextColor={colors.muted}
           style={[styles.input, styles.monoInput]}
           value={p2p.localCandidates}
           editable={false}
@@ -225,20 +213,20 @@ export default function ConnectScreen({
             onPress={() => Clipboard.setStringAsync(p2p.localCandidates)}
             activeOpacity={0.9}
           >
-            <MaterialCommunityIcons name="content-copy" size={18} color="#ffffff" />
+            <MaterialCommunityIcons name="content-copy" size={18} color={colors.accentText} />
             <Text style={styles.primaryButtonText}>Copy ICE</Text>
           </TouchableOpacity>
         ) : null}
         <TextInput
           placeholder="Remote ICE candidates JSON"
-          placeholderTextColor="#9ca3af"
+          placeholderTextColor={colors.muted}
           style={[styles.input, styles.monoInput]}
           value={p2p.remoteCandidates}
           onChangeText={p2p.onRemoteCandidatesChange}
           multiline
         />
         <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={p2p.onAddCandidates} activeOpacity={0.9}>
-          <MaterialCommunityIcons name="plus" size={18} color="#ffffff" />
+          <MaterialCommunityIcons name="plus" size={18} color={colors.accentText} />
           <Text style={styles.primaryButtonText}>Add ICE candidates</Text>
         </TouchableOpacity>
       </View>
@@ -260,7 +248,7 @@ export default function ConnectScreen({
   );
 }
 
-const styles = StyleSheet.create({
+  const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   scrollContent: {
     paddingTop: 16,
     paddingBottom: 120,
@@ -269,8 +257,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#ffffff',
+    borderColor: colors.border,
+    backgroundColor: colors.card,
     padding: 16,
   },
   cardHeader: {
@@ -281,20 +269,21 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#0f172a',
+    color: colors.text,
   },
   cardSubtitle: {
     marginTop: 4,
-    color: '#64748b',
+    color: colors.muted,
   },
   input: {
     marginTop: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.border,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    color: '#0f172a',
+    color: colors.text,
+    backgroundColor: colors.background,
   },
   monoInput: {
     fontSize: 12,
@@ -303,7 +292,7 @@ const styles = StyleSheet.create({
   hint: {
     marginTop: 8,
     fontSize: 12,
-    color: '#64748b',
+    color: colors.muted,
   },
   button: {
     marginTop: 12,
@@ -314,39 +303,60 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   primaryButton: {
-    backgroundColor: '#4f46e5',
+    backgroundColor: colors.accent,
   },
   secondaryButton: {
-    backgroundColor: '#111827',
+    backgroundColor: colors.border,
   },
   primaryButtonText: {
     marginLeft: 8,
     fontWeight: '600',
-    color: '#ffffff',
+    color: colors.accentText,
   },
   disabledButton: {
-    backgroundColor: '#a5b4fc',
+    backgroundColor: colors.border,
   },
   statusRow: {
     marginTop: 12,
     flexDirection: 'row',
     alignItems: 'center',
   },
-  statusText: {
-    marginLeft: 8,
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1f2937',
-  },
+    statusText: {
+      marginLeft: 8,
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    infoCard: {
+      marginTop: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.background,
+      padding: 12,
+    },
+    infoTitle: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.text,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+    },
+    infoText: {
+      marginTop: 6,
+      fontSize: 12,
+      color: colors.muted,
+      lineHeight: 18,
+    },
   addressPill: {
     marginTop: 8,
     borderRadius: 12,
-    backgroundColor: '#eef2ff',
+    backgroundColor: colors.background,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 13,
     fontWeight: '600',
-    color: '#0f172a',
+    color: colors.text,
   },
   logList: {
     marginTop: 8,
@@ -355,17 +365,18 @@ const styles = StyleSheet.create({
   logLine: {
     marginBottom: 4,
     fontSize: 13,
-    color: '#1f2937',
+    color: colors.text,
   },
   keyPreview: {
     marginTop: 8,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.border,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 12,
-    color: '#0f172a',
+    color: colors.text,
+    backgroundColor: colors.background,
   },
   sectionRow: {
     flexDirection: 'row',
