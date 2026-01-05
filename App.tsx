@@ -12,6 +12,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { ThemeProvider, useTheme } from './src/theme/ThemeProvider';
 import { useWalletSession, WalletSessionProvider } from './src/context/WalletSessionProvider';
 import * as Sentry from '@sentry/react-native';
+import Toast from 'react-native-toast-message';
 
 Sentry.init({
   dsn: 'https://005462e44419a10cf92b86000ff8c484@o4510659003940864.ingest.de.sentry.io/4510659569778768',
@@ -179,13 +180,20 @@ export default Sentry.wrap(function App() {
   const [activeTab, setActiveTab] = useState<TabName>('wallet');
   
   return (
-    <SafeAreaProvider>
-      <ThemeProvider>
-        <WalletSessionProvider isWalletActive={activeTab === 'wallet'}>
-          <AppContentWrapper activeTab={activeTab} setActiveTab={setActiveTab} />
-        </WalletSessionProvider>
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <ThemeProvider>
+      <WalletSessionProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <SafeAreaProvider>
+            <NavigationContainer>
+              <Stack.Navigator screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="Home" component={Home} />
+              </Stack.Navigator>
+            </NavigationContainer>
+            <Toast />
+          </SafeAreaProvider>
+        </GestureHandlerRootView>
+      </WalletSessionProvider>
+    </ThemeProvider>
   );
 });
 
