@@ -1,5 +1,5 @@
 import type { ChatMessage } from '@app-types/securechat-types/secureChat';
-import { CHAT_IMAGE_CONTENT_PREFIX, CHAT_IMAGE_SIGNED_URL_TTL_SECONDS } from '@constants/chatImages';
+import { CHAT_IMAGE_CONTENT_PREFIX, CHAT_IMAGE_SIGNED_URL_TTL_SECONDS } from '@constants/chatImages.constants';
 import { createSignedChatImageUrl } from '@services/chatImageStorage';
 
 type SignedUrlCacheEntry = {

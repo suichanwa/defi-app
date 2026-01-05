@@ -14,7 +14,7 @@ import {
   SecurityTab,
 } from '@components/profile';
 import { StatusDialog } from '@components/common';
-import { REWARD_RULES } from '@constants/profile';
+import { REWARD_RULES } from '@constants/profile.constants';
 import { useWalletSession } from '@context/WalletSessionProvider';
 import { useProfileAuth } from '@hooks/useProfileAuth';
 import { useProfilePreferences } from '@hooks/useProfilePreferences';

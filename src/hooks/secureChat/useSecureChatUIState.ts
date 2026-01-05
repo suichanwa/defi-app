@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useReducer } from 'react';
-import { DEFAULT_GLOBAL_CHAT_ID } from '@constants/secureChatScreen';
+import { DEFAULT_GLOBAL_CHAT_ID } from '@constants/secureChat.constants';
 
 type SecureTab = 'chats' | 'connect';
 type ChatView = 'list' | 'thread';

@@ -3,7 +3,7 @@ import { Animated, PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity,
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import PulseBadge from '@components/PulseBadge';
 import type { ChatThread } from '@app-types/securechat-types/secureChat';
-import { DEFAULT_GLOBAL_CHAT_ID } from '@constants/secureChatScreen';
+import { DEFAULT_GLOBAL_CHAT_ID } from '@constants/secureChat.constants';
 import { useTheme } from '@theme/ThemeProvider';
 
 type Props = {

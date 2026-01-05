@@ -24,7 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { ChatAvatarSource, ChatMessage, ChatThread, ServerInfo } from '@app-types/securechat-types/secureChat';
 import { useTheme } from '@theme/ThemeProvider';
-import { CHAT_HISTORY_SCROLL_THRESHOLD } from '@constants/secureChatScreen';
+import { CHAT_HISTORY_SCROLL_THRESHOLD } from '@constants/secureChat.constants';
 import ChatAvatar from '@components/secureChat/ChatAvatar';
 import ChatInputBar from '@components/secureChat/ChatInputBar';
 import ChatThreadHeader from '@components/secureChat/ChatThreadHeader';

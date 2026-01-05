@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
-import { CHAT_IMAGE_BUCKET, CHAT_IMAGE_SIGNED_URL_TTL_SECONDS } from '@constants/chatImages';
+import { CHAT_IMAGE_BUCKET, CHAT_IMAGE_SIGNED_URL_TTL_SECONDS } from '@constants/chatImages.constants';
 import { isSupabaseConfigured, supabase } from './supabaseClient';
 
 type UploadChatImageArgs = {

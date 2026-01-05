@@ -8,7 +8,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
 import SecureChatContent from './components/SecureChatContent';
 import SecureChatLayout from './components/SecureChatLayout';
-import * as SecureChatConstants from '@constants/secureChatScreen';
+import * as SecureChatConstants from '@constants/secureChat.constants';
 import { useSecureChatIdentity } from '@hooks/useSecureChatIdentity';
 import { useSecureChatImageAttachment } from '@hooks/useSecureChatImageAttachment';
 import { useSecureChatUIState } from '@hooks/secureChat/useSecureChatUIState';

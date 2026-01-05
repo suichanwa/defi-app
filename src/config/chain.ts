@@ -1,5 +1,5 @@
 import type { ChainConfig, EthereumChain, SolanaChain } from '@app-types/chain';
-import { CHAINS, CHAIN } from '@constants/chain';
+import { CHAINS, CHAIN } from '@constants/chain.constants';
 
 export type { ChainConfig, EthereumChain, SolanaChain } from '@app-types/chain';
 

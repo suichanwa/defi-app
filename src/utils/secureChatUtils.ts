@@ -1,7 +1,7 @@
 import type { ChatMessage } from '@app-types/securechat-types/secureChat';
 import type { AvatarType } from '@app-types/profile';
 import type { SecureChatMessageRow } from '@app-types/securechat-types/secureChatScreen';
-import { UUID_REGEX } from '@constants/secureChatScreen';
+import { UUID_REGEX } from '@constants/secureChat.constants';
 import { decodeChatImageContent } from '@utils/secureChatImages';
 
 type MapRowOptions = {

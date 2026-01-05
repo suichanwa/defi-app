@@ -12,7 +12,7 @@ import {
 } from '@services/directMessages';
 import { isSupabaseConfigured, supabase } from '@services/supabaseClient';
 import { isUuid } from '@utils/secureChatUtils';
-import { DM_POLL_INTERVAL_ACTIVE_MS, DM_POLL_INTERVAL_IDLE_MS } from '@constants/secureChatScreen';
+import { DM_POLL_INTERVAL_ACTIVE_MS, DM_POLL_INTERVAL_IDLE_MS } from '@constants/secureChat.constants';
 
 type UseDirectMessagesArgs = {
   effectiveUserId: string;

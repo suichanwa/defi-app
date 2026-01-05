@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } fr
 import { createProfileStyles } from '@styles/ProfileStyles';
 import { useTheme } from '@theme/ThemeProvider';
 import ProfileHeader from '@components/profile/ProfileHeader';
-import { CHANGELOG_ENTRIES } from '@constants/changelog';
+import { CHANGELOG_ENTRIES } from '@constants/changelog.constants';
 
 type ChangelogTabProps = {
   scrollStyle: StyleProp<ViewStyle>;
