@@ -1,13 +1,16 @@
 import React, { useMemo, useState } from 'react';
 import { ScrollView, Text, View, StyleSheet, TouchableOpacity } from 'react-native';
-import { RouteProp, useRoute } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import type { StackNavigationProp } from '@react-navigation/stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@theme/ThemeProvider';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useCopyToClipboard } from '@hooks/useCopyToClipboard';
+import { useQRReceive } from '@context/QRReceiveProvider';
 
 type WalletStackParamList = {
   Receive: { address: string };
+  QRReceive: { symbol: string; name: string; address: string };
 };
 
 type ReceiveRouteProp = RouteProp<WalletStackParamList, 'Receive'>;
@@ -16,9 +19,11 @@ export default function ReceiveScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const route = useRoute<ReceiveRouteProp>();
+  const navigation = useNavigation<StackNavigationProp<WalletStackParamList, 'Receive'>>();
   const address = route.params?.address ?? null;
   const [selectedSymbol, setSelectedSymbol] = useState('BTC');
   const { copyText } = useCopyToClipboard();
+  const { setQRData } = useQRReceive();
 
   const tokens = [
     { symbol: 'BTC', name: 'Bitcoin', color: '#f59e0b' },
@@ -65,6 +70,14 @@ export default function ReceiveScreen() {
                     <TouchableOpacity
                       activeOpacity={0.7}
                       style={[localStyles.actionButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+                      onPress={() =>
+                        address &&
+                        (() => {
+                          const payload = { symbol: token.symbol, name: token.name, address };
+                          setQRData(payload);
+                          navigation.navigate('QRReceive', payload);
+                        })()
+                      }
                     >
                       <MaterialCommunityIcons name="qrcode-scan" size={20} color={colors.text} />
                     </TouchableOpacity>

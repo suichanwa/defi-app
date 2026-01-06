@@ -27,6 +27,7 @@ import SendScreen from './walletScreens/SendScreen';
 import SwapScreen from './walletScreens/SwapScreen';
 import SendCryptoScreen from './walletScreens/SendCryptoScreen';
 import SendCryptoComplete from './walletScreens/SendCryptoComplete';
+import QRReceiveScreen from './walletScreens/QRReceiveScreen';
 
 type WalletStackParamList = {
   WalletHome: undefined;
@@ -36,6 +37,7 @@ type WalletStackParamList = {
   Swap: undefined;
   SendCrypto: { symbol: string; name: string; balance: string };
   SendCryptoComplete: { symbol: string };
+  QRReceive: { symbol: string; name: string; address: string };
 };
 
 type WalletAction = {
@@ -355,6 +357,14 @@ export default function WalletScreen() {
   const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const biometricInFlightRef = useRef(false);
 
+  const animatePasscodeUnlock = async (passcode: string) => {
+    setUnlockPassword('');
+    for (let i = 1; i <= passcode.length; i += 1) {
+      setUnlockPassword(passcode.slice(0, i));
+      await new Promise((resolve) => setTimeout(resolve, 60));
+    }
+  };
+
   useEffect(() => {
     if (status === 'missing') {
       setFlow('menu');
@@ -371,17 +381,25 @@ export default function WalletScreen() {
       if (biometricInFlightRef.current) return;
 
       biometricInFlightRef.current = true;
+      setIsSubmitting(true);
+      startSlowMessage('Yeah, this might take a moment...');
       try {
         const canUse = await canUseBiometrics();
         if (!canUse || cancelled) return;
         const stored = await getBiometricPassword();
         if (!stored || cancelled) return;
+        await animatePasscodeUnlock(stored);
         await unlock(stored);
-        if (!cancelled) setFlow('menu');
+        if (!cancelled) {
+          setFlow('menu');
+          setUnlockPassword('');
+        }
       } catch {
         // Silent fail
       } finally {
         biometricInFlightRef.current = false;
+        clearSlowMessage();
+        setIsSubmitting(false);
       }
     };
 
@@ -535,7 +553,13 @@ export default function WalletScreen() {
       await unlock(unlockPassword);
       setFlow('menu');
       if (biometricsAvailable) {
-        await saveBiometricPassword(unlockPassword);
+        const existing = await getBiometricPassword({ requireAuthentication: false });
+        if (!existing) {
+          const confirmResult = await promptBiometric('Enable biometric unlock');
+          if (confirmResult.success) {
+            await saveBiometricPassword(unlockPassword);
+          }
+        }
       }
       setUnlockPassword('');
       resetFlowMessages();
@@ -543,39 +567,6 @@ export default function WalletScreen() {
       setFlowError(walletErrorMessage(error, 'unlock'));
       setShowErrorDialog(true);
     } finally {
-      clearSlowMessage();
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleBiometricUnlock = async () => {
-    resetFlowMessages();
-    if (!biometricsAvailable) {
-      setFlowError('Biometric unlock not available on this device.');
-      setShowErrorDialog(true);
-      return;
-    }
-    if (biometricInFlightRef.current) return;
-    setIsSubmitting(true);
-    startSlowMessage('Yeah, this might take a moment...');
-    try {
-      biometricInFlightRef.current = true;
-      const result = await promptBiometric('Unlock wallet');
-      if (!result.success) return;
-      const stored = await getBiometricPassword({ requireAuthentication: false });
-      if (!stored) {
-        setFlowError('No biometric passcode stored yet. Unlock once with your passcode first.');
-        setShowErrorDialog(true);
-        return;
-      }
-      await unlock(stored);
-      setFlow('menu');
-      resetFlowMessages();
-    } catch (error) {
-      setFlowError(walletErrorMessage(error, 'unlock'));
-      setShowErrorDialog(true);
-    } finally {
-      biometricInFlightRef.current = false;
       clearSlowMessage();
       setIsSubmitting(false);
     }
@@ -704,8 +695,6 @@ export default function WalletScreen() {
           }}
           onFinishSetup={handleFinishSetup}
           onSkipBackup={handleSkipBackup}
-          onBiometricUnlock={handleBiometricUnlock}
-          biometricsAvailable={biometricsAvailable}
         />
       </ScrollView>
     );
@@ -738,6 +727,7 @@ export default function WalletScreen() {
         <Stack.Screen name="SendCrypto" component={SendCryptoScreen} />
         <Stack.Screen name="SendCryptoComplete" component={SendCryptoComplete} />
         <Stack.Screen name="Receive" component={ReceiveScreen} />
+        <Stack.Screen name="QRReceive" component={QRReceiveScreen} />
         <Stack.Screen name="Swap" component={SwapScreen} />
       </Stack.Navigator>
     </NavigationContainer>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, TouchableOpacity, View, StyleSheet } from 'react-native';
+import { Text, View, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '@theme/ThemeProvider';
@@ -15,8 +15,6 @@ type WalletUnlockCardProps = {
   isSubmitting: boolean;
   onChangeUnlockPassword: (value: string) => void;
   onUnlock: () => void;
-  onBiometricUnlock: () => void;
-  biometricsAvailable: boolean;
   isUnlockActive: boolean;
   onActivateUnlock: () => void;
 };
@@ -29,8 +27,6 @@ export default function WalletUnlockCard({
   isSubmitting,
   onChangeUnlockPassword,
   onUnlock,
-  onBiometricUnlock,
-  biometricsAvailable,
   isUnlockActive,
   onActivateUnlock,
 }: WalletUnlockCardProps) {
@@ -62,22 +58,6 @@ export default function WalletUnlockCard({
           <MaterialCommunityIcons name="alert-circle" size={18} color="#ef4444" />
           <Text style={[localStyles.errorText, { color: '#ef4444' }]}>{flowError}</Text>
         </View>
-      )}
-
-      {biometricsAvailable && (
-        <TouchableOpacity
-          style={[
-            localStyles.biometricButton,
-            { backgroundColor: colors.card, borderColor: colors.border },
-            isSubmitting && localStyles.buttonDisabled,
-          ]}
-          onPress={onBiometricUnlock}
-          activeOpacity={0.7}
-          disabled={isSubmitting}
-        >
-          <MaterialCommunityIcons name="fingerprint" size={22} color={colors.accent} />
-          <Text style={[localStyles.biometricText, { color: colors.text }]}>Use biometrics</Text>
-        </TouchableOpacity>
       )}
 
       {isSubmitting && <WalletLoadingOverlay styles={styles} label="Unlocking..." />}
@@ -127,23 +107,5 @@ const localStyles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     lineHeight: 20,
-  },
-  biometricButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-    borderWidth: 2,
-    marginTop: 8,
-  },
-  biometricText: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  buttonDisabled: {
-    opacity: 0.5,
   },
 });

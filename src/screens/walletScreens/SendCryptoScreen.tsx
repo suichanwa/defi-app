@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { useTheme } from '@theme/ThemeProvider';
 import { createWalletStyles } from '@styles/WalletStyles';
+import { useNavVisibility } from '@context/NavVisibilityProvider';
 
 type RouteParams = {
   symbol: string;
@@ -31,6 +32,14 @@ export default function SendCryptoScreen() {
   const [address, setAddress] = useState('');
   const [network, setNetwork] = useState('');
   const [amount, setAmount] = useState('');
+  const { setNavHidden } = useNavVisibility();
+
+  useFocusEffect(
+    React.useCallback(() => {
+      setNavHidden(true);
+      return () => setNavHidden(false);
+    }, [setNavHidden]),
+  );
 
   return (
     <View style={[localStyles.container, { backgroundColor: colors.background }]}>

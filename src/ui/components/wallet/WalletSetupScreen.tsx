@@ -43,8 +43,6 @@ type Props = {
   onGoImport: () => void;
   onFinishSetup: () => void;
   onSkipBackup: () => void;
-  onBiometricUnlock: () => void;
-  biometricsAvailable: boolean;
 };
 
 type PasscodeFieldId = 'primary' | 'confirm' | 'unlock';
@@ -111,8 +109,6 @@ export default function WalletSetupScreen({
   onGoImport,
   onFinishSetup,
   onSkipBackup,
-  onBiometricUnlock,
-  biometricsAvailable,
 }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
@@ -352,8 +348,6 @@ export default function WalletSetupScreen({
           isSubmitting={isSubmitting}
           onChangeUnlockPassword={handleUnlockChange}
           onUnlock={onUnlock}
-          onBiometricUnlock={onBiometricUnlock}
-          biometricsAvailable={biometricsAvailable}
           isUnlockActive={effectivePasscodeField === 'unlock'}
           onActivateUnlock={() => setActivePasscodeField('unlock')}
         />

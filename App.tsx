@@ -16,6 +16,8 @@ import * as Sentry from '@sentry/react-native';
 import Toast from 'react-native-toast-message';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NotificationProvider } from './src/context/NotificationProvider';
+import { NavVisibilityProvider, useNavVisibility } from './src/context/NavVisibilityProvider';
+import { QRReceiveProvider } from './src/context/QRReceiveProvider';
 
 Sentry.init({
   dsn: 'https://005462e44419a10cf92b86000ff8c484@o4510659003940864.ingest.de.sentry.io/4510659569778768',
@@ -40,8 +42,10 @@ function AppContent({ activeTab, onTabChange }: { activeTab: TabName; onTabChang
   const navbarTranslateY = useSharedValue(0);
   const insets = useSafeAreaInsets();
   const { colors, resolved } = useTheme();
+  const { isNavHidden } = useNavVisibility();
   const isSetupMode = status === 'missing' || status === 'loading' || (status === 'unlocked' && !backupCompleted);
-  const showNavbar = status === 'unlocked' && backupCompleted && !(activeTab === 'secureChat' && isChatThreadOpen);
+  const showNavbar =
+    status === 'unlocked' && backupCompleted && !(activeTab === 'secureChat' && isChatThreadOpen) && !isNavHidden;
 
   const toastConfig = useMemo(() => {
     return {
@@ -191,7 +195,11 @@ export default Sentry.wrap(function App() {
         <GestureHandlerRootView style={{ flex: 1 }}>
           <SafeAreaProvider>
             <NotificationProvider>
-              <AppContent activeTab={activeTab} onTabChange={setActiveTab} />
+              <NavVisibilityProvider>
+                <QRReceiveProvider>
+                  <AppContent activeTab={activeTab} onTabChange={setActiveTab} />
+                </QRReceiveProvider>
+              </NavVisibilityProvider>
               <Toast />
             </NotificationProvider>
           </SafeAreaProvider>

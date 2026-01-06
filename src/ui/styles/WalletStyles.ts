@@ -317,6 +317,22 @@ export const createWalletStyles = (colors: ReturnType<typeof useTheme>['colors']
       shadowRadius: 16,
       elevation: 8,
     },
+    qrWrap: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 20,
+    },
+    addressPill: {
+      fontSize: 12,
+      color: colors.muted,
+      fontFamily: 'monospace',
+      marginBottom: 16,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      backgroundColor: colors.background,
+      borderRadius: 10,
+      overflow: 'hidden',
+    },
     setupTitle: {
       fontSize: 28,
       fontWeight: '800',
