@@ -7,6 +7,7 @@ import WalletScreen from './src/screens/WalletScreen';
 import SecureChatScreen from './src/screens/secureChat/SecureChatScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import BottomNavBar, { TabName } from '@components/BottomNavBar';
+import NotificationHost from '@components/common/NotificationHost';
 import { appShellStyles as styles } from '@styles/AppShellStyles';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme } from './src/theme/ThemeProvider';
@@ -14,6 +15,7 @@ import { useWalletSession, WalletSessionProvider } from './src/context/WalletSes
 import * as Sentry from '@sentry/react-native';
 import Toast from 'react-native-toast-message';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { NotificationProvider } from './src/context/NotificationProvider';
 
 Sentry.init({
   dsn: 'https://005462e44419a10cf92b86000ff8c484@o4510659003940864.ingest.de.sentry.io/4510659569778768',
@@ -164,6 +166,9 @@ function AppContent({ activeTab, onTabChange }: { activeTab: TabName; onTabChang
           </Animated.View>
         )}
 
+        {activeTab === 'wallet' && <NotificationHost scope="wallet" animation="slide" />}
+        {activeTab === 'secureChat' && <NotificationHost scope="chat" animation="slide" />}
+
         <ToastManager
           config={toastConfig}
           position="top"
@@ -185,8 +190,10 @@ export default Sentry.wrap(function App() {
       <WalletSessionProvider isWalletActive={activeTab === 'wallet'}>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <SafeAreaProvider>
-            <AppContent activeTab={activeTab} onTabChange={setActiveTab} />
-            <Toast />
+            <NotificationProvider>
+              <AppContent activeTab={activeTab} onTabChange={setActiveTab} />
+              <Toast />
+            </NotificationProvider>
           </SafeAreaProvider>
         </GestureHandlerRootView>
       </WalletSessionProvider>

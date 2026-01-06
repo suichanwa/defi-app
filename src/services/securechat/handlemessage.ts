@@ -1,6 +1,7 @@
 import type { ChatMessage, ChatThread } from '@app-types/securechat-types/secureChat';
 import { decodeChatImageContent, resolveChatImageMessage } from '@utils/secureChatImages';
 import { CHAT_IMAGE_BUCKET } from '@constants/chatImages.constants';
+import { DEFAULT_GLOBAL_CHAT_ID } from '@constants/secureChat.constants';
 import { isSupabaseConfigured, supabase } from '@services/supabaseClient';
 
 import type * as HandleMessageTypes from '@app-types/securechat-types/secureChatHandleMessage';
@@ -38,6 +39,7 @@ export const createNotifyIncomingMessage = ({
   if (message.authorId && message.authorId === effectiveUserId) return;
   if (!message.authorId && message.author === displayLabel) return;
   if (mutedChatIds.has(chatId)) return;
+  if (chatId === DEFAULT_GLOBAL_CHAT_ID) return;
   if (secureTab === 'chats' && chatView === 'thread' && selectedChatId === chatId) return;
 
   const chatName = getChatById(chatId)?.name ?? message.author ?? 'New message';

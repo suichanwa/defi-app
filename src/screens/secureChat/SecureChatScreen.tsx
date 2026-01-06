@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, BackHandler, Platform, useWindowDimensions } from 'react-native';
 import type { ChatMessage, ChatThread, ServerInfo } from '@app-types/securechat-types/secureChat';
 import type { SecureChatMessageRow, SecureChatScreenProps } from '@app-types/securechat-types/secureChatScreen';
+import type { ToastFn } from '@app-types/securechat-types/secureChatHandleMessage';
 import * as date from 'date-and-time';
 import { showToast } from '@services/toast';
 import * as Clipboard from 'expo-clipboard';
@@ -301,6 +302,11 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     }
   }, [displayLabel, p2pChatId, p2pPeerLabel, p2pStatus, selectChat, selectedChatId, setTab]);
 
+  const scopedShowToast = useCallback<ToastFn>(
+    (params) => showToast({ ...params, scope: 'chat', animation: 'slide' }),
+    [],
+  );
+
   const notifyIncomingMessage = useMemo(
     () =>
       createNotifyIncomingMessage({
@@ -311,9 +317,9 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
         chatView,
         selectedChatId,
         getChatById,
-        showToast,
+        showToast: scopedShowToast,
       }),
-    [chatView, displayLabel, effectiveUserId, getChatById, mutedChatIds, secureTab, selectedChatId],
+    [chatView, displayLabel, effectiveUserId, getChatById, mutedChatIds, scopedShowToast, secureTab, selectedChatId],
   );
 
   useEffect(() => {
@@ -604,7 +610,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
           'Local-only accounts cannot sync DMs. Use P2P DM in the Connect tab (offer/answer + ICE).',
           ...prev,
         ]);
-        showToast({
+        scopedShowToast({
           type: 'default',
           text1: 'P2P DM required',
           text2: 'Open Connect tab to exchange offer/answer for this DM.',
@@ -631,7 +637,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
       `Start a P2P DM with ${otherUserName}. Exchange offer/answer + ICE.`,
       ...prev,
     ]);
-    showToast({
+    scopedShowToast({
       type: 'default',
       text1: 'P2P DM',
       text2: 'Use the Connect tab to exchange offer/answer.',
@@ -741,8 +747,8 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
   );
 
   const handleCopyMessage = useMemo(
-    () => createCopyMessageHandler(Clipboard.setStringAsync, showToast),
-    [],
+    () => createCopyMessageHandler(Clipboard.setStringAsync, scopedShowToast),
+    [scopedShowToast],
   );
 
   const handleReplyMessage = useMemo(
@@ -763,9 +769,9 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
         setMessagesByChat,
         setChats,
         resolveAuthorName,
-        showToast,
+        scopedShowToast,
       ),
-    [isOwnMessage, messagesByChat, resolveAuthorName, setMessagesByChat, setChats],
+    [isOwnMessage, messagesByChat, resolveAuthorName, scopedShowToast, setMessagesByChat, setChats],
   );
 
   const handleToggleMute = useCallback(() => {
