@@ -1,5 +1,5 @@
-import React from 'react';
-import { Text, View, StyleSheet, TextInput } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Pressable, Text, View, StyleSheet, TextInput } from 'react-native';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '@theme/ThemeProvider';
 
@@ -23,6 +23,13 @@ export default function PasscodeField({
 }: PasscodeFieldProps) {
   const { colors } = useTheme();
   const PASSCODE_LENGTH = 6;
+  const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (isActive || autoFocus) {
+      inputRef.current?.focus();
+    }
+  }, [autoFocus, isActive]);
 
   return (
     <View style={localStyles.container}>
@@ -30,6 +37,7 @@ export default function PasscodeField({
       
       {/* Hidden input for native keyboard */}
       <TextInput
+        ref={inputRef}
         value={value}
         onChangeText={onChange}
         keyboardType="number-pad"
@@ -41,7 +49,13 @@ export default function PasscodeField({
       />
       
       {/* Visual dots display */}
-      <View style={localStyles.dotsContainer}>
+      <Pressable
+        style={localStyles.dotsContainer}
+        onPress={() => {
+          onActivate?.();
+          inputRef.current?.focus();
+        }}
+      >
         {Array.from({ length: PASSCODE_LENGTH }).map((_, index) => (
           <View
             key={index}
@@ -55,7 +69,7 @@ export default function PasscodeField({
             ]}
           />
         ))}
-      </View>
+      </Pressable>
     </View>
   );
 }

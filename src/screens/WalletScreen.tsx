@@ -18,12 +18,15 @@ import { fetchSolBalance } from '../services/solanaBalances';
 import {
   canUseBiometrics,
   getBiometricPassword,
+  promptBiometric,
   saveBiometricPassword,
 } from '../services/biometrics';
 import AddScreen from './walletScreens/AddScreen';
 import ReceiveScreen from './walletScreens/ReceiveScreen';
 import SendScreen from './walletScreens/SendScreen';
 import SwapScreen from './walletScreens/SwapScreen';
+import SendCryptoScreen from './walletScreens/SendCryptoScreen';
+import SendCryptoComplete from './walletScreens/SendCryptoComplete';
 
 type WalletStackParamList = {
   WalletHome: undefined;
@@ -31,6 +34,8 @@ type WalletStackParamList = {
   Send: undefined;
   Receive: { address: string };
   Swap: undefined;
+  SendCrypto: { symbol: string; name: string; balance: string };
+  SendCryptoComplete: { symbol: string };
 };
 
 type WalletAction = {
@@ -555,7 +560,9 @@ export default function WalletScreen() {
     startSlowMessage('Yeah, this might take a moment...');
     try {
       biometricInFlightRef.current = true;
-      const stored = await getBiometricPassword();
+      const result = await promptBiometric('Unlock wallet');
+      if (!result.success) return;
+      const stored = await getBiometricPassword({ requireAuthentication: false });
       if (!stored) {
         setFlowError('No biometric passcode stored yet. Unlock once with your passcode first.');
         setShowErrorDialog(true);
@@ -728,6 +735,8 @@ export default function WalletScreen() {
         <Stack.Screen name="WalletHome" component={WalletHomeScreen} />
         <Stack.Screen name="Add" component={AddScreen} />
         <Stack.Screen name="Send" component={SendScreen} />
+        <Stack.Screen name="SendCrypto" component={SendCryptoScreen} />
+        <Stack.Screen name="SendCryptoComplete" component={SendCryptoComplete} />
         <Stack.Screen name="Receive" component={ReceiveScreen} />
         <Stack.Screen name="Swap" component={SwapScreen} />
       </Stack.Navigator>

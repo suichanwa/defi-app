@@ -26,9 +26,12 @@ export const saveBiometricPassword = async (password: string) => {
   }
 };
 
-export const getBiometricPassword = async (): Promise<string | null> => {
+export const getBiometricPassword = async (
+  options?: { requireAuthentication?: boolean },
+): Promise<string | null> => {
+  const requireAuthentication = options?.requireAuthentication ?? true;
   try {
-    const value = await SecureStore.getItemAsync(KEY, { requireAuthentication: true });
+    const value = await SecureStore.getItemAsync(KEY, { requireAuthentication });
     return value ?? null;
   } catch {
     return null;
