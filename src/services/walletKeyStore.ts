@@ -9,7 +9,7 @@ import { xchacha20poly1305 } from '@noble/ciphers/chacha.js';
 import { bytesToUtf8, concatBytes, randomBytes, utf8ToBytes } from '@noble/ciphers/utils.js';
 import { scryptAsync } from '@noble/hashes/scrypt.js';
 import { CHAIN } from '../config/chain';
-import type { EncryptedWalletKey, WalletKind } from '../types/wallet';
+import type { EncryptedWalletKey, WalletKind, WalletRecordMeta } from '../types/wallet';
 import { getJson, removeKey, setJson } from './storage';
 import { deleteSecureItem, getSecureItem, setSecureItem } from './secureStore';
 
@@ -64,6 +64,9 @@ const getActiveWalletType = (): WalletKind => (CHAIN.kind === 'solana' ? 'solana
 const getStorageKeys = (walletType: WalletKind) => ({
   metadataKey: `wallet.${walletType}.metadata.v1`,
   secureKey: `wallet.${walletType}.encrypted.v1`,
+  listKey: `wallet.${walletType}.metadata.list.v1`,
+  activeIdKey: `wallet.${walletType}.active.id.v1`,
+  walletSecureKey: (id: string) => `wallet.${walletType}.encrypted.${id}.v1`,
 });
 
 const normalizeMnemonic = (phrase: string) =>
@@ -125,20 +128,35 @@ const deriveEd25519Seed = (seed: Uint8Array, path: string): Uint8Array => {
   return key;
 };
 
-export async function loadEncryptedWalletKey(
-  walletType: WalletKind = getActiveWalletType(),
-): Promise<EncryptedWalletKey | null> {
-  const { metadataKey, secureKey } = getStorageKeys(walletType);
+const normalizeRecordMeta = (record: EncryptedWalletKey): WalletRecordMeta => ({
+  id: record.id,
+  createdAt: record.createdAt,
+  updatedAt: record.updatedAt,
+  backupCompleted: record.backupCompleted,
+  walletType: record.walletType,
+});
+
+const migrateLegacyWallet = async (walletType: WalletKind): Promise<WalletRecordMeta[]> => {
+  const { metadataKey, secureKey, listKey, activeIdKey, walletSecureKey } = getStorageKeys(walletType);
   const [meta, secureJson] = await Promise.all([
     getJson<Omit<EncryptedWalletKey, 'encryptedJson'> | null>(metadataKey),
     getSecureItem(secureKey),
   ]);
 
   if (meta && secureJson) {
-    return { ...meta, encryptedJson: secureJson, walletType };
+    const record: EncryptedWalletKey = { ...meta, encryptedJson: secureJson, walletType };
+    const normalized = normalizeRecordMeta(record);
+    await Promise.all([
+      setJson(listKey, [normalized]),
+      setJson(activeIdKey, normalized.id),
+      setSecureItem(walletSecureKey(normalized.id), secureJson),
+      removeKey(metadataKey),
+      deleteSecureItem(secureKey),
+    ]);
+    return [normalized];
   }
 
-  if (walletType !== 'ethereum') return null;
+  if (walletType !== 'ethereum') return [];
 
   const [legacyMeta, legacySecure, legacyRecord] = await Promise.all([
     getJson<Omit<EncryptedWalletKey, 'encryptedJson'> | null>(LEGACY_METADATA_KEY),
@@ -149,7 +167,7 @@ export async function loadEncryptedWalletKey(
   const legacyEncryptedJson = legacySecure ?? legacyRecord?.encryptedJson ?? null;
   const legacyBase = legacyRecord ?? (legacyMeta ? { ...legacyMeta, encryptedJson: legacyEncryptedJson ?? '' } : null);
 
-  if (!legacyBase || !legacyEncryptedJson) return null;
+  if (!legacyBase || !legacyEncryptedJson) return [];
 
   const record: EncryptedWalletKey = {
     id: legacyBase.id,
@@ -159,22 +177,91 @@ export async function loadEncryptedWalletKey(
     backupCompleted: legacyBase.backupCompleted,
     walletType: 'ethereum',
   };
+  const normalized = normalizeRecordMeta(record);
 
-  await saveEncryptedWalletKey(record, 'ethereum');
-  await Promise.all([removeKey(LEGACY_METADATA_KEY), deleteSecureItem(LEGACY_SECURE_KEY), removeKey(LEGACY_KEY)]);
+  await Promise.all([
+    setJson(listKey, [normalized]),
+    setJson(activeIdKey, normalized.id),
+    setSecureItem(walletSecureKey(normalized.id), legacyEncryptedJson),
+    removeKey(LEGACY_METADATA_KEY),
+    deleteSecureItem(LEGACY_SECURE_KEY),
+    removeKey(LEGACY_KEY),
+  ]);
 
-  return record;
+  return [normalized];
+};
+
+export async function loadWalletRecords(
+  walletType: WalletKind = getActiveWalletType(),
+): Promise<WalletRecordMeta[]> {
+  const { listKey, activeIdKey } = getStorageKeys(walletType);
+  const stored = await getJson<WalletRecordMeta[] | null>(listKey);
+  if (stored && stored.length) {
+    const activeId = await getJson<string | null>(activeIdKey);
+    if (!activeId || !stored.some((record) => record.id === activeId)) {
+      await setJson(activeIdKey, stored[0].id);
+    }
+    return stored;
+  }
+
+  const migrated = await migrateLegacyWallet(walletType);
+  if (migrated.length) return migrated;
+  return [];
+}
+
+export async function getActiveWalletId(walletType: WalletKind = getActiveWalletType()): Promise<string | null> {
+  const { activeIdKey } = getStorageKeys(walletType);
+  return getJson<string | null>(activeIdKey);
+}
+
+export async function setActiveWalletId(
+  walletId: string,
+  walletType: WalletKind = getActiveWalletType(),
+): Promise<void> {
+  const { activeIdKey } = getStorageKeys(walletType);
+  await setJson(activeIdKey, walletId);
+}
+
+export async function loadEncryptedWalletKeyById(
+  walletId: string,
+  walletType: WalletKind = getActiveWalletType(),
+): Promise<EncryptedWalletKey | null> {
+  const records = await loadWalletRecords(walletType);
+  const record = records.find((item) => item.id === walletId);
+  if (!record) return null;
+  const { walletSecureKey } = getStorageKeys(walletType);
+  const encryptedJson = await getSecureItem(walletSecureKey(record.id));
+  if (!encryptedJson) return null;
+  return { ...record, encryptedJson, walletType: record.walletType ?? walletType };
+}
+
+export async function loadEncryptedWalletKey(
+  walletType: WalletKind = getActiveWalletType(),
+): Promise<EncryptedWalletKey | null> {
+  const records = await loadWalletRecords(walletType);
+  if (!records.length) return null;
+  const storedActive = await getActiveWalletId(walletType);
+  const activeId = storedActive && records.some((record) => record.id === storedActive) ? storedActive : records[0].id;
+  if (activeId !== storedActive) {
+    await setActiveWalletId(activeId, walletType);
+  }
+  return loadEncryptedWalletKeyById(activeId, walletType);
 }
 
 export async function saveEncryptedWalletKey(
   record: EncryptedWalletKey,
   walletType: WalletKind = record.walletType ?? getActiveWalletType(),
 ): Promise<void> {
-  const { metadataKey, secureKey } = getStorageKeys(walletType);
+  const { listKey, walletSecureKey } = getStorageKeys(walletType);
   const { encryptedJson, ...meta } = record;
+  const existing = await loadWalletRecords(walletType);
+  const nextRecords = existing.some((item) => item.id === meta.id)
+    ? existing.map((item) => (item.id === meta.id ? { ...item, ...meta, walletType } : item))
+    : [...existing, { ...meta, walletType }];
   await Promise.all([
-    setJson(metadataKey, { ...meta, walletType }),
-    setSecureItem(secureKey, encryptedJson),
+    setJson(listKey, nextRecords),
+    setActiveWalletId(meta.id, walletType),
+    setSecureItem(walletSecureKey(meta.id), encryptedJson),
   ]);
 }
 
@@ -195,6 +282,28 @@ export async function encryptWalletKey(privateKey: string, password: string): Pr
 export async function decryptWalletKey(encryptedJson: string, password: string): Promise<string> {
   const wallet = await Wallet.fromEncryptedJson(encryptedJson, password);
   return wallet.privateKey;
+}
+
+export async function removeWalletRecord(
+  walletId: string,
+  walletType: WalletKind = getActiveWalletType(),
+): Promise<void> {
+  const { listKey, activeIdKey, walletSecureKey } = getStorageKeys(walletType);
+  const records = await loadWalletRecords(walletType);
+  const nextRecords = records.filter((record) => record.id !== walletId);
+  await Promise.all([
+    setJson(listKey, nextRecords),
+    deleteSecureItem(walletSecureKey(walletId)),
+  ]);
+  const storedActive = await getJson<string | null>(activeIdKey);
+  if (storedActive === walletId) {
+    const nextActive = nextRecords[0]?.id ?? null;
+    if (nextActive) {
+      await setJson(activeIdKey, nextActive);
+    } else {
+      await removeKey(activeIdKey);
+    }
+  }
 }
 
 const encryptSolanaSecretKey = async (
@@ -411,15 +520,24 @@ export async function changeWalletPassword(
 }
 
 export async function markBackupCompleted(walletType: WalletKind = getActiveWalletType()): Promise<void> {
-  const existing = await loadEncryptedWalletKey(walletType);
-  if (!existing) return;
-  const next = { ...existing, backupCompleted: true, updatedAt: new Date().toISOString(), walletType };
-  await saveEncryptedWalletKey(next, walletType);
+  const { listKey } = getStorageKeys(walletType);
+  const records = await loadWalletRecords(walletType);
+  if (!records.length) return;
+  const activeId = await getActiveWalletId(walletType);
+  if (!activeId) return;
+  const next = records.map((record) =>
+    record.id === activeId
+      ? { ...record, backupCompleted: true, updatedAt: new Date().toISOString(), walletType }
+      : record,
+  );
+  await setJson(listKey, next);
 }
 
 export async function clearWallet(walletType: WalletKind = getActiveWalletType()): Promise<void> {
-  const { metadataKey, secureKey } = getStorageKeys(walletType);
-  await Promise.all([removeKey(metadataKey), deleteSecureItem(secureKey)]);
+  const { metadataKey, secureKey, listKey, activeIdKey, walletSecureKey } = getStorageKeys(walletType);
+  const records = await loadWalletRecords(walletType);
+  await Promise.all(records.map((record) => deleteSecureItem(walletSecureKey(record.id))));
+  await Promise.all([removeKey(metadataKey), deleteSecureItem(secureKey), removeKey(listKey), removeKey(activeIdKey)]);
 
   if (walletType === 'ethereum') {
     await Promise.all([removeKey(LEGACY_METADATA_KEY), deleteSecureItem(LEGACY_SECURE_KEY), removeKey(LEGACY_KEY)]);

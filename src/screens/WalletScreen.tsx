@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Animated, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createStackNavigator, StackNavigationProp } from '@react-navigation/stack';
 import { NavigationContainer } from '@react-navigation/native';
 import PulseBadge from '@components/PulseBadge';
@@ -28,6 +28,10 @@ import SwapScreen from './walletScreens/SwapScreen';
 import SendCryptoScreen from './walletScreens/SendCryptoScreen';
 import SendCryptoComplete from './walletScreens/SendCryptoComplete';
 import QRReceiveScreen from './walletScreens/QRReceiveScreen';
+import ExpressSwapScreen from './walletScreens/ExpressSwapScreen';
+import ExpressSwapSuccessScreen from './walletScreens/ExpressSwapSuccessScreen';
+import WalletTokensTab from './walletScreens/Tokens/WalletTokensTab';
+import WalletNFTsTab from './walletScreens/NFTs/WalletNFTsTab';
 
 type WalletStackParamList = {
   WalletHome: undefined;
@@ -35,6 +39,8 @@ type WalletStackParamList = {
   Send: undefined;
   Receive: { address: string };
   Swap: undefined;
+  ExpressSwap: undefined;
+  ExpressSwapSuccess: undefined;
   SendCrypto: { symbol: string; name: string; balance: string };
   SendCryptoComplete: { symbol: string };
   QRReceive: { symbol: string; name: string; address: string };
@@ -54,6 +60,8 @@ type TokenBalance = {
   color: string;
   fixedPrice?: number;
 };
+
+type WalletTab = 'tokens' | 'nfts' | 'activity';
 
 const walletActions: WalletAction[] = [
   { label: 'Add', icon: 'plus-circle', screen: 'Add' },
@@ -86,7 +94,36 @@ const Stack = createStackNavigator<WalletStackParamList>();
 function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<WalletStackParamList, 'WalletHome'> }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
-  const { status, address } = useWalletSession();
+  const { status, address, wallets, activeWalletId, switchWallet } = useWalletSession();
+  const { width } = useWindowDimensions();
+  const cardWidth = Math.max(0, width - 40);
+  const walletScrollRef = useRef<ScrollView>(null);
+
+  const walletList = useMemo(() => {
+    if (wallets.length) return wallets;
+    if (address) {
+      return [
+        {
+          id: address,
+          createdAt: '',
+          updatedAt: '',
+          walletType: CHAIN.kind === 'solana' ? 'solana' : 'ethereum',
+        },
+      ];
+    }
+    return [];
+  }, [wallets, address]);
+
+  const activeIndex = useMemo(() => {
+    if (!walletList.length) return 0;
+    const index = walletList.findIndex((record) => record.id === activeWalletId);
+    return index >= 0 ? index : 0;
+  }, [walletList, activeWalletId]);
+
+  useEffect(() => {
+    if (!walletList.length || !cardWidth) return;
+    walletScrollRef.current?.scrollTo({ x: activeIndex * cardWidth, animated: false });
+  }, [activeIndex, cardWidth, walletList.length]);
 
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
@@ -95,6 +132,7 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [chainTokens, setChainTokens] = useState<TokenBalance[]>(defaultTokens);
   const [fetchingChain, setFetchingChain] = useState(false);
+  const [activeTab, setActiveTab] = useState<WalletTab>('tokens');
 
   const totalValueAnimated = useRef(new Animated.Value(0)).current;
   const [displayTotal, setDisplayTotal] = useState(0);
@@ -222,37 +260,72 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
       </View>
 
       <View style={styles.cardWrapper}>
-        <View style={styles.walletCard}>
-          <View style={styles.walletHeader}>
-            <Text style={styles.pill}>Primary</Text>
-            <Text style={styles.walletTitle}>Main Wallet</Text>
-          </View>
-          <Text style={styles.balanceLabel}>Total value</Text>
-          <Text style={styles.balance}>{formatCurrency(displayTotal)}</Text>
-          {address && <Text style={styles.addressText}>{address}</Text>}
+        <ScrollView
+          ref={walletScrollRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={(event) => {
+            if (!cardWidth || walletList.length <= 1) return;
+            const nextIndex = Math.round(event.nativeEvent.contentOffset.x / cardWidth);
+            const nextWallet = walletList[nextIndex];
+            if (nextWallet) {
+              switchWallet(nextWallet.id);
+            }
+          }}
+        >
+          {walletList.map((wallet, index) => {
+            const isActive = wallet.id === activeWalletId || (!activeWalletId && index === 0);
+            return (
+              <View key={wallet.id} style={{ width: cardWidth }}>
+                <View style={styles.walletCard}>
+                  <View style={styles.walletHeader}>
+                    <Text style={styles.pill}>{isActive ? 'Active' : 'Wallet'}</Text>
+                    <Text style={styles.walletTitle}>Wallet {index + 1}</Text>
+                  </View>
+                  <Text style={styles.balanceLabel}>Total value</Text>
+                  <Text style={styles.balance}>{isActive ? formatCurrency(displayTotal) : '--'}</Text>
+                  <Text style={styles.addressText}>{wallet.id}</Text>
 
-          <View style={styles.actionsRow}>
-            {walletActions.map((action) => (
-              <TouchableOpacity
-                key={action.label}
-                style={styles.actionButton}
-                activeOpacity={0.7}
+                  <View style={styles.actionsRow}>
+                    {walletActions.map((action) => (
+                      <TouchableOpacity
+                        key={action.label}
+                        style={styles.actionButton}
+                        activeOpacity={0.7}
                 onPress={() => {
                   if (action.screen === 'Receive' && address) {
                     navigation.navigate('Receive', { address });
                   } else {
                     navigation.navigate(action.screen as any);
                   }
-                }}
-              >
-                <View style={styles.actionIcon}>
-                  <MaterialCommunityIcons name={action.icon} size={22} color="#ffffff" />
+                        }}
+                      >
+                        <View style={styles.actionIcon}>
+                          <MaterialCommunityIcons name={action.icon} size={22} color="#ffffff" />
+                        </View>
+                        <Text style={styles.actionLabel}>{action.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </View>
-                <Text style={styles.actionLabel}>{action.label}</Text>
-              </TouchableOpacity>
+              </View>
+            );
+          })}
+        </ScrollView>
+        {walletList.length > 1 && (
+          <View style={localStyles.walletPager}>
+            {walletList.map((wallet, index) => (
+              <View
+                key={`wallet-dot-${wallet.id}`}
+                style={[
+                  localStyles.walletDot,
+                  { backgroundColor: index === activeIndex ? colors.accent : colors.border },
+                ]}
+              />
             ))}
           </View>
-        </View>
+        )}
       </View>
 
       <View style={styles.searchContainer}>
@@ -275,47 +348,35 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
       {rpcError && <Text style={styles.errorText}>{rpcError}</Text>}
 
       <View style={styles.tabRow}>
-        <TouchableOpacity style={[styles.tabBase, styles.tabActive]}>
-          <Text style={styles.tabActiveText}>Tokens</Text>
+        <TouchableOpacity
+          style={[styles.tabBase, activeTab === 'tokens' ? styles.tabActive : styles.tabInactive]}
+          onPress={() => setActiveTab('tokens')}
+        >
+          <Text style={activeTab === 'tokens' ? styles.tabActiveText : styles.tabInactiveText}>Tokens</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.tabBase, styles.tabInactive]}>
-          <Text style={styles.tabInactiveText}>NFTs</Text>
+        <TouchableOpacity
+          style={[styles.tabBase, activeTab === 'nfts' ? styles.tabActive : styles.tabInactive]}
+          onPress={() => setActiveTab('nfts')}
+        >
+          <Text style={activeTab === 'nfts' ? styles.tabActiveText : styles.tabInactiveText}>NFTs</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.tabBase, styles.tabInactive]}>
-          <Text style={styles.tabInactiveText}>Activity</Text>
+        <TouchableOpacity
+          style={[styles.tabBase, activeTab === 'activity' ? styles.tabActive : styles.tabInactive]}
+          onPress={() => setActiveTab('activity')}
+        >
+          <Text style={activeTab === 'activity' ? styles.tabActiveText : styles.tabInactiveText}>Activity</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.listCard}>
-        {chainTokens.map((token, index) => (
-          <View key={token.symbol} style={[styles.tokenRow, index !== chainTokens.length - 1 && styles.tokenRowSpacing]}>
-            <View style={[styles.tokenIcon, { backgroundColor: `${token.color}22`, borderColor: token.color }]}>
-              <Ionicons name="ellipse" size={16} color={token.color} />
-            </View>
-            <View style={styles.tokenInfo}>
-              <Text style={styles.tokenName}>{token.name}</Text>
-              <Text style={styles.tokenSymbol}>{token.symbol}</Text>
-            </View>
-            <View style={styles.tokenAmounts}>
-              <Text style={styles.tokenBalance}>
-                {token.amount.toFixed(token.amount < 1 ? 6 : 4)} {token.symbol}
-              </Text>
-              <Text style={styles.tokenValue}>
-                {(() => {
-                  const livePrice =
-                    token.pair && typeof prices[token.pair] === 'number'
-                      ? prices[token.pair]
-                      : token.fixedPrice !== undefined
-                      ? token.fixedPrice
-                      : undefined;
-                  if (typeof livePrice !== 'number') return loading ? 'Updating prices...' : '-';
-                  return formatCurrency(livePrice * token.amount);
-                })()}
-              </Text>
-            </View>
-          </View>
-        ))}
-      </View>
+      {activeTab === 'tokens' && (
+        <WalletTokensTab tokens={chainTokens} prices={prices} loading={loading} formatCurrency={formatCurrency} />
+      )}
+      {activeTab === 'nfts' && <WalletNFTsTab />}
+      {activeTab === 'activity' && (
+        <View style={styles.listCard}>
+          <Text style={styles.metaText}>No activity yet.</Text>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -373,6 +434,7 @@ export default function WalletScreen() {
     }
   }, [status]);
 
+
   useEffect(() => {
     let cancelled = false;
     
@@ -420,6 +482,7 @@ export default function WalletScreen() {
     setFlowError(null);
     setFlowMessage(null);
   };
+
 
   const normalizeMnemonic = (phrase: string) =>
     phrase
@@ -729,7 +792,23 @@ export default function WalletScreen() {
         <Stack.Screen name="Receive" component={ReceiveScreen} />
         <Stack.Screen name="QRReceive" component={QRReceiveScreen} />
         <Stack.Screen name="Swap" component={SwapScreen} />
+        <Stack.Screen name="ExpressSwap" component={ExpressSwapScreen} />
+        <Stack.Screen name="ExpressSwapSuccess" component={ExpressSwapSuccessScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
+
+const localStyles = StyleSheet.create({
+  walletPager: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 12,
+  },
+  walletDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+});

@@ -43,6 +43,7 @@ type Props = {
   onGoImport: () => void;
   onFinishSetup: () => void;
   onSkipBackup: () => void;
+  initialImportOpen?: boolean;
 };
 
 type PasscodeFieldId = 'primary' | 'confirm' | 'unlock';
@@ -109,11 +110,12 @@ export default function WalletSetupScreen({
   onGoImport,
   onFinishSetup,
   onSkipBackup,
+  initialImportOpen,
 }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const [showHelp, setShowHelp] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(Boolean(initialImportOpen));
   const lastAutoUnlock = useRef('');
   const lastAutoCreate = useRef('');
   const [activePasscodeField, setActivePasscodeField] = useState<PasscodeFieldId | null>(null);
@@ -147,6 +149,12 @@ export default function WalletSetupScreen({
     setShowImportModal(false);
     onGoCreate();
   };
+
+  useEffect(() => {
+    if (initialImportOpen) {
+      setShowImportModal(true);
+    }
+  }, [initialImportOpen]);
 
   useEffect(() => {
     if (flow === 'create-passcode') {

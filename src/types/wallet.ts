@@ -8,3 +8,7 @@ export type EncryptedWalletKey = {
   backupCompleted?: boolean;
   walletType?: WalletKind;
 };
+
+export type WalletRecordMeta = Omit<EncryptedWalletKey, 'encryptedJson'> & {
+  label?: string;
+};

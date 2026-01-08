@@ -8,11 +8,21 @@ export type ChangelogEntry = {
 };
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
-    {
-    id: '0.16-2026-1-6',
+  {
+    id: '0.19-2026-1-8',
+    version: '0.19.1',
+    date: '2026-1-8',
+    title: 'dev build 0.19.1 ',
+    summary: 'NFTs and wallet',
+    changes: [
+      "NFTs and wallet",
+    ],
+  },
+  {
+    id: '0.18-2026-1-6',
     version: '0.18.0',
-    date: '2025-12-26',
-    title: 'dev build 0.16.1 with a few changes',
+    date: '2026-1-6',
+    title: 'dev build 0.18 with wallet send/receive',
     summary: 'work on wallet',
     changes: [
       "Add send recieve functionality to the wallet",
