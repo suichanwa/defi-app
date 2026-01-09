@@ -1,13 +1,27 @@
 import React, { useMemo } from 'react';
-import { Text, View } from 'react-native';
-import { CHAIN, getSolanaClusterLabel } from '@config/chain';
+import { Text, TouchableOpacity, View } from 'react-native';
+import { getSolanaClusterLabel } from '@config/chain';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '@theme/ThemeProvider';
+import { useChain } from '@context/ChainProvider';
 
-export default function NetworkBadge() {
+type NetworkBadgeProps = {
+  onPress?: () => void;
+};
+
+export default function NetworkBadge({ onPress }: NetworkBadgeProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
-  const label = CHAIN.kind === 'solana' ? getSolanaClusterLabel(CHAIN.cluster) : 'Mainnet';
+  const { chain } = useChain();
+  const label = chain.kind === 'solana' ? getSolanaClusterLabel(chain.cluster) : 'Mainnet';
+
+  if (onPress) {
+    return (
+      <TouchableOpacity style={styles.networkBadge} onPress={onPress} activeOpacity={0.8}>
+        <Text style={styles.networkBadgeText}>{label}</Text>
+      </TouchableOpacity>
+    );
+  }
 
   return (
     <View style={styles.networkBadge}>

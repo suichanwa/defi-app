@@ -18,6 +18,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NotificationProvider } from './src/context/NotificationProvider';
 import { NavVisibilityProvider, useNavVisibility } from './src/context/NavVisibilityProvider';
 import { QRReceiveProvider } from './src/context/QRReceiveProvider';
+import { ChainProvider } from './src/context/ChainProvider';
 
 Sentry.init({
   dsn: 'https://005462e44419a10cf92b86000ff8c484@o4510659003940864.ingest.de.sentry.io/4510659569778768',
@@ -191,20 +192,22 @@ export default Sentry.wrap(function App() {
   
   return (
     <ThemeProvider>
-      <WalletSessionProvider isWalletActive={activeTab === 'wallet'}>
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <SafeAreaProvider>
-            <NotificationProvider>
-              <NavVisibilityProvider>
-                <QRReceiveProvider>
-                  <AppContent activeTab={activeTab} onTabChange={setActiveTab} />
-                </QRReceiveProvider>
-              </NavVisibilityProvider>
-              <Toast />
-            </NotificationProvider>
-          </SafeAreaProvider>
-        </GestureHandlerRootView>
-      </WalletSessionProvider>
+      <ChainProvider>
+        <WalletSessionProvider isWalletActive={activeTab === 'wallet'}>
+          <GestureHandlerRootView style={{ flex: 1 }}>
+            <SafeAreaProvider>
+              <NotificationProvider>
+                <NavVisibilityProvider>
+                  <QRReceiveProvider>
+                    <AppContent activeTab={activeTab} onTabChange={setActiveTab} />
+                  </QRReceiveProvider>
+                </NavVisibilityProvider>
+                <Toast />
+              </NotificationProvider>
+            </SafeAreaProvider>
+          </GestureHandlerRootView>
+        </WalletSessionProvider>
+      </ChainProvider>
     </ThemeProvider>
   );
 });

@@ -1,4 +1,4 @@
-import { ETHEREUM_RPC_URL, SOLANA_RPC_URL } from '@env';
+import { ETHEREUM_RPC_URL, SOLANA_MAINNET_RPC_URL, SOLANA_RPC_URL } from '@env';
 import type { ChainConfig, SolanaChain } from '@app-types/chain';
 
 export const defaultSolanaRpcByCluster: Record<SolanaChain['cluster'], string> = {
@@ -25,7 +25,7 @@ export const CHAINS: Record<string, ChainConfig> = {
     kind: 'solana',
     name: 'Solana',
     cluster: 'mainnet-beta',
-    rpcUrl: SOLANA_RPC_URL?.trim() || defaultSolanaRpcByCluster['mainnet-beta'],
+    rpcUrl: SOLANA_MAINNET_RPC_URL?.trim() || defaultSolanaRpcByCluster['mainnet-beta'],
     explorerBaseUrl: 'https://explorer.solana.com',
     nativeToken: {
       name: 'Solana',

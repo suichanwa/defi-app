@@ -8,7 +8,7 @@ import { sha512 } from '@noble/hashes/sha2.js';
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js';
 import { bytesToUtf8, concatBytes, randomBytes, utf8ToBytes } from '@noble/ciphers/utils.js';
 import { scryptAsync } from '@noble/hashes/scrypt.js';
-import { CHAIN } from '../config/chain';
+import { getActiveChain } from '../config/chain';
 import type { EncryptedWalletKey, WalletKind, WalletRecordMeta } from '../types/wallet';
 import { getJson, removeKey, setJson } from './storage';
 import { deleteSecureItem, getSecureItem, setSecureItem } from './secureStore';
@@ -59,7 +59,7 @@ export class WalletReencryptError extends Error {
   }
 }
 
-const getActiveWalletType = (): WalletKind => (CHAIN.kind === 'solana' ? 'solana' : 'ethereum');
+const getActiveWalletType = (): WalletKind => (getActiveChain().kind === 'solana' ? 'solana' : 'ethereum');
 
 const getStorageKeys = (walletType: WalletKind) => ({
   metadataKey: `wallet.${walletType}.metadata.v1`,
@@ -304,6 +304,26 @@ export async function removeWalletRecord(
       await removeKey(activeIdKey);
     }
   }
+}
+
+export async function updateWalletRecordMeta(
+  walletId: string,
+  updates: Partial<Pick<WalletRecordMeta, 'label' | 'color'>>,
+  walletType: WalletKind = getActiveWalletType(),
+): Promise<WalletRecordMeta[]> {
+  const { listKey } = getStorageKeys(walletType);
+  const records = await loadWalletRecords(walletType);
+  const nextRecords = records.map((record) =>
+    record.id === walletId
+      ? {
+          ...record,
+          label: updates.label ?? record.label,
+          color: updates.color ?? record.color,
+        }
+      : record,
+  );
+  await setJson(listKey, nextRecords);
+  return nextRecords;
 }
 
 const encryptSolanaSecretKey = async (

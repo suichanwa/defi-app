@@ -5,7 +5,7 @@ import {
   WalletReencryptError,
 } from '../services/walletKeyStore';
 import { RpcConfigurationError } from '../services/provider';
-import { CHAIN } from '../config/chain';
+import { getActiveChain } from '../config/chain';
 
 type WalletAction = 'create' | 'import' | 'unlock' | 'send';
 
@@ -53,7 +53,13 @@ const getRpcStatus = (error: unknown): number | null => {
 
 export function rpcErrorMessage(error: unknown): string | null {
   if (error instanceof RpcConfigurationError) return error.message;
-  const envKey = CHAIN.kind === 'solana' ? 'SOLANA_RPC_URL' : 'ETHEREUM_RPC_URL';
+  const chain = getActiveChain();
+  const envKey =
+    chain.kind === 'solana'
+      ? chain.cluster === 'mainnet-beta'
+        ? 'SOLANA_MAINNET_RPC_URL'
+        : 'SOLANA_RPC_URL'
+      : 'ETHEREUM_RPC_URL';
   const status = getRpcStatus(error);
   if (status === 401) return `RPC unauthorized (401). Check ${envKey} or your provider key.`;
   if (status === 403) return 'RPC access forbidden (403). Check your provider permissions.';

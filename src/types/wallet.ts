@@ -11,4 +11,5 @@ export type EncryptedWalletKey = {
 
 export type WalletRecordMeta = Omit<EncryptedWalletKey, 'encryptedJson'> & {
   label?: string;
+  color?: string;
 };

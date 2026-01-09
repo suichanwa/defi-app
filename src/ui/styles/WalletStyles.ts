@@ -50,6 +50,21 @@ export const createWalletStyles = (colors: ReturnType<typeof useTheme>['colors']
       fontWeight: '600',
       color: colors.text,
     },
+    networkBadge: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    networkBadgeText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.text,
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
 
     // Card wrapper with better shadow
     cardWrapper: {

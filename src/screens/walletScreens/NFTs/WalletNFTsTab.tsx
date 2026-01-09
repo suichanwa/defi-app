@@ -1,40 +1,131 @@
-import React, { useMemo } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { ALCHEMY_NFT_FALLBACK_OWNER } from '@env';
 import { useTheme } from '@theme/ThemeProvider';
+import { useChain } from '@context/ChainProvider';
+import { fetchAlchemySolanaNfts } from '@services/nft/alchemySolana';
 
 type NftItem = {
   id: string;
   name: string;
   collection: string;
-  color: string;
+  imageUrl: string | null;
 };
 
-const MOCK_NFTS: NftItem[] = [
-  { id: 'ape-1', name: 'Trickster Ape', collection: 'Bored Set', color: '#f59e0b' },
-  { id: 'ape-2', name: 'Halo Ape', collection: 'Bored Set', color: '#6d28d9' },
-  { id: 'ape-3', name: 'Neon Ape', collection: 'Bored Set', color: '#22c55e' },
-  { id: 'ape-4', name: 'Citrus Ape', collection: 'Bored Set', color: '#fb7185' },
-];
+type WalletNFTsTabProps = {
+  ownerAddress: string | null;
+};
 
-export default function WalletNFTsTab() {
+const FALLBACK_COLORS = ['#f59e0b', '#6d28d9', '#22c55e', '#fb7185', '#38bdf8', '#f97316'];
+const LOCAL_FALLBACK_IMAGE = require('../../../../assets/nfttest/nfttest.jpg');
+
+export default function WalletNFTsTab({ ownerAddress }: WalletNFTsTabProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { chain } = useChain();
+  const [nfts, setNfts] = useState<NftItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [useLocalFallback, setUseLocalFallback] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      if (chain.kind !== 'solana') {
+        setNfts([]);
+        setError('NFT view is available for Solana wallets only.');
+        return;
+      }
+      const fallbackOwner = ALCHEMY_NFT_FALLBACK_OWNER?.trim() || '';
+      const shouldUseFallback = chain.cluster !== 'mainnet-beta' || !ownerAddress;
+      const targetOwner = shouldUseFallback ? fallbackOwner : ownerAddress;
+      if (!targetOwner) {
+        setNfts([]);
+        setError('Set a fallback Solana mainnet owner to preview NFTs.');
+        return;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const items = await fetchAlchemySolanaNfts(targetOwner, 'mainnet-beta');
+        if (!cancelled) {
+          setNfts(items);
+          setUseLocalFallback(items.length === 0);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Unable to load NFTs.');
+          setUseLocalFallback(true);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [ownerAddress, chain]);
 
   return (
     <View style={styles.grid}>
-      {MOCK_NFTS.map((nft) => (
+      {loading && (
+        <Text style={[styles.stateText, { color: colors.muted }]}>Loading NFTs...</Text>
+      )}
+      {!loading && error && (
+        <Text style={[styles.stateText, { color: colors.muted }]}>{error}</Text>
+      )}
+      {!loading && !error && nfts.length === 0 && !useLocalFallback && (
+        <Text style={[styles.stateText, { color: colors.muted }]}>No NFTs found.</Text>
+      )}
+      {useLocalFallback && (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={[
+            styles.card,
+            { backgroundColor: `${FALLBACK_COLORS[0]}26`, borderColor: FALLBACK_COLORS[0] },
+          ]}
+        >
+          <Image source={LOCAL_FALLBACK_IMAGE} style={styles.image} resizeMode="cover" />
+          <View style={styles.content}>
+            <Text numberOfLines={1} style={[styles.name, { color: colors.text }]}>
+              NFT Preview
+            </Text>
+            <Text numberOfLines={1} style={[styles.collection, { color: colors.muted }]}>
+              Local fallback
+            </Text>
+          </View>
+        </TouchableOpacity>
+      )}
+      {nfts.map((nft, index) => (
         <TouchableOpacity
           key={nft.id}
           activeOpacity={0.85}
-          style={[styles.card, { backgroundColor: `${nft.color}26`, borderColor: nft.color }]}
+          style={[
+            styles.card,
+            {
+              backgroundColor: `${FALLBACK_COLORS[index % FALLBACK_COLORS.length]}26`,
+              borderColor: FALLBACK_COLORS[index % FALLBACK_COLORS.length],
+            },
+          ]}
         >
-          <View style={[styles.badge, { backgroundColor: nft.color }]}>
-            <Ionicons name="sparkles" size={14} color="#ffffff" />
-          </View>
+          {nft.imageUrl ? (
+            <Image source={{ uri: nft.imageUrl }} style={styles.image} resizeMode="cover" />
+          ) : (
+            <View style={styles.imageFallback}>
+              <Ionicons name="image" size={22} color="#ffffff" />
+            </View>
+          )}
           <View style={styles.content}>
-            <Text style={[styles.name, { color: colors.text }]}>{nft.name}</Text>
-            <Text style={[styles.collection, { color: colors.muted }]}>{nft.collection}</Text>
+            <Text numberOfLines={1} style={[styles.name, { color: colors.text }]}>
+              {nft.name}
+            </Text>
+            <Text numberOfLines={1} style={[styles.collection, { color: colors.muted }]}>
+              {nft.collection}
+            </Text>
           </View>
         </TouchableOpacity>
       ))}
@@ -49,23 +140,17 @@ const createStyles = (colors: { text: string; muted: string }) =>
       flexWrap: 'wrap',
       gap: 16,
     },
+    stateText: {
+      fontSize: 13,
+      fontWeight: '600',
+      marginBottom: 8,
+    },
     card: {
       width: '47%',
       borderRadius: 18,
       borderWidth: 1.5,
-      padding: 16,
-      minHeight: 160,
-      justifyContent: 'space-between',
-    },
-    badge: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    content: {
-      gap: 6,
+      padding: 12,
+      minHeight: 200,
     },
     name: {
       fontSize: 14,
@@ -74,5 +159,24 @@ const createStyles = (colors: { text: string; muted: string }) =>
     collection: {
       fontSize: 12,
       fontWeight: '600',
+    },
+    image: {
+      width: '100%',
+      height: 110,
+      borderRadius: 12,
+      marginBottom: 12,
+      backgroundColor: '#0f172a',
+    },
+    imageFallback: {
+      width: '100%',
+      height: 110,
+      borderRadius: 12,
+      marginBottom: 12,
+      backgroundColor: '#0f172a',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    content: {
+      gap: 6,
     },
   });

@@ -1,9 +1,21 @@
 import type { ChainConfig, EthereumChain, SolanaChain } from '@app-types/chain';
-import { CHAINS, CHAIN } from '@constants/chain.constants';
+import { CHAINS } from '@constants/chain.constants';
 
 export type { ChainConfig, EthereumChain, SolanaChain } from '@app-types/chain';
 
-export { CHAINS, CHAIN };
+export type ChainKey = keyof typeof CHAINS;
+
+let activeChainKey: ChainKey = 'solanaDevnet';
+
+export const getActiveChainKey = () => activeChainKey;
+export const setActiveChainKey = (nextKey: ChainKey) => {
+  if (CHAINS[nextKey]) {
+    activeChainKey = nextKey;
+  }
+};
+export const getActiveChain = () => CHAINS[activeChainKey];
+
+export { CHAINS };
 
 export const isSolanaChain = (chain: ChainConfig): chain is SolanaChain => chain.kind === 'solana';
 

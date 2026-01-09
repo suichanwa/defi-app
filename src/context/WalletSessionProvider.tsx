@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { AppState } from 'react-native';
 import { Wallet } from 'ethers';
 import type { Keypair } from '@solana/web3.js';
-import { CHAIN } from '../config/chain';
+import { getActiveChain } from '../config/chain';
 import {
   createInitialWalletKey,
   encryptWalletKey,
@@ -15,6 +15,7 @@ import {
   clearWallet as clearWalletStorage,
   saveEncryptedWalletKey,
   setActiveWalletId,
+  updateWalletRecordMeta,
   createSolanaWalletRecord,
   importSolanaWalletRecord,
   unlockSolanaWallet,
@@ -41,6 +42,7 @@ type WalletSession = {
   confirmBackup: () => Promise<void>;
   forgetWallet: () => Promise<void>;
   switchWallet: (walletId: string) => Promise<void>;
+  updateWalletMeta: (walletId: string, updates: Partial<WalletRecordMeta>) => Promise<void>;
 };
 
 const WalletSessionContext = createContext<WalletSession | null>(null);
@@ -80,7 +82,7 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
 
   const hydrateUnlockedWallet = useCallback(
     async (record: { id: string; encryptedJson: string; backupCompleted?: boolean }, password: string) => {
-      if (CHAIN.kind === 'solana') {
+      if (getActiveChain().kind === 'solana') {
         const { keypair, mnemonic } = await unlockSolanaWallet(record.encryptedJson, password);
         setWallet(keypair);
         setAddress(record.id);
@@ -169,7 +171,7 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
     }
     setActiveWalletIdState(existing.id);
     lastPasswordRef.current = password;
-    if (CHAIN.kind === 'solana') {
+    if (getActiveChain().kind === 'solana') {
       await hydrateUnlockedWallet(existing, password);
       setStatus('unlocked');
       scheduleLock();
@@ -203,7 +205,7 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
   };
 
   const createWallet = async (password: string) => {
-    if (CHAIN.kind === 'solana') {
+    if (getActiveChain().kind === 'solana') {
       const { record, keypair, mnemonic } = await createSolanaWalletRecord(password);
       setAddress(record.id);
       setBackupCompletedState(false);
@@ -233,7 +235,7 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
   };
 
   const importWallet = async (mnemonic: string, password: string) => {
-    if (CHAIN.kind === 'solana') {
+    if (getActiveChain().kind === 'solana') {
       const { record, keypair } = await importSolanaWalletRecord(mnemonic.trim(), password);
       setAddress(record.id);
       setBackupCompletedState(false);
@@ -268,6 +270,14 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
     setBackupCompletedState(true);
     setRecoveryPhrase(null);
     await refreshWallets();
+  };
+
+  const updateWalletMeta = async (walletId: string, updates: Partial<WalletRecordMeta>) => {
+    const next = await updateWalletRecordMeta(walletId, {
+      label: updates.label,
+      color: updates.color,
+    });
+    setWallets(next);
   };
 
   const switchWallet = async (walletId: string) => {
@@ -319,6 +329,7 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
       confirmBackup,
       forgetWallet,
       switchWallet,
+      updateWalletMeta,
     }),
     [
       status,
@@ -328,6 +339,7 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
       backupCompletedState,
       wallets,
       activeWalletId,
+      updateWalletMeta,
     ],
   );
 

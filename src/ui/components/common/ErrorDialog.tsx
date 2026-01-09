@@ -5,17 +5,19 @@ type Props = {
   visible: boolean;
   title?: string;
   message: string;
+  variant?: 'error' | 'warning' | 'info';
   onClose: () => void;
 };
 
-export default function ErrorDialog({ visible, title = 'Error', message, onClose }: Props) {
+export default function ErrorDialog({ visible, title = 'Error', message, variant = 'error', onClose }: Props) {
+  const variantStyle = variantStyles[variant];
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.card}>
-          <Text style={styles.title}>{title}</Text>
+        <View style={[styles.card, variantStyle.card]}>
+          <Text style={[styles.title, variantStyle.title]}>{title}</Text>
           <Text style={styles.message}>{message}</Text>
-          <TouchableOpacity style={styles.button} onPress={onClose} activeOpacity={0.9}>
+          <TouchableOpacity style={[styles.button, variantStyle.button]} onPress={onClose} activeOpacity={0.9}>
             <Text style={styles.buttonText}>OK</Text>
           </TouchableOpacity>
         </View>
@@ -56,10 +58,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: '#ef4444',
   },
   buttonText: {
     color: '#ffffff',
     fontWeight: '600',
   },
 });
+
+const variantStyles = {
+  error: StyleSheet.create({
+    card: { borderColor: '#fecaca' },
+    title: { color: '#b91c1c' },
+    button: { backgroundColor: '#ef4444' },
+  }),
+  warning: StyleSheet.create({
+    card: { borderColor: '#fde68a' },
+    title: { color: '#b45309' },
+    button: { backgroundColor: '#f59e0b' },
+  }),
+  info: StyleSheet.create({
+    card: { borderColor: '#bfdbfe' },
+    title: { color: '#1d4ed8' },
+    button: { backgroundColor: '#2563eb' },
+  }),
+} as const;

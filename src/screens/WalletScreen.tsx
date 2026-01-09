@@ -1,20 +1,33 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import {
+  Animated,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createStackNavigator, StackNavigationProp } from '@react-navigation/stack';
 import { NavigationContainer } from '@react-navigation/native';
 import PulseBadge from '@components/PulseBadge';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '../theme/ThemeProvider';
+import { useChain } from '../context/ChainProvider';
 import { useWalletSession } from '../context/WalletSessionProvider';
 import { ERC20_TOKENS } from '../config/tokens';
 import { fetchNativeBalance, fetchTokenBalances } from '../services/balances';
-import { CHAIN } from '../config/chain';
+import type { ChainConfig } from '../config/chain';
+import type { WalletRecordMeta } from '../types/wallet';
 import WalletSetupScreen from '@components/wallet/WalletSetupScreen';
 import NetworkBadge from '@components/wallet/NetworkBadge';
 import { rpcErrorMessage, walletErrorMessage } from '../utils/walletErrors';
 import ErrorDialog from '@components/common/ErrorDialog';
 import { fetchSolBalance } from '../services/solanaBalances';
+import { requestSolAirdrop } from '../services/solanaAirdrop';
+import useApiError from '../hooks/useApiError';
 import {
   canUseBiometrics,
   getBiometricPassword,
@@ -30,6 +43,7 @@ import SendCryptoComplete from './walletScreens/SendCryptoComplete';
 import QRReceiveScreen from './walletScreens/QRReceiveScreen';
 import ExpressSwapScreen from './walletScreens/ExpressSwapScreen';
 import ExpressSwapSuccessScreen from './walletScreens/ExpressSwapSuccessScreen';
+import WalletCardSettingsScreen from './walletScreens/WalletCardSettingsScreen';
 import WalletTokensTab from './walletScreens/Tokens/WalletTokensTab';
 import WalletNFTsTab from './walletScreens/NFTs/WalletNFTsTab';
 
@@ -44,6 +58,7 @@ type WalletStackParamList = {
   SendCrypto: { symbol: string; name: string; balance: string };
   SendCryptoComplete: { symbol: string };
   QRReceive: { symbol: string; name: string; address: string };
+  WalletCardSettings: { walletId: string };
 };
 
 type WalletAction = {
@@ -70,15 +85,15 @@ const walletActions: WalletAction[] = [
   { label: 'Swap', icon: 'swap-horizontal', screen: 'Swap' },
 ];
 
-const defaultTokens: TokenBalance[] = [
+const buildDefaultTokens = (chain: ChainConfig): TokenBalance[] => [
   {
-    name: CHAIN.nativeToken.name,
-    symbol: CHAIN.nativeToken.symbol,
+    name: chain.nativeToken.name,
+    symbol: chain.nativeToken.symbol,
     amount: 0,
-    pair: CHAIN.nativeToken.priceSymbol,
-    color: CHAIN.nativeToken.color,
+    pair: chain.nativeToken.priceSymbol,
+    color: chain.nativeToken.color,
   },
-  ...(CHAIN.kind === 'ethereum'
+  ...(chain.kind === 'ethereum'
     ? ERC20_TOKENS.map<TokenBalance>((t) => ({
         name: t.name,
         symbol: t.symbol,
@@ -94,12 +109,22 @@ const Stack = createStackNavigator<WalletStackParamList>();
 function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<WalletStackParamList, 'WalletHome'> }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
+  const { chain, chainKey, setChainKey } = useChain();
   const { status, address, wallets, activeWalletId, switchWallet } = useWalletSession();
   const { width } = useWindowDimensions();
   const cardWidth = Math.max(0, width - 40);
   const walletScrollRef = useRef<ScrollView>(null);
+  const [isAirdropLoading, setIsAirdropLoading] = useState(false);
+  const [airdropMessage, setAirdropMessage] = useState<string | null>(null);
+  const [airdropTick, setAirdropTick] = useState(0);
+  const { errorMessage, errorTitle, errorVariant, isErrorVisible, handleError, clearError } = useApiError();
+  const handleActivateWallet = (walletId: string) => {
+    if (walletId && walletId !== activeWalletId) {
+      switchWallet(walletId);
+    }
+  };
 
-  const walletList = useMemo(() => {
+  const walletList = useMemo<WalletRecordMeta[]>(() => {
     if (wallets.length) return wallets;
     if (address) {
       return [
@@ -107,12 +132,14 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
           id: address,
           createdAt: '',
           updatedAt: '',
-          walletType: CHAIN.kind === 'solana' ? 'solana' : 'ethereum',
+          walletType: chain.kind === 'solana' ? 'solana' : 'ethereum',
+          label: undefined,
+          color: undefined,
         },
       ];
     }
     return [];
-  }, [wallets, address]);
+  }, [wallets, address, chain.kind]);
 
   const activeIndex = useMemo(() => {
     if (!walletList.length) return 0;
@@ -130,7 +157,7 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
   const [error, setError] = useState<string | null>(null);
   const [rpcError, setRpcError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
-  const [chainTokens, setChainTokens] = useState<TokenBalance[]>(defaultTokens);
+  const [chainTokens, setChainTokens] = useState<TokenBalance[]>(() => buildDefaultTokens(chain));
   const [fetchingChain, setFetchingChain] = useState(false);
   const [activeTab, setActiveTab] = useState<WalletTab>('tokens');
 
@@ -191,7 +218,7 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
     fetchPrices();
     const interval = setInterval(fetchPrices, 1_000);
     return () => clearInterval(interval);
-  }, [status, trackedPairs]);
+  }, [status, trackedPairs, chain]);
 
   useEffect(() => {
     totalValueAnimated.setValue(totalValueUSD);
@@ -212,10 +239,10 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
       if (status !== 'unlocked' || !address) return;
       setFetchingChain(true);
       try {
-        if (CHAIN.kind === 'solana') {
+        if (chain.kind === 'solana') {
           const native = await fetchSolBalance(address);
-          const nextTokens: TokenBalance[] = defaultTokens.map((token) =>
-            token.symbol === CHAIN.nativeToken.symbol ? { ...token, amount: Number(native) } : token,
+          const nextTokens: TokenBalance[] = buildDefaultTokens(chain).map((token) =>
+            token.symbol === chain.nativeToken.symbol ? { ...token, amount: Number(native) } : token,
           );
           setChainTokens(nextTokens);
         } else {
@@ -223,8 +250,8 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
             fetchNativeBalance(address),
             fetchTokenBalances(address, ERC20_TOKENS),
           ]);
-          const nextTokens: TokenBalance[] = defaultTokens.map((token) => {
-            if (token.symbol === CHAIN.nativeToken.symbol) {
+          const nextTokens: TokenBalance[] = buildDefaultTokens(chain).map((token) => {
+            if (token.symbol === chain.nativeToken.symbol) {
               return { ...token, amount: Number(native) };
             }
             const match = erc20[token.symbol];
@@ -241,7 +268,40 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
       }
     };
     loadOnChain();
-  }, [status, address]);
+  }, [status, address, chain, airdropTick]);
+
+  useEffect(() => {
+    setChainTokens(buildDefaultTokens(chain));
+    setAirdropMessage(null);
+  }, [chain]);
+
+  const handleToggleNetwork = async () => {
+    if (chainKey === 'solanaDevnet') {
+      await setChainKey('solanaMainnet');
+      return;
+    }
+    if (chainKey === 'solanaMainnet') {
+      await setChainKey('solanaDevnet');
+    }
+  };
+
+  const handleAirdrop = async () => {
+    if (!address || chain.kind !== 'solana' || chain.cluster !== 'devnet') return;
+    setIsAirdropLoading(true);
+    setAirdropMessage(null);
+    try {
+      await requestSolAirdrop(address, 1);
+      setAirdropMessage('Airdrop requested. Balance will update shortly.');
+      setAirdropTick((prev) => prev + 1);
+    } catch (error) {
+      handleError(error, {
+        defaultMessage: 'Airdrop failed. Try again.',
+        rateLimitMessage: 'Airdrop rate limited. Please wait a moment and try again.',
+      });
+    } finally {
+      setIsAirdropLoading(false);
+    }
+  };
 
   return (
     <ScrollView contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}>
@@ -250,14 +310,34 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
           <Text style={styles.headerTitle}>Wallet</Text>
           <Text style={styles.headerSubtitle}>On-chain balances with live pricing.</Text>
         </View>
-        <View style={styles.headerPills}>
-          <NetworkBadge />
+        <View style={localStyles.headerPills}>
+          <NetworkBadge onPress={handleToggleNetwork} />
+          {chain.kind === 'solana' && chain.cluster === 'devnet' && (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[localStyles.airdropButton, { borderColor: colors.border }]}
+              onPress={handleAirdrop}
+              disabled={isAirdropLoading || !address}
+            >
+              <Text style={[localStyles.airdropButtonText, { color: colors.text }]}>
+                {isAirdropLoading ? 'Airdropping...' : 'Airdrop 1 SOL'}
+              </Text>
+            </TouchableOpacity>
+          )}
           <View style={styles.statusPill}>
             <PulseBadge size={8} color={fetchingChain ? '#f97316' : '#22c55e'} durationMs={1400} />
             <Text style={styles.statusText}>{fetchingChain ? 'Syncing' : 'Live'}</Text>
           </View>
         </View>
       </View>
+      {airdropMessage && <Text style={[styles.messageText, styles.messageInfo]}>{airdropMessage}</Text>}
+      <ErrorDialog
+        visible={isErrorVisible}
+        title={errorTitle}
+        message={errorMessage}
+        variant={errorVariant}
+        onClose={clearError}
+      />
 
       <View style={styles.cardWrapper}>
         <ScrollView
@@ -265,12 +345,16 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
+          onContentSizeChange={() => {
+            if (!cardWidth || !walletList.length) return;
+            walletScrollRef.current?.scrollTo({ x: activeIndex * cardWidth, animated: false });
+          }}
           onMomentumScrollEnd={(event) => {
             if (!cardWidth || walletList.length <= 1) return;
             const nextIndex = Math.round(event.nativeEvent.contentOffset.x / cardWidth);
             const nextWallet = walletList[nextIndex];
             if (nextWallet) {
-              switchWallet(nextWallet.id);
+              handleActivateWallet(nextWallet.id);
             }
           }}
         >
@@ -278,14 +362,38 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
             const isActive = wallet.id === activeWalletId || (!activeWalletId && index === 0);
             return (
               <View key={wallet.id} style={{ width: cardWidth }}>
-                <View style={styles.walletCard}>
+                <View
+                  style={[
+                    styles.walletCard,
+                    {
+                      borderColor: wallet.color ?? colors.border,
+                      backgroundColor: wallet.color ? `${wallet.color}12` : colors.card,
+                    },
+                  ]}
+                >
                   <View style={styles.walletHeader}>
                     <Text style={styles.pill}>{isActive ? 'Active' : 'Wallet'}</Text>
-                    <Text style={styles.walletTitle}>Wallet {index + 1}</Text>
+                    <Text style={styles.walletTitle}>{wallet.label ?? `Wallet ${index + 1}`}</Text>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      style={[localStyles.editButton, { borderColor: colors.border }]}
+                      onPress={() => navigation.navigate('WalletCardSettings', { walletId: wallet.id })}
+                    >
+                      <MaterialCommunityIcons name="pencil" size={16} color={colors.text} />
+                    </TouchableOpacity>
                   </View>
                   <Text style={styles.balanceLabel}>Total value</Text>
                   <Text style={styles.balance}>{isActive ? formatCurrency(displayTotal) : '--'}</Text>
                   <Text style={styles.addressText}>{wallet.id}</Text>
+                  {!isActive && (
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      style={[localStyles.activateButton, { borderColor: colors.border }]}
+                      onPress={() => handleActivateWallet(wallet.id)}
+                    >
+                      <Text style={[localStyles.activateButtonText, { color: colors.text }]}>Activate wallet</Text>
+                    </TouchableOpacity>
+                  )}
 
                   <View style={styles.actionsRow}>
                     {walletActions.map((action) => (
@@ -293,12 +401,12 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
                         key={action.label}
                         style={styles.actionButton}
                         activeOpacity={0.7}
-                onPress={() => {
-                  if (action.screen === 'Receive' && address) {
-                    navigation.navigate('Receive', { address });
-                  } else {
-                    navigation.navigate(action.screen as any);
-                  }
+                        onPress={() => {
+                          if (action.screen === 'Receive' && address) {
+                            navigation.navigate('Receive', { address });
+                          } else {
+                            navigation.navigate(action.screen as any);
+                          }
                         }}
                       >
                         <View style={styles.actionIcon}>
@@ -371,7 +479,7 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
       {activeTab === 'tokens' && (
         <WalletTokensTab tokens={chainTokens} prices={prices} loading={loading} formatCurrency={formatCurrency} />
       )}
-      {activeTab === 'nfts' && <WalletNFTsTab />}
+      {activeTab === 'nfts' && <WalletNFTsTab ownerAddress={address} />}
       {activeTab === 'activity' && (
         <View style={styles.listCard}>
           <Text style={styles.metaText}>No activity yet.</Text>
@@ -794,6 +902,7 @@ export default function WalletScreen() {
         <Stack.Screen name="Swap" component={SwapScreen} />
         <Stack.Screen name="ExpressSwap" component={ExpressSwapScreen} />
         <Stack.Screen name="ExpressSwapSuccess" component={ExpressSwapSuccessScreen} />
+        <Stack.Screen name="WalletCardSettings" component={WalletCardSettingsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -810,5 +919,45 @@ const localStyles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+  },
+  headerPills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    maxWidth: 160,
+  },
+  activateButton: {
+    marginTop: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+  },
+  activateButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  airdropButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    maxWidth: 140,
+  },
+  airdropButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  editButton: {
+    marginLeft: 'auto',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
