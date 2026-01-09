@@ -8,12 +8,14 @@ type WalletSearchBarProps = {
   value?: string;
   placeholder?: string;
   onChangeText?: (text: string) => void;
+  onFocus?: () => void;
 };
 
 export default function WalletSearchBar({
   value,
   placeholder = 'Search tokens...',
   onChangeText,
+  onFocus,
 }: WalletSearchBarProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
@@ -27,6 +29,7 @@ export default function WalletSearchBar({
         style={styles.searchInput}
         value={value}
         onChangeText={onChangeText}
+        onFocus={onFocus}
       />
       <MaterialCommunityIcons name="link-variant" size={20} color={colors.muted} style={styles.searchIcon} />
     </View>

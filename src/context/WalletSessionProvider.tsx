@@ -42,6 +42,7 @@ type WalletSession = {
   confirmBackup: () => Promise<void>;
   forgetWallet: () => Promise<void>;
   removeWallet: (walletId: string) => Promise<void>;
+  registerActivity: () => void;
   switchWallet: (walletId: string) => Promise<void>;
   updateWalletMeta: (walletId: string, updates: Partial<WalletRecordMeta>) => Promise<void>;
 };
@@ -190,6 +191,11 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
     clearLockTimer();
     lastPasswordRef.current = null;
   };
+
+  const registerActivity = useCallback(() => {
+    if (status !== 'unlocked') return;
+    scheduleLock();
+  }, [scheduleLock, status]);
 
   const forgetWallet = async () => {
     clearLockTimer();
@@ -374,6 +380,7 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
       confirmBackup,
       forgetWallet,
       removeWallet,
+      registerActivity,
       switchWallet,
       updateWalletMeta,
     }),
@@ -387,6 +394,7 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
       activeWalletId,
       updateWalletMeta,
       removeWallet,
+      registerActivity,
     ],
   );
 

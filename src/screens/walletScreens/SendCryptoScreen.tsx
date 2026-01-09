@@ -6,6 +6,10 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import { useTheme } from '@theme/ThemeProvider';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useNavVisibility } from '@context/NavVisibilityProvider';
+import { useChain } from '@context/ChainProvider';
+import { useWalletSession } from '@context/WalletSessionProvider';
+import { getSolanaConnection } from '@services/solanaProvider';
+import { Keypair, PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
 
 type RouteParams = {
   symbol: string;
@@ -20,7 +24,7 @@ type WalletStackParamList = {
   Receive: { address: string };
   Swap: undefined;
   SendCrypto: { symbol: string; name: string; balance: string };
-  SendCryptoComplete: { symbol: string };
+  SendCryptoComplete: { symbol: string; amount: string; toAddress: string; signature: string };
 };
 
 export default function SendCryptoScreen() {
@@ -32,7 +36,11 @@ export default function SendCryptoScreen() {
   const [address, setAddress] = useState('');
   const [network, setNetwork] = useState('');
   const [amount, setAmount] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const { setNavHidden } = useNavVisibility();
+  const { chain } = useChain();
+  const { wallet } = useWalletSession();
 
   useFocusEffect(
     React.useCallback(() => {
@@ -40,6 +48,59 @@ export default function SendCryptoScreen() {
       return () => setNavHidden(false);
     }, [setNavHidden]),
   );
+
+  const handleSend = async () => {
+    if (isSubmitting) return;
+    setFormError(null);
+    const trimmedAddress = address.trim();
+    const amountValue = Number(amount);
+
+    if (!trimmedAddress) {
+      setFormError('Enter a recipient address.');
+      return;
+    }
+    if (!Number.isFinite(amountValue) || amountValue <= 0) {
+      setFormError('Enter a valid amount.');
+      return;
+    }
+    if (symbol && symbol !== 'SOL') {
+      setFormError('Only SOL transfers are supported on devnet right now.');
+      return;
+    }
+    if (chain.kind !== 'solana') {
+      setFormError('Solana devnet is required for sending right now.');
+      return;
+    }
+    if (!wallet || !(wallet instanceof Keypair)) {
+      setFormError('Wallet is locked. Unlock to send.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const connection = getSolanaConnection();
+      const toPubkey = new PublicKey(trimmedAddress);
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: wallet.publicKey,
+          toPubkey,
+          lamports: Math.round(amountValue * 1_000_000_000),
+        }),
+      );
+      const signature = await connection.sendTransaction(transaction, [wallet]);
+      await connection.confirmTransaction(signature, 'confirmed');
+      navigation.navigate('SendCryptoComplete', {
+        symbol: symbol ?? 'SOL',
+        amount: amountValue.toString(),
+        toAddress: trimmedAddress,
+        signature,
+      });
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Unable to send transaction.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <View style={[localStyles.container, { backgroundColor: colors.background }]}>
@@ -126,12 +187,15 @@ export default function SendCryptoScreen() {
           </View>
         </View>
 
+        {formError && <Text style={styles.errorText}>{formError}</Text>}
+
         <TouchableOpacity
           activeOpacity={0.9}
-          style={[styles.primaryButton, localStyles.inlineButton]}
-          onPress={() => navigation.navigate('SendCryptoComplete', { symbol: symbol ?? 'BTC' })}
+          style={[styles.primaryButton, localStyles.inlineButton, isSubmitting && styles.buttonDisabled]}
+          onPress={handleSend}
+          disabled={isSubmitting}
         >
-          <Text style={styles.primaryButtonText}>Withdraw</Text>
+          <Text style={styles.primaryButtonText}>{isSubmitting ? 'Sending...' : 'Withdraw'}</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>

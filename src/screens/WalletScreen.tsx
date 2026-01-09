@@ -36,6 +36,7 @@ import WalletHeaderSection from './walletScreens/components/WalletHeaderSection'
 import WalletCardCarousel, { WalletActionItem } from './walletScreens/components/WalletCardCarousel';
 import WalletSearchBar from './walletScreens/components/WalletSearchBar';
 import WalletTabSelector, { WalletTab } from './walletScreens/components/WalletTabSelector';
+import WalletTokenSearchOverlay from './walletScreens/components/WalletTokenSearchOverlay';
 
 type WalletStackParamList = {
   WalletHome: undefined;
@@ -46,7 +47,7 @@ type WalletStackParamList = {
   ExpressSwap: undefined;
   ExpressSwapSuccess: undefined;
   SendCrypto: { symbol: string; name: string; balance: string };
-  SendCryptoComplete: { symbol: string };
+  SendCryptoComplete: { symbol: string; amount: string; toAddress: string; signature: string };
   QRReceive: { symbol: string; name: string; address: string };
   WalletCardSettings: { walletId: string };
   WalletSettings: { walletId: string };
@@ -69,7 +70,7 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const { chain, chainKey, setChainKey } = useChain();
-  const { status, address, wallets, activeWalletId, switchWallet } = useWalletSession();
+  const { status, address, wallets, activeWalletId, switchWallet, registerActivity } = useWalletSession();
   const { width } = useWindowDimensions();
   const cardWidth = Math.max(0, width - 40);
   const [isAirdropLoading, setIsAirdropLoading] = useState(false);
@@ -119,6 +120,7 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
     onMomentumScrollEnd,
   } = useWalletRefresh(chain, status, address, airdropTick, 15000);
   const [activeTab, setActiveTab] = useState<WalletTab>('tokens');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const totalValueAnimated = useRef(new Animated.Value(0)).current;
   const [displayTotal, setDisplayTotal] = useState(0);
@@ -196,6 +198,8 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
       onScrollBeginDrag={onScrollBeginDrag}
       onScrollEndDrag={onScrollEndDrag}
       onMomentumScrollEnd={onMomentumScrollEnd}
+      onTouchStart={registerActivity}
+      onScroll={registerActivity}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
     >
@@ -236,7 +240,8 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
         onActivateWallet={handleActivateWallet}
       />
 
-      <WalletSearchBar />
+      <WalletSearchBar onFocus={() => setIsSearchOpen(true)} />
+      <WalletTokenSearchOverlay visible={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
 
       {priceError ? (
         <Text style={styles.errorText}>{priceError}</Text>

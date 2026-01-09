@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, View, StyleSheet, TouchableOpacity } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -9,6 +9,7 @@ import { useCopyToClipboard } from '@hooks/useCopyToClipboard';
 import { useQRReceive } from '@context/QRReceiveProvider';
 import { useNavVisibility } from '@context/NavVisibilityProvider';
 import { useWalletSession } from '@context/WalletSessionProvider';
+import { fetchSolBalance } from '@services/solanaBalances';
 
 type WalletStackParamList = {
   Receive: { address: string };
@@ -28,6 +29,8 @@ export default function ReceiveScreen() {
   const { setQRData } = useQRReceive();
   const { setNavHidden } = useNavVisibility();
   const { wallets, activeWalletId } = useWalletSession();
+  const [solBalance, setSolBalance] = useState<string>('0.00');
+  const [balanceError, setBalanceError] = useState<string | null>(null);
   const walletList = wallets.length
     ? wallets
     : address
@@ -48,19 +51,33 @@ export default function ReceiveScreen() {
     return () => setNavHidden(false);
   }, [setNavHidden]);
 
-  const tokens = [
-    { symbol: 'BTC', name: 'Bitcoin', color: '#f59e0b' },
-    { symbol: 'ETH', name: 'Ethereum', color: '#6366f1' },
-    { symbol: 'BNB', name: 'BNB Smart Chain', color: '#fbbf24' },
-    { symbol: 'XRP', name: 'Ripple', color: '#0f172a' },
-    { symbol: 'SOL', name: 'Solana', color: '#8b5cf6' },
-  ];
+  const tokens = [{ symbol: 'SOL', name: 'Solana', color: '#8b5cf6' }];
 
   const formatAddress = (value: string | null) => {
     if (!value) return 'Address unavailable';
     if (value.length <= 10) return value;
     return `${value.slice(0, 4)}...${value.slice(-4)}`;
   };
+
+  useEffect(() => {
+    let active = true;
+    const loadBalance = async () => {
+      if (!selectedAddress) return;
+      try {
+        const balance = await fetchSolBalance(selectedAddress);
+        if (!active) return;
+        setSolBalance(Number(balance).toFixed(4));
+        setBalanceError(null);
+      } catch {
+        if (!active) return;
+        setBalanceError('Unable to load balance');
+      }
+    };
+    loadBalance();
+    return () => {
+      active = false;
+    };
+  }, [selectedAddress]);
 
   return (
     <View style={localStyles.container}>
@@ -130,6 +147,9 @@ export default function ReceiveScreen() {
                   <Text style={[localStyles.assetName, { color: colors.text }]}>{token.name}</Text>
                   <Text style={[localStyles.assetAddress, { color: colors.muted }]}>
                     {formatAddress(selectedAddress)}
+                  </Text>
+                  <Text style={[localStyles.assetBalance, { color: colors.text }]}>
+                    Balance: {balanceError ? '--' : solBalance} SOL
                   </Text>
                 </View>
                 <View style={localStyles.actions}>
@@ -256,6 +276,11 @@ const localStyles = StyleSheet.create({
   assetAddress: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  assetBalance: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 6,
   },
   actions: {
     flexDirection: 'row',

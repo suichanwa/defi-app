@@ -19,7 +19,7 @@ export default function FlowMessage({ styles, error, message }: Props) {
       {error ? (
         <View style={[localStyles.messageBox, localStyles.errorBox]}>
           <MaterialCommunityIcons name="alert-circle" size={18} color="#ef4444" />
-          <Text style={[styles.errorText, localStyles.messageText]}>{error}</Text>
+          <Text style={[localStyles.messageText, localStyles.errorText]}>{error}</Text>
         </View>
       ) : null}
       {message ? (
@@ -53,6 +53,10 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       fontSize: 14,
       fontWeight: '600',
       lineHeight: 20,
+      color: colors.text,
+    },
+    errorText: {
+      color: colors.warningText,
     },
     errorBox: {
       backgroundColor: `${colors.warningBackground}`,
