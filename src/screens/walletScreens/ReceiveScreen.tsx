@@ -7,6 +7,7 @@ import { useTheme } from '@theme/ThemeProvider';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useCopyToClipboard } from '@hooks/useCopyToClipboard';
 import { useQRReceive } from '@context/QRReceiveProvider';
+import { useNavVisibility } from '@context/NavVisibilityProvider';
 
 type WalletStackParamList = {
   Receive: { address: string };
@@ -24,6 +25,12 @@ export default function ReceiveScreen() {
   const [selectedSymbol, setSelectedSymbol] = useState('BTC');
   const { copyText } = useCopyToClipboard();
   const { setQRData } = useQRReceive();
+  const { setNavHidden } = useNavVisibility();
+
+  React.useEffect(() => {
+    setNavHidden(true);
+    return () => setNavHidden(false);
+  }, [setNavHidden]);
 
   const tokens = [
     { symbol: 'BTC', name: 'Bitcoin', color: '#f59e0b' },
@@ -42,7 +49,18 @@ export default function ReceiveScreen() {
   return (
     <View style={localStyles.container}>
       <ScrollView contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}>
-        <Text style={styles.headerTitle}>Receive</Text>
+        <View style={localStyles.headerRow}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            activeOpacity={0.7}
+            style={[localStyles.backButton, { borderColor: colors.border }]}
+            onPress={() => navigation.goBack()}
+          >
+            <MaterialCommunityIcons name="chevron-left" size={22} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Receive</Text>
+          <View style={localStyles.headerSpacer} />
+        </View>
         <Text style={styles.headerSubtitle}>Choose the asset to receive funds.</Text>
 
         <View style={localStyles.list}>
@@ -108,6 +126,23 @@ export default function ReceiveScreen() {
 const localStyles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerSpacer: {
+    width: 36,
   },
   list: {
     gap: 12,

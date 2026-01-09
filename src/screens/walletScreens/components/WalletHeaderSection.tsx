@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import PulseBadge from '@components/PulseBadge';
 import NetworkBadge from '@components/wallet/NetworkBadge';
 import { createWalletStyles } from '@styles/WalletStyles';
@@ -25,14 +25,16 @@ export default function WalletHeaderSection({
 }: WalletHeaderSectionProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
+  const { width } = useWindowDimensions();
+  const pillsMaxWidth = Math.min(200, Math.floor(width * 0.48));
 
   return (
     <View style={styles.headerRow}>
-      <View>
+      <View style={localStyles.titleBlock}>
         <Text style={styles.headerTitle}>Wallet</Text>
         <Text style={styles.headerSubtitle}>On-chain balances with live pricing.</Text>
       </View>
-      <View style={localStyles.headerPills}>
+      <View style={[localStyles.headerPills, { maxWidth: pillsMaxWidth }]}>
         <NetworkBadge onPress={onToggleNetwork} />
         {chain.kind === 'solana' && chain.cluster === 'devnet' && (
           <TouchableOpacity
@@ -56,13 +58,18 @@ export default function WalletHeaderSection({
 }
 
 const localStyles = StyleSheet.create({
+  titleBlock: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 12,
+  },
   headerPills: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
     alignItems: 'center',
     justifyContent: 'flex-end',
-    maxWidth: 160,
+    alignSelf: 'flex-end',
   },
   airdropButton: {
     paddingHorizontal: 12,

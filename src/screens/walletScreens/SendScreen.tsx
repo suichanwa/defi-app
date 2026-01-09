@@ -1,10 +1,16 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, View, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { useTheme } from '@theme/ThemeProvider';
 import { createWalletStyles } from '@styles/WalletStyles';
+import { useChain } from '@context/ChainProvider';
+import { useWalletSession } from '@context/WalletSessionProvider';
+import { ERC20_TOKENS } from '@config/tokens';
+import { fetchNativeBalance, fetchTokenBalances } from '@services/balances';
+import { fetchSolBalance } from '@services/solanaBalances';
+import type { ChainConfig } from '@config/chain';
 
 type WalletStackParamList = {
   WalletHome: undefined;
@@ -20,17 +26,63 @@ export default function SendScreen() {
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const [search, setSearch] = useState('');
   const navigation = useNavigation<StackNavigationProp<WalletStackParamList, 'Send'>>();
+  const { chain } = useChain();
+  const { status, address } = useWalletSession();
+  const [coins, setCoins] = useState(() => buildDefaultTokens(chain));
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const history = ['ETH', 'XRP', 'SOL', 'DODGE'];
-  const coins = [
-    { symbol: 'BTC', name: 'Bitcoin', amount: '0.01', value: '~$1000', color: '#f59e0b' },
-    { symbol: 'SOL', name: 'Solana', amount: '20.5', value: '~$2510', color: '#8b5cf6' },
-    { symbol: 'BNB', name: 'BNB Smart Chain', amount: '4.54', value: '~$8546', color: '#fbbf24' },
-    { symbol: 'AVAX', name: 'Avalanche', amount: '0.01', value: '~$0.25', color: '#ef4444' },
-    { symbol: 'ETH', name: 'Ethereum', amount: '0.01', value: '~$1000', color: '#6366f1' },
-    { symbol: 'XRP', name: 'Ripple', amount: '0.01', value: '~$1000', color: '#0f172a' },
-    { symbol: 'ARB', name: 'Arbitrum', amount: '0.01', value: '~$1000', color: '#0ea5e9' },
-  ];
+
+  useEffect(() => {
+    setCoins(buildDefaultTokens(chain));
+  }, [chain]);
+
+  useEffect(() => {
+    const loadBalances = async () => {
+      if (status !== 'unlocked' || !address) return;
+      setLoading(true);
+      setError(null);
+      try {
+        if (chain.kind === 'solana') {
+          const native = await fetchSolBalance(address);
+          setCoins((prev) =>
+            prev.map((token) =>
+              token.symbol === chain.nativeToken.symbol ? { ...token, amount: Number(native) } : token,
+            ),
+          );
+        } else {
+          const [native, erc20] = await Promise.all([
+            fetchNativeBalance(address),
+            fetchTokenBalances(address, ERC20_TOKENS),
+          ]);
+          setCoins((prev) =>
+            prev.map((token) => {
+              if (token.symbol === chain.nativeToken.symbol) {
+                return { ...token, amount: Number(native) };
+              }
+              const match = erc20[token.symbol];
+              return { ...token, amount: match ? Number(match) : 0 };
+            }),
+          );
+        }
+      } catch {
+        setError('Unable to load balances right now.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadBalances();
+  }, [status, address, chain]);
+
+  const formatAmount = (value: number) => {
+    if (!Number.isFinite(value)) return '0';
+    if (value >= 1) {
+      return value.toLocaleString('en-US', { maximumFractionDigits: 4 });
+    }
+    return value.toLocaleString('en-US', { maximumFractionDigits: 6 });
+  };
 
   return (
     <View style={localStyles.container}>
@@ -67,6 +119,7 @@ export default function SendScreen() {
         </View>
 
         <Text style={[localStyles.sectionTitle, { color: colors.text, marginTop: 16 }]}>Coin List</Text>
+        {error && <Text style={styles.errorText}>{error}</Text>}
         <View style={styles.listCard}>
           {coins.map((coin, index) => (
             <TouchableOpacity
@@ -76,7 +129,7 @@ export default function SendScreen() {
                 navigation.navigate('SendCrypto', {
                   symbol: coin.symbol,
                   name: coin.name,
-                  balance: coin.amount,
+                  balance: formatAmount(coin.amount),
                 })
               }
               style={[styles.tokenRow, index !== coins.length - 1 && styles.tokenRowSpacing]}
@@ -89,8 +142,8 @@ export default function SendScreen() {
                 <Text style={styles.tokenSymbol}>{coin.name}</Text>
               </View>
               <View style={styles.tokenAmounts}>
-                <Text style={styles.tokenBalance}>{coin.amount}</Text>
-                <Text style={styles.tokenValue}>{coin.value}</Text>
+                <Text style={styles.tokenBalance}>{formatAmount(coin.amount)}</Text>
+                <Text style={styles.tokenValue}>{loading ? 'Loading...' : 'On-chain balance'}</Text>
               </View>
             </TouchableOpacity>
           ))}
@@ -99,6 +152,30 @@ export default function SendScreen() {
     </View>
   );
 }
+
+type TokenBalance = {
+  name: string;
+  symbol: string;
+  amount: number;
+  color: string;
+};
+
+const buildDefaultTokens = (chain: ChainConfig): TokenBalance[] => [
+  {
+    name: chain.nativeToken.name,
+    symbol: chain.nativeToken.symbol,
+    amount: 0,
+    color: chain.nativeToken.color,
+  },
+  ...(chain.kind === 'ethereum'
+    ? ERC20_TOKENS.map<TokenBalance>((token) => ({
+        name: token.name,
+        symbol: token.symbol,
+        amount: 0,
+        color: token.symbol === 'USDC' ? '#0ea5e9' : '#f59e0b',
+      }))
+    : []),
+];
 
 const localStyles = StyleSheet.create({
   container: {

@@ -17,7 +17,7 @@ export function getSolanaConnection(): Connection {
   if (rpcUrl.includes('YOUR_KEY')) {
     throw new RpcConfigurationError('Solana RPC URL uses a placeholder key. Update SOLANA_RPC_URL.');
   }
-  connection = new Connection(rpcUrl, 'confirmed');
+  connection = new Connection(rpcUrl, { commitment: 'confirmed', disableRetryOnRateLimit: true });
   return connection;
 }
 

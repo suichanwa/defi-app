@@ -44,7 +44,18 @@ export default function SendCryptoScreen() {
   return (
     <View style={[localStyles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={[styles.scrollContent, localStyles.scrollContent]}>
-        <Text style={[localStyles.title, { color: colors.text }]}>Send {symbol ?? 'Crypto'}</Text>
+        <View style={localStyles.headerRow}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            activeOpacity={0.7}
+            style={[localStyles.backButton, { borderColor: colors.border }]}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="chevron-back" size={20} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[localStyles.title, { color: colors.text }]}>Send {symbol ?? 'Crypto'}</Text>
+          <View style={localStyles.headerSpacer} />
+        </View>
 
         <View style={localStyles.fieldGroup}>
           <Text style={[localStyles.label, { color: colors.text }]}>Address/Invoice</Text>
@@ -134,11 +145,27 @@ const localStyles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 40,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerSpacer: {
+    width: 36,
+  },
   title: {
     fontSize: 22,
     fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 24,
+    flex: 1,
   },
   fieldGroup: {
     marginBottom: 20,

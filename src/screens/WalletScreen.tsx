@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, ScrollView, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Animated, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createStackNavigator, StackNavigationProp } from '@react-navigation/stack';
 import { NavigationContainer } from '@react-navigation/native';
@@ -104,6 +104,7 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
   const cardWidth = Math.max(0, width - 40);
   const [isAirdropLoading, setIsAirdropLoading] = useState(false);
   const [airdropMessage, setAirdropMessage] = useState<string | null>(null);
+  const [airdropAmount, setAirdropAmount] = useState('1');
   const [airdropTick, setAirdropTick] = useState(0);
   const { errorMessage, errorTitle, errorVariant, isErrorVisible, handleError, clearError } = useApiError();
   const handleActivateWallet = (walletId: string) => {
@@ -270,10 +271,17 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
 
   const handleAirdrop = async () => {
     if (!address || chain.kind !== 'solana' || chain.cluster !== 'devnet') return;
+    const amountValue = Number(airdropAmount);
+    if (!Number.isFinite(amountValue) || amountValue <= 0) {
+      handleError(new Error('Invalid amount'), {
+        defaultMessage: 'Enter a valid airdrop amount.',
+      });
+      return;
+    }
     setIsAirdropLoading(true);
     setAirdropMessage(null);
     try {
-      await requestSolAirdrop(address, 1);
+      await requestSolAirdrop(address, amountValue);
       setAirdropMessage('Airdrop requested. Balance will update shortly.');
       setAirdropTick((prev) => prev + 1);
     } catch (error) {
@@ -304,6 +312,19 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
         variant={errorVariant}
         onClose={clearError}
       />
+      {chain.kind === 'solana' && chain.cluster === 'devnet' && (
+        <View style={localStyles.airdropRow}>
+          <Text style={[localStyles.airdropLabel, { color: colors.text }]}>Airdrop amount (SOL)</Text>
+          <TextInput
+            value={airdropAmount}
+            onChangeText={setAirdropAmount}
+            keyboardType="decimal-pad"
+            placeholder="1"
+            placeholderTextColor={colors.muted}
+            style={[localStyles.airdropInput, { color: colors.text, borderColor: colors.border }]}
+          />
+        </View>
+      )}
 
       <WalletCardCarousel
         walletList={walletList}
@@ -768,3 +789,23 @@ export default function WalletScreen() {
     </NavigationContainer>
   );
 }
+
+const localStyles = StyleSheet.create({
+  airdropRow: {
+    marginBottom: 16,
+    gap: 8,
+  },
+  airdropLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  airdropInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    fontWeight: '600',
+    backgroundColor: 'transparent',
+  },
+});

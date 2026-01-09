@@ -28,6 +28,7 @@
     "@scure/base": "^2.0.0",
     "@scure/bip39": "^2.0.1",
     "@sentry/react-native": "^7.8.0",
+    "@solana-developers/helpers": "^2.8.1",
     "@solana/wallet-adapter-base": "^0.9.27",
     "@solana/wallet-adapter-react": "^0.15.39",
     "@solana/web3.js": "^1.98.4",
