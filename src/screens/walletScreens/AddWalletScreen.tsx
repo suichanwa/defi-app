@@ -1,16 +1,19 @@
 import React, { useMemo, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '@theme/ThemeProvider';
 import { createWalletStyles } from '@styles/WalletStyles';
 import WalletSetupScreen from '@components/wallet/WalletSetupScreen';
 import { useWalletSession } from '@context/WalletSessionProvider';
 import { walletErrorMessage } from '@utils/walletErrors';
+import { useNavVisibility } from '@context/NavVisibilityProvider';
 
 export default function AddScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const { createWallet, importWallet, confirmBackup } = useWalletSession();
+  const { setNavHidden } = useNavVisibility();
 
   const [flow, setFlow] = useState<'menu' | 'create-passcode' | 'create-recovery' | 'create-success' | 'unlock'>(
     'menu',
@@ -30,6 +33,13 @@ export default function AddScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFlowOpen, setIsFlowOpen] = useState(false);
   const [initialImportOpen, setInitialImportOpen] = useState(false);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      setNavHidden(true);
+      return () => setNavHidden(false);
+    }, [setNavHidden]),
+  );
 
   const resetFlowMessages = () => {
     setFlowError(null);

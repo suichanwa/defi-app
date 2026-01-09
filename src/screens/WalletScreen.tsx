@@ -1,6 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createStackNavigator, StackNavigationProp } from '@react-navigation/stack';
 import { NavigationContainer } from '@react-navigation/native';
 import { createWalletStyles } from '@styles/WalletStyles';
@@ -17,13 +16,14 @@ import ErrorDialog from '@components/common/ErrorDialog';
 import { fetchSolBalance } from '../services/solanaBalances';
 import { requestSolAirdrop } from '../services/solanaAirdrop';
 import useApiError from '../hooks/useApiError';
+import useDoubleScrollRefresh from '../hooks/useDoubleScrollRefresh';
 import {
   canUseBiometrics,
   getBiometricPassword,
   promptBiometric,
   saveBiometricPassword,
 } from '../services/biometrics';
-import AddScreen from './walletScreens/AddScreen';
+import AddScreen from './walletScreens/AddWalletScreen';
 import ReceiveScreen from './walletScreens/ReceiveScreen';
 import SendScreen from './walletScreens/SendScreen';
 import SwapScreen from './walletScreens/SwapScreen';
@@ -158,7 +158,7 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
     return `$${rounded.toFixed(2)}`;
   };
 
-  const fetchPrices = async () => {
+  const fetchPrices = useCallback(async () => {
     if (trackedPairs.length === 0) return;
     setLoading(true);
     setError(null);
@@ -182,7 +182,7 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
     } finally {
       setLoading(false);
     }
-  };
+  }, [trackedPairs]);
 
   const totalValueUSD = useMemo(() => {
     return chainTokens.reduce((sum, token) => {
@@ -202,7 +202,7 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
     fetchPrices();
     const interval = setInterval(fetchPrices, 1_000);
     return () => clearInterval(interval);
-  }, [status, trackedPairs, chain]);
+  }, [status, chain, fetchPrices]);
 
   useEffect(() => {
     totalValueAnimated.setValue(totalValueUSD);
@@ -218,41 +218,42 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
     }).start();
   }, [totalValueUSD, totalValueAnimated]);
 
-  useEffect(() => {
-    const loadOnChain = async () => {
-      if (status !== 'unlocked' || !address) return;
-      setFetchingChain(true);
-      try {
-        if (chain.kind === 'solana') {
-          const native = await fetchSolBalance(address);
-          const nextTokens: TokenBalance[] = buildDefaultTokens(chain).map((token) =>
-            token.symbol === chain.nativeToken.symbol ? { ...token, amount: Number(native) } : token,
-          );
-          setChainTokens(nextTokens);
-        } else {
-          const [native, erc20] = await Promise.all([
-            fetchNativeBalance(address),
-            fetchTokenBalances(address, ERC20_TOKENS),
-          ]);
-          const nextTokens: TokenBalance[] = buildDefaultTokens(chain).map((token) => {
-            if (token.symbol === chain.nativeToken.symbol) {
-              return { ...token, amount: Number(native) };
-            }
-            const match = erc20[token.symbol];
-            return { ...token, amount: match ? Number(match) : 0 };
-          });
-          setChainTokens(nextTokens);
-        }
-        setRpcError(null);
-      } catch (error) {
-        const rpcMessage = rpcErrorMessage(error);
-        setRpcError(rpcMessage ?? 'Unable to load on-chain balances.');
-      } finally {
-        setFetchingChain(false);
+  const loadOnChain = useCallback(async () => {
+    if (status !== 'unlocked' || !address) return;
+    setFetchingChain(true);
+    try {
+      if (chain.kind === 'solana') {
+        const native = await fetchSolBalance(address);
+        const nextTokens: TokenBalance[] = buildDefaultTokens(chain).map((token) =>
+          token.symbol === chain.nativeToken.symbol ? { ...token, amount: Number(native) } : token,
+        );
+        setChainTokens(nextTokens);
+      } else {
+        const [native, erc20] = await Promise.all([
+          fetchNativeBalance(address),
+          fetchTokenBalances(address, ERC20_TOKENS),
+        ]);
+        const nextTokens: TokenBalance[] = buildDefaultTokens(chain).map((token) => {
+          if (token.symbol === chain.nativeToken.symbol) {
+            return { ...token, amount: Number(native) };
+          }
+          const match = erc20[token.symbol];
+          return { ...token, amount: match ? Number(match) : 0 };
+        });
+        setChainTokens(nextTokens);
       }
-    };
+      setRpcError(null);
+    } catch (error) {
+      const rpcMessage = rpcErrorMessage(error);
+      setRpcError(rpcMessage ?? 'Unable to load on-chain balances.');
+    } finally {
+      setFetchingChain(false);
+    }
+  }, [address, chain, status]);
+
+  useEffect(() => {
     loadOnChain();
-  }, [status, address, chain, airdropTick]);
+  }, [loadOnChain, airdropTick]);
 
   useEffect(() => {
     setChainTokens(buildDefaultTokens(chain));
@@ -294,8 +295,18 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
     }
   };
 
+  const handleManualRefresh = useCallback(() => {
+    fetchPrices();
+    loadOnChain();
+  }, [fetchPrices, loadOnChain]);
+
+  const { onScrollEndDrag } = useDoubleScrollRefresh({ onTrigger: handleManualRefresh });
+
   return (
-    <ScrollView contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}>
+    <ScrollView
+      contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}
+      onScrollEndDrag={onScrollEndDrag}
+    >
       <WalletHeaderSection
         chain={chain}
         fetchingChain={fetchingChain}

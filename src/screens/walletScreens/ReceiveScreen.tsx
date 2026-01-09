@@ -8,6 +8,7 @@ import { createWalletStyles } from '@styles/WalletStyles';
 import { useCopyToClipboard } from '@hooks/useCopyToClipboard';
 import { useQRReceive } from '@context/QRReceiveProvider';
 import { useNavVisibility } from '@context/NavVisibilityProvider';
+import { useWalletSession } from '@context/WalletSessionProvider';
 
 type WalletStackParamList = {
   Receive: { address: string };
@@ -26,6 +27,21 @@ export default function ReceiveScreen() {
   const { copyText } = useCopyToClipboard();
   const { setQRData } = useQRReceive();
   const { setNavHidden } = useNavVisibility();
+  const { wallets, activeWalletId } = useWalletSession();
+  const walletList = wallets.length
+    ? wallets
+    : address
+      ? [
+          {
+            id: address,
+            label: 'Active wallet',
+          },
+        ]
+      : [];
+  const [selectedWalletId, setSelectedWalletId] = useState<string | null>(
+    activeWalletId ?? walletList[0]?.id ?? null,
+  );
+  const selectedAddress = walletList.find((wallet) => wallet.id === selectedWalletId)?.id ?? address ?? null;
 
   React.useEffect(() => {
     setNavHidden(true);
@@ -63,6 +79,36 @@ export default function ReceiveScreen() {
         </View>
         <Text style={styles.headerSubtitle}>Choose the asset to receive funds.</Text>
 
+        {walletList.length > 0 && (
+          <View style={localStyles.walletSection}>
+            <Text style={[localStyles.walletLabel, { color: colors.text }]}>Receive to</Text>
+            <View style={localStyles.walletRow}>
+              {walletList.map((wallet) => {
+                const isActive = wallet.id === selectedWalletId;
+                return (
+                  <TouchableOpacity
+                    key={wallet.id}
+                    activeOpacity={0.8}
+                    style={[
+                      localStyles.walletChip,
+                      { borderColor: colors.border, backgroundColor: colors.card },
+                      isActive && { borderColor: colors.accent, backgroundColor: `${colors.accent}12` },
+                    ]}
+                    onPress={() => setSelectedWalletId(wallet.id)}
+                  >
+                    <Text style={[localStyles.walletChipText, { color: colors.text }]}>
+                      {wallet.label ?? 'Wallet'}
+                    </Text>
+                    <Text style={[localStyles.walletChipSubtext, { color: colors.muted }]}>
+                      {formatAddress(wallet.id)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
         <View style={localStyles.list}>
           {tokens.map((token) => {
             const isActive = token.symbol === selectedSymbol;
@@ -82,16 +128,18 @@ export default function ReceiveScreen() {
                 </View>
                 <View style={localStyles.assetInfo}>
                   <Text style={[localStyles.assetName, { color: colors.text }]}>{token.name}</Text>
-                  <Text style={[localStyles.assetAddress, { color: colors.muted }]}>{formatAddress(address)}</Text>
+                  <Text style={[localStyles.assetAddress, { color: colors.muted }]}>
+                    {formatAddress(selectedAddress)}
+                  </Text>
                 </View>
                 <View style={localStyles.actions}>
                     <TouchableOpacity
                       activeOpacity={0.7}
                       style={[localStyles.actionButton, { backgroundColor: colors.background, borderColor: colors.border }]}
                       onPress={() =>
-                        address &&
+                        selectedAddress &&
                         (() => {
-                          const payload = { symbol: token.symbol, name: token.name, address };
+                          const payload = { symbol: token.symbol, name: token.name, address: selectedAddress };
                           setQRData(payload);
                           navigation.navigate('QRReceive', payload);
                         })()
@@ -103,7 +151,7 @@ export default function ReceiveScreen() {
                       activeOpacity={0.7}
                       style={[localStyles.actionButton, { backgroundColor: colors.background, borderColor: colors.border }]}
                       onPress={() =>
-                        copyText(address ?? '', {
+                        copyText(selectedAddress ?? '', {
                           scope: 'wallet',
                           animation: 'slide',
                           successMessage: 'Copied to clipboard',
@@ -147,6 +195,36 @@ const localStyles = StyleSheet.create({
   list: {
     gap: 12,
     marginTop: 8,
+  },
+  walletSection: {
+    marginTop: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  walletLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  walletRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  walletChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    minWidth: 140,
+  },
+  walletChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  walletChipSubtext: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 4,
   },
   listItem: {
     flexDirection: 'row',
