@@ -20,6 +20,7 @@ type WalletCardCarouselProps<TAction extends WalletActionItem> = {
   actions: TAction[];
   onActionPress: (action: TAction) => void;
   onEditWallet: (walletId: string) => void;
+  onSettingsWallet: (walletId: string) => void;
   onActivateWallet: (walletId: string) => void;
 };
 
@@ -33,6 +34,7 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
   actions,
   onActionPress,
   onEditWallet,
+  onSettingsWallet,
   onActivateWallet,
 }: WalletCardCarouselProps<TAction>) {
   const { colors } = useTheme();
@@ -80,13 +82,22 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
                 <View style={styles.walletHeader}>
                   <Text style={styles.pill}>{isActive ? 'Active' : 'Wallet'}</Text>
                   <Text style={styles.walletTitle}>{wallet.label ?? `Wallet ${index + 1}`}</Text>
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    style={[localStyles.editButton, { borderColor: colors.border }]}
-                    onPress={() => onEditWallet(wallet.id)}
-                  >
-                    <MaterialCommunityIcons name="pencil" size={16} color={colors.text} />
-                  </TouchableOpacity>
+                  <View style={localStyles.headerActions}>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      style={[localStyles.editButton, { borderColor: colors.border }]}
+                      onPress={() => onEditWallet(wallet.id)}
+                    >
+                      <MaterialCommunityIcons name="pencil" size={16} color={colors.text} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      style={[localStyles.settingsButton, { borderColor: colors.border }]}
+                      onPress={() => onSettingsWallet(wallet.id)}
+                    >
+                      <MaterialCommunityIcons name="cog" size={16} color={colors.text} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
                 <Text style={styles.balanceLabel}>Total value</Text>
                 <Text style={styles.balance}>{isActive ? formatCurrency(displayTotal) : '--'}</Text>
@@ -96,10 +107,13 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
                     activeOpacity={0.8}
                     style={[localStyles.activateButton, { borderColor: colors.border }]}
                     onPress={() => onActivateWallet(wallet.id)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    pressRetentionOffset={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   >
                     <Text style={[localStyles.activateButtonText, { color: colors.text }]}>Activate wallet</Text>
                   </TouchableOpacity>
                 )}
+                {isActive && <View style={localStyles.activateSpacer} />}
 
                 <View style={styles.actionsRow}>
                   {actions.map((action) => (
@@ -151,19 +165,37 @@ const localStyles = StyleSheet.create({
     borderRadius: 4,
   },
   activateButton: {
-    marginTop: 12,
-    paddingVertical: 10,
+    marginTop: 10,
+    height: 38,
+    paddingVertical: 8,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
   },
+  activateSpacer: {
+    marginTop: 10,
+    height: 38,
+  },
   activateButtonText: {
     fontSize: 13,
     fontWeight: '700',
   },
-  editButton: {
+  headerActions: {
     marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  editButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  settingsButton: {
     width: 28,
     height: 28,
     borderRadius: 14,

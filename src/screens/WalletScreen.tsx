@@ -1,22 +1,18 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, ScrollView, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { createStackNavigator, StackNavigationProp } from '@react-navigation/stack';
 import { NavigationContainer } from '@react-navigation/native';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '../theme/ThemeProvider';
 import { useChain } from '../context/ChainProvider';
 import { useWalletSession } from '../context/WalletSessionProvider';
-import { ERC20_TOKENS } from '../config/tokens';
-import { fetchNativeBalance, fetchTokenBalances } from '../services/balances';
-import type { ChainConfig } from '../config/chain';
 import type { WalletRecordMeta } from '../types/wallet';
 import WalletSetupScreen from '@components/wallet/WalletSetupScreen';
-import { rpcErrorMessage, walletErrorMessage } from '../utils/walletErrors';
+import { walletErrorMessage } from '../utils/walletErrors';
 import ErrorDialog from '@components/common/ErrorDialog';
-import { fetchSolBalance } from '../services/solanaBalances';
 import { requestSolAirdrop } from '../services/solanaAirdrop';
 import useApiError from '../hooks/useApiError';
-import useDoubleScrollRefresh from '../hooks/useDoubleScrollRefresh';
+import useWalletRefresh from '../hooks/useWalletRefresh';
 import {
   canUseBiometrics,
   getBiometricPassword,
@@ -33,6 +29,7 @@ import QRReceiveScreen from './walletScreens/QRReceiveScreen';
 import ExpressSwapScreen from './walletScreens/ExpressSwapScreen';
 import ExpressSwapSuccessScreen from './walletScreens/ExpressSwapSuccessScreen';
 import WalletCardSettingsScreen from './walletScreens/WalletCardSettingsScreen';
+import WalletSettingsScreen from './walletScreens/WalletSettingsScreen';
 import WalletTokensTab from './walletScreens/Tokens/WalletTokensTab';
 import WalletNFTsTab from './walletScreens/NFTs/WalletNFTsTab';
 import WalletHeaderSection from './walletScreens/components/WalletHeaderSection';
@@ -52,19 +49,11 @@ type WalletStackParamList = {
   SendCryptoComplete: { symbol: string };
   QRReceive: { symbol: string; name: string; address: string };
   WalletCardSettings: { walletId: string };
+  WalletSettings: { walletId: string };
 };
 
 type WalletAction = WalletActionItem & {
   screen: keyof WalletStackParamList;
-};
-
-type TokenBalance = {
-  name: string;
-  symbol: string;
-  amount: number;
-  pair?: string;
-  color: string;
-  fixedPrice?: number;
 };
 
 const walletActions: WalletAction[] = [
@@ -72,25 +61,6 @@ const walletActions: WalletAction[] = [
   { label: 'Send', icon: 'send', screen: 'Send' },
   { label: 'Receive', icon: 'qrcode-scan', screen: 'Receive' },
   { label: 'Swap', icon: 'swap-horizontal', screen: 'Swap' },
-];
-
-const buildDefaultTokens = (chain: ChainConfig): TokenBalance[] => [
-  {
-    name: chain.nativeToken.name,
-    symbol: chain.nativeToken.symbol,
-    amount: 0,
-    pair: chain.nativeToken.priceSymbol,
-    color: chain.nativeToken.color,
-  },
-  ...(chain.kind === 'ethereum'
-    ? ERC20_TOKENS.map<TokenBalance>((t) => ({
-        name: t.name,
-        symbol: t.symbol,
-        amount: 0,
-        pair: t.priceSymbol,
-        color: t.symbol === 'USDC' ? '#0ea5e9' : '#f59e0b',
-      }))
-    : []),
 ];
 
 const Stack = createStackNavigator<WalletStackParamList>();
@@ -104,7 +74,6 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
   const cardWidth = Math.max(0, width - 40);
   const [isAirdropLoading, setIsAirdropLoading] = useState(false);
   const [airdropMessage, setAirdropMessage] = useState<string | null>(null);
-  const [airdropAmount, setAirdropAmount] = useState('1');
   const [airdropTick, setAirdropTick] = useState(0);
   const { errorMessage, errorTitle, errorVariant, isErrorVisible, handleError, clearError } = useApiError();
   const handleActivateWallet = (walletId: string) => {
@@ -136,19 +105,23 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
     return index >= 0 ? index : 0;
   }, [walletList, activeWalletId]);
 
-  const [prices, setPrices] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [rpcError, setRpcError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
-  const [chainTokens, setChainTokens] = useState<TokenBalance[]>(() => buildDefaultTokens(chain));
-  const [fetchingChain, setFetchingChain] = useState(false);
+  const {
+    prices,
+    loadingPrices,
+    priceError,
+    lastUpdated,
+    lastChainUpdated,
+    chainTokens,
+    fetchingChain,
+    rpcError,
+    onScrollBeginDrag,
+    onScrollEndDrag,
+    onMomentumScrollEnd,
+  } = useWalletRefresh(chain, status, address, airdropTick, 15000);
   const [activeTab, setActiveTab] = useState<WalletTab>('tokens');
 
   const totalValueAnimated = useRef(new Animated.Value(0)).current;
   const [displayTotal, setDisplayTotal] = useState(0);
-
-  const trackedPairs = useMemo(() => chainTokens.filter((t) => t.pair).map((t) => t.pair as string), [chainTokens]);
 
   const formatCurrency = (value: number) => {
     if (typeof Intl !== 'undefined' && typeof Intl.NumberFormat === 'function') {
@@ -157,32 +130,6 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
     const rounded = Math.round(value * 100) / 100;
     return `$${rounded.toFixed(2)}`;
   };
-
-  const fetchPrices = useCallback(async () => {
-    if (trackedPairs.length === 0) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const url = `https://api.binance.com/api/v3/ticker/price?symbols=${encodeURIComponent(
-        JSON.stringify(trackedPairs),
-      )}`;
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Binance status ${response.status}`);
-      }
-      const data: { symbol: string; price: string }[] = await response.json();
-      const next: Record<string, number> = {};
-      data.forEach((item) => {
-        next[item.symbol] = Number(item.price);
-      });
-      setPrices(next);
-      setLastUpdated(new Date().toLocaleTimeString());
-    } catch {
-      setError('Unable to load live prices right now.');
-    } finally {
-      setLoading(false);
-    }
-  }, [trackedPairs]);
 
   const totalValueUSD = useMemo(() => {
     return chainTokens.reduce((sum, token) => {
@@ -198,13 +145,6 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
   }, [prices, chainTokens]);
 
   useEffect(() => {
-    if (status !== 'unlocked') return;
-    fetchPrices();
-    const interval = setInterval(fetchPrices, 1_000);
-    return () => clearInterval(interval);
-  }, [status, chain, fetchPrices]);
-
-  useEffect(() => {
     totalValueAnimated.setValue(totalValueUSD);
     const id = totalValueAnimated.addListener(({ value }) => setDisplayTotal(value));
     return () => totalValueAnimated.removeListener(id);
@@ -218,45 +158,7 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
     }).start();
   }, [totalValueUSD, totalValueAnimated]);
 
-  const loadOnChain = useCallback(async () => {
-    if (status !== 'unlocked' || !address) return;
-    setFetchingChain(true);
-    try {
-      if (chain.kind === 'solana') {
-        const native = await fetchSolBalance(address);
-        const nextTokens: TokenBalance[] = buildDefaultTokens(chain).map((token) =>
-          token.symbol === chain.nativeToken.symbol ? { ...token, amount: Number(native) } : token,
-        );
-        setChainTokens(nextTokens);
-      } else {
-        const [native, erc20] = await Promise.all([
-          fetchNativeBalance(address),
-          fetchTokenBalances(address, ERC20_TOKENS),
-        ]);
-        const nextTokens: TokenBalance[] = buildDefaultTokens(chain).map((token) => {
-          if (token.symbol === chain.nativeToken.symbol) {
-            return { ...token, amount: Number(native) };
-          }
-          const match = erc20[token.symbol];
-          return { ...token, amount: match ? Number(match) : 0 };
-        });
-        setChainTokens(nextTokens);
-      }
-      setRpcError(null);
-    } catch (error) {
-      const rpcMessage = rpcErrorMessage(error);
-      setRpcError(rpcMessage ?? 'Unable to load on-chain balances.');
-    } finally {
-      setFetchingChain(false);
-    }
-  }, [address, chain, status]);
-
   useEffect(() => {
-    loadOnChain();
-  }, [loadOnChain, airdropTick]);
-
-  useEffect(() => {
-    setChainTokens(buildDefaultTokens(chain));
     setAirdropMessage(null);
   }, [chain]);
 
@@ -272,17 +174,10 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
 
   const handleAirdrop = async () => {
     if (!address || chain.kind !== 'solana' || chain.cluster !== 'devnet') return;
-    const amountValue = Number(airdropAmount);
-    if (!Number.isFinite(amountValue) || amountValue <= 0) {
-      handleError(new Error('Invalid amount'), {
-        defaultMessage: 'Enter a valid airdrop amount.',
-      });
-      return;
-    }
     setIsAirdropLoading(true);
     setAirdropMessage(null);
     try {
-      await requestSolAirdrop(address, amountValue);
+      await requestSolAirdrop(address, 1);
       setAirdropMessage('Airdrop requested. Balance will update shortly.');
       setAirdropTick((prev) => prev + 1);
     } catch (error) {
@@ -295,17 +190,14 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
     }
   };
 
-  const handleManualRefresh = useCallback(() => {
-    fetchPrices();
-    loadOnChain();
-  }, [fetchPrices, loadOnChain]);
-
-  const { onScrollEndDrag } = useDoubleScrollRefresh({ onTrigger: handleManualRefresh });
-
   return (
     <ScrollView
       contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}
+      onScrollBeginDrag={onScrollBeginDrag}
       onScrollEndDrag={onScrollEndDrag}
+      onMomentumScrollEnd={onMomentumScrollEnd}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
     >
       <WalletHeaderSection
         chain={chain}
@@ -323,19 +215,6 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
         variant={errorVariant}
         onClose={clearError}
       />
-      {chain.kind === 'solana' && chain.cluster === 'devnet' && (
-        <View style={localStyles.airdropRow}>
-          <Text style={[localStyles.airdropLabel, { color: colors.text }]}>Airdrop amount (SOL)</Text>
-          <TextInput
-            value={airdropAmount}
-            onChangeText={setAirdropAmount}
-            keyboardType="decimal-pad"
-            placeholder="1"
-            placeholderTextColor={colors.muted}
-            style={[localStyles.airdropInput, { color: colors.text, borderColor: colors.border }]}
-          />
-        </View>
-      )}
 
       <WalletCardCarousel
         walletList={walletList}
@@ -353,16 +232,20 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
           }
         }}
         onEditWallet={(walletId) => navigation.navigate('WalletCardSettings', { walletId })}
+        onSettingsWallet={(walletId) => navigation.navigate('WalletSettings', { walletId })}
         onActivateWallet={handleActivateWallet}
       />
 
       <WalletSearchBar />
 
-      {error ? (
-        <Text style={styles.errorText}>{error}</Text>
+      {priceError ? (
+        <Text style={styles.errorText}>{priceError}</Text>
       ) : (
         <View style={styles.metaRow}>
           <Text style={styles.metaText}>Prices: {lastUpdated ? `Updated ${lastUpdated}` : 'Loading...'}</Text>
+          <Text style={styles.metaText}>
+            Balances: {lastChainUpdated ? `Updated ${lastChainUpdated}` : 'Waiting...'}
+          </Text>
         </View>
       )}
       {rpcError && <Text style={styles.errorText}>{rpcError}</Text>}
@@ -370,7 +253,7 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
       <WalletTabSelector activeTab={activeTab} onChangeTab={setActiveTab} />
 
       {activeTab === 'tokens' && (
-        <WalletTokensTab tokens={chainTokens} prices={prices} loading={loading} formatCurrency={formatCurrency} />
+        <WalletTokensTab tokens={chainTokens} prices={prices} loading={loadingPrices} formatCurrency={formatCurrency} />
       )}
       {activeTab === 'nfts' && <WalletNFTsTab ownerAddress={address} />}
       {activeTab === 'activity' && (
@@ -443,14 +326,14 @@ export default function WalletScreen() {
       if (status !== 'locked') return;
       if (biometricInFlightRef.current) return;
 
-      biometricInFlightRef.current = true;
-      setIsSubmitting(true);
-      startSlowMessage('Yeah, this might take a moment...');
       try {
         const canUse = await canUseBiometrics();
         if (!canUse || cancelled) return;
         const stored = await getBiometricPassword();
         if (!stored || cancelled) return;
+        biometricInFlightRef.current = true;
+        setIsSubmitting(true);
+        startSlowMessage('Yeah, this might take a moment...');
         await animatePasscodeUnlock(stored);
         await unlock(stored);
         if (!cancelled) {
@@ -796,27 +679,8 @@ export default function WalletScreen() {
         <Stack.Screen name="ExpressSwap" component={ExpressSwapScreen} />
         <Stack.Screen name="ExpressSwapSuccess" component={ExpressSwapSuccessScreen} />
         <Stack.Screen name="WalletCardSettings" component={WalletCardSettingsScreen} />
+        <Stack.Screen name="WalletSettings" component={WalletSettingsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
-
-const localStyles = StyleSheet.create({
-  airdropRow: {
-    marginBottom: 16,
-    gap: 8,
-  },
-  airdropLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  airdropInput: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    fontWeight: '600',
-    backgroundColor: 'transparent',
-  },
-});

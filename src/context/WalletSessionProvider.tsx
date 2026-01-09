@@ -41,6 +41,7 @@ type WalletSession = {
   importWallet: (mnemonic: string, password: string) => Promise<{ address: string }>;
   confirmBackup: () => Promise<void>;
   forgetWallet: () => Promise<void>;
+  removeWallet: (walletId: string) => Promise<void>;
   switchWallet: (walletId: string) => Promise<void>;
   updateWalletMeta: (walletId: string, updates: Partial<WalletRecordMeta>) => Promise<void>;
 };
@@ -280,6 +281,50 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
     setWallets(next);
   };
 
+  const removeWallet = async (walletId: string) => {
+    if (!walletId) return;
+    await removeWalletRecord(walletId);
+    const { records, activeId } = await refreshWallets();
+    if (!records.length || !activeId) {
+      setWallet(null);
+      setAddress(null);
+      setRecoveryPhrase(null);
+      setBackupCompletedState(false);
+      setActiveWalletIdState(null);
+      lastPasswordRef.current = null;
+      setStatus('missing');
+      return;
+    }
+
+    setActiveWalletIdState(activeId);
+    setAddress(activeId);
+    const recordMeta = records.find((record) => record.id === activeId);
+    setBackupCompletedState(Boolean(recordMeta?.backupCompleted));
+
+    if (status !== 'unlocked') {
+      setWallet(null);
+      setRecoveryPhrase(null);
+      return;
+    }
+
+    const password = lastPasswordRef.current;
+    if (!password) {
+      setWallet(null);
+      setRecoveryPhrase(null);
+      setStatus('locked');
+      return;
+    }
+
+    const record = await loadEncryptedWalletKeyById(activeId);
+    if (!record) {
+      setStatus('missing');
+      return;
+    }
+    await hydrateUnlockedWallet(record, password);
+    setStatus('unlocked');
+    scheduleLock();
+  };
+
   const switchWallet = async (walletId: string) => {
     if (!walletId || walletId === activeWalletId) return;
     await setActiveWalletId(walletId);
@@ -328,6 +373,7 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
       importWallet,
       confirmBackup,
       forgetWallet,
+      removeWallet,
       switchWallet,
       updateWalletMeta,
     }),
@@ -340,6 +386,7 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
       wallets,
       activeWalletId,
       updateWalletMeta,
+      removeWallet,
     ],
   );
 

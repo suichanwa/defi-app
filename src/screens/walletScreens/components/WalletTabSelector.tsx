@@ -29,6 +29,9 @@ export default function WalletTabSelector({ activeTab, onChangeTab }: WalletTabS
             key={tab.id}
             style={[styles.tabBase, isActive ? styles.tabActive : styles.tabInactive]}
             onPress={() => onChangeTab(tab.id)}
+            activeOpacity={0.8}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            pressRetentionOffset={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Text style={isActive ? styles.tabActiveText : styles.tabInactiveText}>{tab.label}</Text>
           </TouchableOpacity>
