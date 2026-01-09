@@ -8,8 +8,8 @@ import { createWalletStyles } from '@styles/WalletStyles';
 import { useNavVisibility } from '@context/NavVisibilityProvider';
 import { useChain } from '@context/ChainProvider';
 import { useWalletSession } from '@context/WalletSessionProvider';
-import { getSolanaConnection } from '@services/solanaProvider';
-import { Keypair, PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
+import { sendSolTransfer } from '@services/solanaTransfers';
+import { Keypair } from '@solana/web3.js';
 
 type RouteParams = {
   symbol: string;
@@ -54,6 +54,7 @@ export default function SendCryptoScreen() {
     setFormError(null);
     const trimmedAddress = address.trim();
     const amountValue = Number(amount);
+    const availableValue = Number(balance ?? '0');
 
     if (!trimmedAddress) {
       setFormError('Enter a recipient address.');
@@ -61,6 +62,10 @@ export default function SendCryptoScreen() {
     }
     if (!Number.isFinite(amountValue) || amountValue <= 0) {
       setFormError('Enter a valid amount.');
+      return;
+    }
+    if (Number.isFinite(availableValue) && amountValue > availableValue) {
+      setFormError('Insufficient balance.');
       return;
     }
     if (symbol && symbol !== 'SOL') {
@@ -78,17 +83,7 @@ export default function SendCryptoScreen() {
 
     setIsSubmitting(true);
     try {
-      const connection = getSolanaConnection();
-      const toPubkey = new PublicKey(trimmedAddress);
-      const transaction = new Transaction().add(
-        SystemProgram.transfer({
-          fromPubkey: wallet.publicKey,
-          toPubkey,
-          lamports: Math.round(amountValue * 1_000_000_000),
-        }),
-      );
-      const signature = await connection.sendTransaction(transaction, [wallet]);
-      await connection.confirmTransaction(signature, 'confirmed');
+      const signature = await sendSolTransfer(wallet, trimmedAddress, amountValue);
       navigation.navigate('SendCryptoComplete', {
         symbol: symbol ?? 'SOL',
         amount: amountValue.toString(),
