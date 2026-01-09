@@ -1,18 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Animated,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { Animated, ScrollView, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createStackNavigator, StackNavigationProp } from '@react-navigation/stack';
 import { NavigationContainer } from '@react-navigation/native';
-import PulseBadge from '@components/PulseBadge';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '../theme/ThemeProvider';
 import { useChain } from '../context/ChainProvider';
@@ -22,7 +12,6 @@ import { fetchNativeBalance, fetchTokenBalances } from '../services/balances';
 import type { ChainConfig } from '../config/chain';
 import type { WalletRecordMeta } from '../types/wallet';
 import WalletSetupScreen from '@components/wallet/WalletSetupScreen';
-import NetworkBadge from '@components/wallet/NetworkBadge';
 import { rpcErrorMessage, walletErrorMessage } from '../utils/walletErrors';
 import ErrorDialog from '@components/common/ErrorDialog';
 import { fetchSolBalance } from '../services/solanaBalances';
@@ -46,6 +35,10 @@ import ExpressSwapSuccessScreen from './walletScreens/ExpressSwapSuccessScreen';
 import WalletCardSettingsScreen from './walletScreens/WalletCardSettingsScreen';
 import WalletTokensTab from './walletScreens/Tokens/WalletTokensTab';
 import WalletNFTsTab from './walletScreens/NFTs/WalletNFTsTab';
+import WalletHeaderSection from './walletScreens/components/WalletHeaderSection';
+import WalletCardCarousel, { WalletActionItem } from './walletScreens/components/WalletCardCarousel';
+import WalletSearchBar from './walletScreens/components/WalletSearchBar';
+import WalletTabSelector, { WalletTab } from './walletScreens/components/WalletTabSelector';
 
 type WalletStackParamList = {
   WalletHome: undefined;
@@ -61,9 +54,7 @@ type WalletStackParamList = {
   WalletCardSettings: { walletId: string };
 };
 
-type WalletAction = {
-  label: string;
-  icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+type WalletAction = WalletActionItem & {
   screen: keyof WalletStackParamList;
 };
 
@@ -75,8 +66,6 @@ type TokenBalance = {
   color: string;
   fixedPrice?: number;
 };
-
-type WalletTab = 'tokens' | 'nfts' | 'activity';
 
 const walletActions: WalletAction[] = [
   { label: 'Add', icon: 'plus-circle', screen: 'Add' },
@@ -113,7 +102,6 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
   const { status, address, wallets, activeWalletId, switchWallet } = useWalletSession();
   const { width } = useWindowDimensions();
   const cardWidth = Math.max(0, width - 40);
-  const walletScrollRef = useRef<ScrollView>(null);
   const [isAirdropLoading, setIsAirdropLoading] = useState(false);
   const [airdropMessage, setAirdropMessage] = useState<string | null>(null);
   const [airdropTick, setAirdropTick] = useState(0);
@@ -146,11 +134,6 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
     const index = walletList.findIndex((record) => record.id === activeWalletId);
     return index >= 0 ? index : 0;
   }, [walletList, activeWalletId]);
-
-  useEffect(() => {
-    if (!walletList.length || !cardWidth) return;
-    walletScrollRef.current?.scrollTo({ x: activeIndex * cardWidth, animated: false });
-  }, [activeIndex, cardWidth, walletList.length]);
 
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
@@ -305,31 +288,14 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
 
   return (
     <ScrollView contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}>
-      <View style={styles.headerRow}>
-        <View>
-          <Text style={styles.headerTitle}>Wallet</Text>
-          <Text style={styles.headerSubtitle}>On-chain balances with live pricing.</Text>
-        </View>
-        <View style={localStyles.headerPills}>
-          <NetworkBadge onPress={handleToggleNetwork} />
-          {chain.kind === 'solana' && chain.cluster === 'devnet' && (
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={[localStyles.airdropButton, { borderColor: colors.border }]}
-              onPress={handleAirdrop}
-              disabled={isAirdropLoading || !address}
-            >
-              <Text style={[localStyles.airdropButtonText, { color: colors.text }]}>
-                {isAirdropLoading ? 'Airdropping...' : 'Airdrop 1 SOL'}
-              </Text>
-            </TouchableOpacity>
-          )}
-          <View style={styles.statusPill}>
-            <PulseBadge size={8} color={fetchingChain ? '#f97316' : '#22c55e'} durationMs={1400} />
-            <Text style={styles.statusText}>{fetchingChain ? 'Syncing' : 'Live'}</Text>
-          </View>
-        </View>
-      </View>
+      <WalletHeaderSection
+        chain={chain}
+        fetchingChain={fetchingChain}
+        address={address}
+        isAirdropLoading={isAirdropLoading}
+        onToggleNetwork={handleToggleNetwork}
+        onAirdrop={handleAirdrop}
+      />
       {airdropMessage && <Text style={[styles.messageText, styles.messageInfo]}>{airdropMessage}</Text>}
       <ErrorDialog
         visible={isErrorVisible}
@@ -339,112 +305,26 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
         onClose={clearError}
       />
 
-      <View style={styles.cardWrapper}>
-        <ScrollView
-          ref={walletScrollRef}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onContentSizeChange={() => {
-            if (!cardWidth || !walletList.length) return;
-            walletScrollRef.current?.scrollTo({ x: activeIndex * cardWidth, animated: false });
-          }}
-          onMomentumScrollEnd={(event) => {
-            if (!cardWidth || walletList.length <= 1) return;
-            const nextIndex = Math.round(event.nativeEvent.contentOffset.x / cardWidth);
-            const nextWallet = walletList[nextIndex];
-            if (nextWallet) {
-              handleActivateWallet(nextWallet.id);
-            }
-          }}
-        >
-          {walletList.map((wallet, index) => {
-            const isActive = wallet.id === activeWalletId || (!activeWalletId && index === 0);
-            return (
-              <View key={wallet.id} style={{ width: cardWidth }}>
-                <View
-                  style={[
-                    styles.walletCard,
-                    {
-                      borderColor: wallet.color ?? colors.border,
-                      backgroundColor: wallet.color ? `${wallet.color}12` : colors.card,
-                    },
-                  ]}
-                >
-                  <View style={styles.walletHeader}>
-                    <Text style={styles.pill}>{isActive ? 'Active' : 'Wallet'}</Text>
-                    <Text style={styles.walletTitle}>{wallet.label ?? `Wallet ${index + 1}`}</Text>
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      style={[localStyles.editButton, { borderColor: colors.border }]}
-                      onPress={() => navigation.navigate('WalletCardSettings', { walletId: wallet.id })}
-                    >
-                      <MaterialCommunityIcons name="pencil" size={16} color={colors.text} />
-                    </TouchableOpacity>
-                  </View>
-                  <Text style={styles.balanceLabel}>Total value</Text>
-                  <Text style={styles.balance}>{isActive ? formatCurrency(displayTotal) : '--'}</Text>
-                  <Text style={styles.addressText}>{wallet.id}</Text>
-                  {!isActive && (
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      style={[localStyles.activateButton, { borderColor: colors.border }]}
-                      onPress={() => handleActivateWallet(wallet.id)}
-                    >
-                      <Text style={[localStyles.activateButtonText, { color: colors.text }]}>Activate wallet</Text>
-                    </TouchableOpacity>
-                  )}
+      <WalletCardCarousel
+        walletList={walletList}
+        activeWalletId={activeWalletId}
+        activeIndex={activeIndex}
+        cardWidth={cardWidth}
+        displayTotal={displayTotal}
+        formatCurrency={formatCurrency}
+        actions={walletActions}
+        onActionPress={(action) => {
+          if (action.screen === 'Receive' && address) {
+            navigation.navigate('Receive', { address });
+          } else {
+            navigation.navigate(action.screen as any);
+          }
+        }}
+        onEditWallet={(walletId) => navigation.navigate('WalletCardSettings', { walletId })}
+        onActivateWallet={handleActivateWallet}
+      />
 
-                  <View style={styles.actionsRow}>
-                    {walletActions.map((action) => (
-                      <TouchableOpacity
-                        key={action.label}
-                        style={styles.actionButton}
-                        activeOpacity={0.7}
-                        onPress={() => {
-                          if (action.screen === 'Receive' && address) {
-                            navigation.navigate('Receive', { address });
-                          } else {
-                            navigation.navigate(action.screen as any);
-                          }
-                        }}
-                      >
-                        <View style={styles.actionIcon}>
-                          <MaterialCommunityIcons name={action.icon} size={22} color="#ffffff" />
-                        </View>
-                        <Text style={styles.actionLabel}>{action.label}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              </View>
-            );
-          })}
-        </ScrollView>
-        {walletList.length > 1 && (
-          <View style={localStyles.walletPager}>
-            {walletList.map((wallet, index) => (
-              <View
-                key={`wallet-dot-${wallet.id}`}
-                style={[
-                  localStyles.walletDot,
-                  { backgroundColor: index === activeIndex ? colors.accent : colors.border },
-                ]}
-              />
-            ))}
-          </View>
-        )}
-      </View>
-
-      <View style={styles.searchContainer}>
-        <MaterialCommunityIcons name="magnify" size={20} color={colors.muted} style={styles.searchIcon} />
-        <TextInput 
-          placeholder="Search tokens..." 
-          placeholderTextColor={colors.muted}
-          style={styles.searchInput} 
-        />
-        <MaterialCommunityIcons name="link-variant" size={20} color={colors.muted} style={styles.searchIcon} />
-      </View>
+      <WalletSearchBar />
 
       {error ? (
         <Text style={styles.errorText}>{error}</Text>
@@ -455,26 +335,7 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
       )}
       {rpcError && <Text style={styles.errorText}>{rpcError}</Text>}
 
-      <View style={styles.tabRow}>
-        <TouchableOpacity
-          style={[styles.tabBase, activeTab === 'tokens' ? styles.tabActive : styles.tabInactive]}
-          onPress={() => setActiveTab('tokens')}
-        >
-          <Text style={activeTab === 'tokens' ? styles.tabActiveText : styles.tabInactiveText}>Tokens</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabBase, activeTab === 'nfts' ? styles.tabActive : styles.tabInactive]}
-          onPress={() => setActiveTab('nfts')}
-        >
-          <Text style={activeTab === 'nfts' ? styles.tabActiveText : styles.tabInactiveText}>NFTs</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabBase, activeTab === 'activity' ? styles.tabActive : styles.tabInactive]}
-          onPress={() => setActiveTab('activity')}
-        >
-          <Text style={activeTab === 'activity' ? styles.tabActiveText : styles.tabInactiveText}>Activity</Text>
-        </TouchableOpacity>
-      </View>
+      <WalletTabSelector activeTab={activeTab} onChangeTab={setActiveTab} />
 
       {activeTab === 'tokens' && (
         <WalletTokensTab tokens={chainTokens} prices={prices} loading={loading} formatCurrency={formatCurrency} />
@@ -907,57 +768,3 @@ export default function WalletScreen() {
     </NavigationContainer>
   );
 }
-
-const localStyles = StyleSheet.create({
-  walletPager: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 12,
-  },
-  walletDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  headerPills: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    maxWidth: 160,
-  },
-  activateButton: {
-    marginTop: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-  },
-  activateButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  airdropButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    maxWidth: 140,
-  },
-  airdropButtonText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  editButton: {
-    marginLeft: 'auto',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
