@@ -15,6 +15,7 @@ import { useWalletSession, WalletSessionProvider } from './src/context/WalletSes
 import * as Sentry from '@sentry/react-native';
 import Toast from 'react-native-toast-message';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { NotificationProvider } from './src/context/NotificationProvider';
 import { NavVisibilityProvider, useNavVisibility } from './src/context/NavVisibilityProvider';
 import { QRReceiveProvider } from './src/context/QRReceiveProvider';
@@ -22,16 +23,8 @@ import { ChainProvider } from './src/context/ChainProvider';
 
 Sentry.init({
   dsn: 'https://005462e44419a10cf92b86000ff8c484@o4510659003940864.ingest.de.sentry.io/4510659569778768',
-
-  // Adds more context data to events (IP address, cookies, user, etc.)
-  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
   sendDefaultPii: true,
-
-  // Enable Logs
   enableLogs: true,
-
-  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
-  // spotlight: __DEV__,
 });
 
 function AppContent({ activeTab, onTabChange }: { activeTab: TabName; onTabChange: (tab: TabName) => void }) {
@@ -125,7 +118,6 @@ function AppContent({ activeTab, onTabChange }: { activeTab: TabName; onTabChang
     transform: [{ translateX: 12 * (1 - secureTransition.value) }],
   }));
 
-  const isWeb = Platform.OS === 'web';
   const walletPointerEvents = activeTab === 'secureChat' ? 'none' : 'auto';
   const chatPointerEvents = activeTab === 'secureChat' ? 'auto' : 'none';
 
@@ -188,7 +180,6 @@ function AppContent({ activeTab, onTabChange }: { activeTab: TabName; onTabChang
         {activeTab === 'secureChat' && <NotificationHost scope="chat" animation="slide" />}
 
         <ToastManager
-          config={toastConfig}
           position="top"
           topOffset={insets.top + 12}
           duration={3500}
@@ -202,26 +193,28 @@ function AppContent({ activeTab, onTabChange }: { activeTab: TabName; onTabChang
 
 export default Sentry.wrap(function App() {
   const [activeTab, setActiveTab] = useState<TabName>('wallet');
-  
+
   return (
-    <ThemeProvider>
-      <ChainProvider>
-        <WalletSessionProvider isWalletActive={activeTab === 'wallet'}>
-          <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider>
+        <ChainProvider>
+          <WalletSessionProvider isWalletActive={activeTab === 'wallet'}>
             <SafeAreaProvider>
               <NotificationProvider>
                 <NavVisibilityProvider>
                   <QRReceiveProvider>
-                    <AppContent activeTab={activeTab} onTabChange={setActiveTab} />
+                    <BottomSheetModalProvider>
+                      <AppContent activeTab={activeTab} onTabChange={setActiveTab} />
+                    </BottomSheetModalProvider>
                   </QRReceiveProvider>
                 </NavVisibilityProvider>
                 <Toast />
               </NotificationProvider>
             </SafeAreaProvider>
-          </GestureHandlerRootView>
-        </WalletSessionProvider>
-      </ChainProvider>
-    </ThemeProvider>
+          </WalletSessionProvider>
+        </ChainProvider>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 });
 

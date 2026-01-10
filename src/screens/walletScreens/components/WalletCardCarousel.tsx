@@ -1,9 +1,12 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated from 'react-native-reanimated';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '@theme/ThemeProvider';
-import type { WalletRecordMeta } from '@types/wallet';
+import type { WalletRecordMeta } from '@app-types/wallet';
+import WalletBottomMenu from '@components/wallet/WalletBottomMenu';
 
 export type WalletActionItem = {
   label: string;
@@ -20,7 +23,6 @@ type WalletCardCarouselProps<TAction extends WalletActionItem> = {
   actions: TAction[];
   onActionPress: (action: TAction) => void;
   onEditWallet: (walletId: string) => void;
-  onSettingsWallet: (walletId: string) => void;
   onActivateWallet: (walletId: string) => void;
 };
 
@@ -34,12 +36,12 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
   actions,
   onActionPress,
   onEditWallet,
-  onSettingsWallet,
   onActivateWallet,
 }: WalletCardCarouselProps<TAction>) {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const walletScrollRef = useRef<ScrollView>(null);
+  const [menuWalletId, setMenuWalletId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!walletList.length || !cardWidth) return;
@@ -68,72 +70,97 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
       >
         {walletList.map((wallet, index) => {
           const isActive = wallet.id === activeWalletId || (!activeWalletId && index === 0);
+          
+          const longPressGesture = Gesture.LongPress()
+            .minDuration(400)
+            .onStart(() => {
+              console.log('🔥 Long press detected for wallet:', wallet.id);
+              setMenuWalletId(wallet.id);
+            })
+            .runOnJS(true);
+
           return (
             <View key={wallet.id} style={{ width: cardWidth }}>
-              <View
-                style={[
-                  styles.walletCard,
-                  {
-                    borderColor: wallet.color ?? colors.border,
-                    backgroundColor: wallet.color ? `${wallet.color}12` : colors.card,
-                  },
-                ]}
-              >
-                <View style={styles.walletHeader}>
-                  <Text style={styles.pill}>{isActive ? 'Active' : 'Wallet'}</Text>
-                  <Text style={styles.walletTitle}>{wallet.label ?? `Wallet ${index + 1}`}</Text>
-                  <View style={localStyles.headerActions}>
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      style={[localStyles.editButton, { borderColor: colors.border }]}
-                      onPress={() => onEditWallet(wallet.id)}
-                    >
-                      <MaterialCommunityIcons name="pencil" size={16} color={colors.text} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      style={[localStyles.settingsButton, { borderColor: colors.border }]}
-                      onPress={() => onSettingsWallet(wallet.id)}
-                    >
-                      <MaterialCommunityIcons name="cog" size={16} color={colors.text} />
-                    </TouchableOpacity>
+              <GestureDetector gesture={longPressGesture}>
+                <Animated.View
+                  style={[
+                    styles.walletCard,
+                    {
+                      borderColor: wallet.color ?? colors.border,
+                      backgroundColor: wallet.color ? `${wallet.color}12` : colors.card,
+                    },
+                  ]}
+                >
+                  {/* Long-press target area - this overlay captures the gesture */}
+                  <Pressable
+                    style={StyleSheet.absoluteFill}
+                    onLongPress={() => {
+                      console.log('🔥 Pressable long press for wallet:', wallet.id);
+                      setMenuWalletId(wallet.id);
+                    }}
+                    delayLongPress={400}
+                  />
+                  
+                  <View style={styles.walletHeader} pointerEvents="box-none">
+                    <Text style={styles.pill}>{isActive ? 'Active' : 'Wallet'}</Text>
+                    <Text style={styles.walletTitle}>{wallet.label ?? `Wallet ${index + 1}`}</Text>
+                    <View style={localStyles.headerActions}>
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        style={[localStyles.editButton, { borderColor: colors.border }]}
+                        onPress={() => onEditWallet(wallet.id)}
+                      >
+                        <MaterialCommunityIcons name="pencil" size={16} color={colors.text} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
-                <Text style={styles.balanceLabel}>Total value</Text>
-                <Text style={styles.balance}>{isActive ? formatCurrency(displayTotal) : '--'}</Text>
-                {!isActive && (
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    style={[localStyles.activateButton, { borderColor: colors.border }]}
-                    onPress={() => onActivateWallet(wallet.id)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    pressRetentionOffset={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                  >
-                    <Text style={[localStyles.activateButtonText, { color: colors.text }]}>Activate wallet</Text>
-                  </TouchableOpacity>
-                )}
-                {isActive && <View style={localStyles.activateSpacer} />}
-
-                <View style={styles.actionsRow}>
-                  {actions.map((action) => (
+                  
+                  <View pointerEvents="none">
+                    <Text style={styles.balanceLabel}>Total value</Text>
+                    <Text style={styles.balance}>{isActive ? formatCurrency(displayTotal) : '--'}</Text>
+                  </View>
+                  
+                  {!isActive && (
                     <TouchableOpacity
-                      key={action.label}
-                      style={styles.actionButton}
-                      activeOpacity={0.7}
-                      onPress={() => onActionPress(action)}
+                      activeOpacity={0.8}
+                      style={[localStyles.activateButton, { borderColor: colors.border }]}
+                      onPress={() => onActivateWallet(wallet.id)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      pressRetentionOffset={{ top: 12, bottom: 12, left: 12, right: 12 }}
                     >
-                      <View style={styles.actionIcon}>
-                        <MaterialCommunityIcons name={action.icon} size={22} color="#ffffff" />
-                      </View>
-                      <Text style={styles.actionLabel}>{action.label}</Text>
+                      <Text style={[localStyles.activateButtonText, { color: colors.text }]}>Activate wallet</Text>
                     </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
+                  )}
+                  {isActive && <View style={localStyles.activateSpacer} />}
+
+                  <View style={styles.actionsRow}>
+                    {actions.map((action) => (
+                      <TouchableOpacity
+                        key={action.label}
+                        style={styles.actionButton}
+                        activeOpacity={0.7}
+                        onPress={() => onActionPress(action)}
+                      >
+                        <View style={styles.actionIcon}>
+                          <MaterialCommunityIcons name={action.icon} size={22} color="#ffffff" />
+                        </View>
+                        <Text style={styles.actionLabel}>{action.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </Animated.View>
+              </GestureDetector>
             </View>
           );
         })}
       </ScrollView>
+      
+      <WalletBottomMenu
+        walletId={menuWalletId}
+        visible={menuWalletId !== null}
+        onClose={() => setMenuWalletId(null)}
+      />
+      
       {walletList.length > 1 && (
         <View style={localStyles.walletPager}>
           {walletList.map((wallet, index) => (
@@ -187,14 +214,6 @@ const localStyles = StyleSheet.create({
     gap: 8,
   },
   editButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  settingsButton: {
     width: 28,
     height: 28,
     borderRadius: 14,

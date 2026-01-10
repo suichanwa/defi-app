@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, ScrollView, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Animated, BackHandler, ScrollView, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { createStackNavigator, StackNavigationProp } from '@react-navigation/stack';
 import { NavigationContainer } from '@react-navigation/native';
 import { createWalletStyles } from '@styles/WalletStyles';
@@ -37,6 +37,7 @@ import WalletCardCarousel, { WalletActionItem } from './walletScreens/components
 import WalletSearchBar from './walletScreens/components/WalletSearchBar';
 import WalletTabSelector, { WalletTab } from './walletScreens/components/WalletTabSelector';
 import WalletTokenSearchOverlay from './walletScreens/components/WalletTokenSearchOverlay';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 
 type WalletStackParamList = {
   WalletHome: undefined;
@@ -164,6 +165,16 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
     setAirdropMessage(null);
   }, [chain]);
 
+  useEffect(() => {
+    if (!isSearchOpen) return;
+    const onBackPress = () => {
+      setIsSearchOpen(false);
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [isSearchOpen]);
+
   const handleToggleNetwork = async () => {
     if (chainKey === 'solanaDevnet') {
       await setChainKey('solanaMainnet');
@@ -193,80 +204,81 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
   };
 
   return (
-    <ScrollView
-      contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}
-      onScrollBeginDrag={onScrollBeginDrag}
-      onScrollEndDrag={onScrollEndDrag}
-      onMomentumScrollEnd={onMomentumScrollEnd}
-      onTouchStart={registerActivity}
-      onScroll={registerActivity}
-      keyboardShouldPersistTaps="handled"
-      keyboardDismissMode="on-drag"
-    >
-      <WalletHeaderSection
-        chain={chain}
-        fetchingChain={fetchingChain}
-        address={address}
-        isAirdropLoading={isAirdropLoading}
-        onToggleNetwork={handleToggleNetwork}
-        onAirdrop={handleAirdrop}
-      />
-      {airdropMessage && <Text style={[styles.messageText, styles.messageInfo]}>{airdropMessage}</Text>}
-      <ErrorDialog
-        visible={isErrorVisible}
-        title={errorTitle}
-        message={errorMessage}
-        variant={errorVariant}
-        onClose={clearError}
-      />
+    <View style={{ flex: 1 }}>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}
+        onScrollBeginDrag={onScrollBeginDrag}
+        onScrollEndDrag={onScrollEndDrag}
+        onMomentumScrollEnd={onMomentumScrollEnd}
+        onTouchStart={registerActivity}
+        onScroll={registerActivity}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
+        <WalletHeaderSection
+          chain={chain}
+          fetchingChain={fetchingChain}
+          address={address}
+          isAirdropLoading={isAirdropLoading}
+          onToggleNetwork={handleToggleNetwork}
+          onAirdrop={handleAirdrop}
+        />
+        {airdropMessage && <Text style={[styles.messageText, styles.messageInfo]}>{airdropMessage}</Text>}
+        <ErrorDialog
+          visible={isErrorVisible}
+          title={errorTitle}
+          message={errorMessage}
+          variant={errorVariant}
+          onClose={clearError}
+        />
 
-      <WalletCardCarousel
-        walletList={walletList}
-        activeWalletId={activeWalletId}
-        activeIndex={activeIndex}
-        cardWidth={cardWidth}
-        displayTotal={displayTotal}
-        formatCurrency={formatCurrency}
-        actions={walletActions}
-        onActionPress={(action) => {
-          if (action.screen === 'Receive' && address) {
-            navigation.navigate('Receive', { address });
-          } else {
-            navigation.navigate(action.screen as any);
-          }
-        }}
-        onEditWallet={(walletId) => navigation.navigate('WalletCardSettings', { walletId })}
-        onSettingsWallet={(walletId) => navigation.navigate('WalletSettings', { walletId })}
-        onActivateWallet={handleActivateWallet}
-      />
+        <WalletCardCarousel
+          walletList={walletList}
+          activeWalletId={activeWalletId}
+          activeIndex={activeIndex}
+          cardWidth={cardWidth}
+          displayTotal={displayTotal}
+          formatCurrency={formatCurrency}
+          actions={walletActions}
+          onActionPress={(action) => {
+            if (action.screen === 'Receive' && address) {
+              navigation.navigate('Receive', { address });
+            } else {
+              navigation.navigate(action.screen as any);
+            }
+          }}
+          onEditWallet={(walletId) => navigation.navigate('WalletCardSettings', { walletId })}
+          onActivateWallet={handleActivateWallet}
+        />
 
-      <WalletSearchBar onFocus={() => setIsSearchOpen(true)} />
-      <WalletTokenSearchOverlay visible={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+        <WalletSearchBar onFocus={() => setIsSearchOpen(true)} />
+        <WalletTokenSearchOverlay visible={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
 
-      {priceError ? (
-        <Text style={styles.errorText}>{priceError}</Text>
-      ) : (
-        <View style={styles.metaRow}>
-          <Text style={styles.metaText}>Prices: {lastUpdated ? `Updated ${lastUpdated}` : 'Loading...'}</Text>
-          <Text style={styles.metaText}>
-            Balances: {lastChainUpdated ? `Updated ${lastChainUpdated}` : 'Waiting...'}
-          </Text>
-        </View>
-      )}
-      {rpcError && <Text style={styles.errorText}>{rpcError}</Text>}
+        {priceError ? (
+          <Text style={styles.errorText}>{priceError}</Text>
+        ) : (
+          <View style={styles.metaRow}>
+            <Text style={styles.metaText}>Prices: {lastUpdated ? `Updated ${lastUpdated}` : 'Loading...'}</Text>
+            <Text style={styles.metaText}>
+              Balances: {lastChainUpdated ? `Updated ${lastChainUpdated}` : 'Waiting...'}
+            </Text>
+          </View>
+        )}
+        {rpcError && <Text style={styles.errorText}>{rpcError}</Text>}
 
-      <WalletTabSelector activeTab={activeTab} onChangeTab={setActiveTab} />
+        <WalletTabSelector activeTab={activeTab} onChangeTab={setActiveTab} />
 
-      {activeTab === 'tokens' && (
-        <WalletTokensTab tokens={chainTokens} prices={prices} loading={loadingPrices} formatCurrency={formatCurrency} />
-      )}
-      {activeTab === 'nfts' && <WalletNFTsTab ownerAddress={address} />}
-      {activeTab === 'activity' && (
-        <View style={styles.listCard}>
-          <Text style={styles.metaText}>No activity yet.</Text>
-        </View>
-      )}
-    </ScrollView>
+        {activeTab === 'tokens' && (
+          <WalletTokensTab tokens={chainTokens} prices={prices} loading={loadingPrices} formatCurrency={formatCurrency} />
+        )}
+        {activeTab === 'nfts' && <WalletNFTsTab ownerAddress={address} />}
+        {activeTab === 'activity' && (
+          <View style={styles.listCard}>
+            <Text style={styles.metaText}>No activity yet.</Text>
+          </View>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -653,39 +665,41 @@ export default function WalletScreen() {
   }
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-          gestureEnabled: true,
-          gestureDirection: 'horizontal',
-          cardStyleInterpolator: ({ current, layouts }) => ({
-            cardStyle: {
-              transform: [
-                {
-                  translateX: current.progress.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [layouts.screen.width, 0],
-                  }),
-                },
-              ],
-            },
-          }),
-        }}
-      >
-        <Stack.Screen name="WalletHome" component={WalletHomeScreen} />
-        <Stack.Screen name="Add" component={AddScreen} />
-        <Stack.Screen name="Send" component={SendScreen} />
-        <Stack.Screen name="SendCrypto" component={SendCryptoScreen} />
-        <Stack.Screen name="SendCryptoComplete" component={SendCryptoComplete} />
-        <Stack.Screen name="Receive" component={ReceiveScreen} />
-        <Stack.Screen name="QRReceive" component={QRReceiveScreen} />
-        <Stack.Screen name="Swap" component={SwapScreen} />
-        <Stack.Screen name="ExpressSwap" component={ExpressSwapScreen} />
-        <Stack.Screen name="ExpressSwapSuccess" component={ExpressSwapSuccessScreen} />
-        <Stack.Screen name="WalletCardSettings" component={WalletCardSettingsScreen} />
-        <Stack.Screen name="WalletSettings" component={WalletSettingsScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <BottomSheetModalProvider>
+      <NavigationContainer>
+        <Stack.Navigator
+          screenOptions={{
+            headerShown: false,
+            gestureEnabled: true,
+            gestureDirection: 'horizontal',
+            cardStyleInterpolator: ({ current, layouts }) => ({
+              cardStyle: {
+                transform: [
+                  {
+                    translateX: current.progress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [layouts.screen.width, 0],
+                    }),
+                  },
+                ],
+              },
+            }),
+          }}
+        >
+          <Stack.Screen name="WalletHome" component={WalletHomeScreen} />
+          <Stack.Screen name="Add" component={AddScreen} />
+          <Stack.Screen name="Send" component={SendScreen} />
+          <Stack.Screen name="SendCrypto" component={SendCryptoScreen} />
+          <Stack.Screen name="SendCryptoComplete" component={SendCryptoComplete} />
+          <Stack.Screen name="Receive" component={ReceiveScreen} />
+          <Stack.Screen name="QRReceive" component={QRReceiveScreen} />
+          <Stack.Screen name="Swap" component={SwapScreen} />
+          <Stack.Screen name="ExpressSwap" component={ExpressSwapScreen} />
+          <Stack.Screen name="ExpressSwapSuccess" component={ExpressSwapSuccessScreen} />
+          <Stack.Screen name="WalletCardSettings" component={WalletCardSettingsScreen} />
+          <Stack.Screen name="WalletSettings" component={WalletSettingsScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </BottomSheetModalProvider>
   );
 }
