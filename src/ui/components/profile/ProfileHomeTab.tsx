@@ -12,6 +12,7 @@ type ProfileHomeTabProps = {
   onOpenAuth: () => void;
   onOpenSecurity: () => void;
   onOpenRewards: () => void;
+  onOpenTransactionHistory: () => void;
   onOpenLocalization: () => void;
   onOpenDeveloper: () => void;
   onOpenAbout: () => void;
@@ -27,6 +28,7 @@ export default function ProfileHomeTab({
   onOpenAuth,
   onOpenSecurity,
   onOpenRewards,
+  onOpenTransactionHistory,
   onOpenLocalization,
   onOpenDeveloper,
   onOpenAbout,
@@ -98,7 +100,7 @@ export default function ProfileHomeTab({
         </View>
       </TouchableOpacity>
 
-    <TouchableOpacity style={cardStyle} onPress={onOpenRewards} activeOpacity={0.85}>
+      <TouchableOpacity style={cardStyle} onPress={onOpenRewards} activeOpacity={0.85}>
         <View style={styles.cardRow}>
           <View style={styles.cardIcon}>
             <Ionicons name="gift-outline" size={22} color={colors.accent} />
@@ -106,6 +108,19 @@ export default function ProfileHomeTab({
           <View style={styles.cardBody}>
             <Text style={styles.cardTitle}>RewardsHub</Text>
             <Text style={styles.cardSubtitle}>Track points and recent activity.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+        </View>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={cardStyle} onPress={onOpenTransactionHistory} activeOpacity={0.85}>
+        <View style={styles.cardRow}>
+          <View style={styles.cardIcon}>
+            <Ionicons name="receipt-outline" size={22} color={colors.accent} />
+          </View>
+          <View style={styles.cardBody}>
+            <Text style={styles.cardTitle}>Transaction history</Text>
+            <Text style={styles.cardSubtitle}>Review recent wallet activity.</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.muted} />
         </View>

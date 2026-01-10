@@ -12,6 +12,7 @@ import {
   ProfileTabTransition,
   RewardsTab,
   SecurityTab,
+  TransactionHistoryTab,
 } from '@components/profile';
 import { StatusDialog } from '@components/common';
 import { REWARD_RULES } from '@constants/profile.constants';
@@ -19,6 +20,7 @@ import { useWalletSession } from '@context/WalletSessionProvider';
 import { useProfileAuth } from '@hooks/useProfileAuth';
 import { useProfilePreferences } from '@hooks/useProfilePreferences';
 import { useRewards } from '@hooks/useRewards';
+import { useTransactionHistory } from '@hooks/useTransactionHistory';
 import { useWalletSecurity } from '@hooks/useWalletSecurity';
 import { useTheme } from '@theme/ThemeProvider';
 import { buildIdenticon } from '@utils/identicon';
@@ -29,6 +31,7 @@ type ProfileView =
   | 'personalization'
   | 'security'
   | 'rewards'
+  | 'transactionHistory'
   | 'auth'
   | 'developer'
   | 'localization'
@@ -45,10 +48,11 @@ export default function ProfileScreen() {
   });
 
   const theme = useTheme();
-  const { forgetWallet } = useWalletSession();
+  const { forgetWallet, address } = useWalletSession();
   const auth = useProfileAuth();
   const profile = useProfilePreferences({ theme, session: auth.state.session });
   const rewards = useRewards({ session: auth.state.session });
+  const transactionHistory = useTransactionHistory({ address });
   const security = useWalletSecurity({
     alias: profile.state.alias,
     avatarType: profile.state.avatarType,
@@ -224,6 +228,20 @@ export default function ProfileScreen() {
         />
       );
       break;
+    case 'transactionHistory':
+      content = (
+        <TransactionHistoryTab
+          scrollStyle={profile.styles.scrollStyle}
+          cardStyle={profile.styles.cardStyle}
+          items={transactionHistory.items}
+          loading={transactionHistory.status.loading}
+          error={transactionHistory.status.error}
+          message={transactionHistory.status.message}
+          onBack={() => setView('home')}
+          onRefresh={transactionHistory.refresh}
+        />
+      );
+      break;
     case 'localization':
       content = (
         <LocalizationTab
@@ -297,6 +315,7 @@ export default function ProfileScreen() {
           onOpenAuth={() => setView('auth')}
           onOpenSecurity={() => setView('security')}
           onOpenRewards={() => setView('rewards')}
+          onOpenTransactionHistory={() => setView('transactionHistory')}
           onOpenLocalization={() => setView('localization')}
           onOpenDeveloper={() => setView('developer')}
           onOpenAbout={() => setView('about')}

@@ -101,7 +101,6 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
                 </View>
                 <Text style={styles.balanceLabel}>Total value</Text>
                 <Text style={styles.balance}>{isActive ? formatCurrency(displayTotal) : '--'}</Text>
-                <Text style={styles.addressText}>{wallet.id}</Text>
                 {!isActive && (
                   <TouchableOpacity
                     activeOpacity={0.8}

@@ -8,3 +8,4 @@ export { default as ProfileHomeTab } from './ProfileHomeTab';
 export { default as RewardsTab } from './RewardsTab';
 export { default as SecurityTab } from './SecurityTab';
 export { default as ProfileTabTransition } from './ProfileTabTransition';
+export { default as TransactionHistoryTab } from './TransactionHistoryTab';

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, Platform, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import ToastManager from 'toastify-react-native';
 import WalletScreen from './src/screens/WalletScreen';
@@ -96,6 +96,19 @@ function AppContent({ activeTab, onTabChange }: { activeTab: TabName; onTabChang
     navbarOpacity.value = withTiming(shouldHideNavbar ? 0 : 1, { duration: 250 });
     navbarTranslateY.value = withTiming(shouldHideNavbar ? 20 : 0, { duration: 250 });
   }, [isChatThreadOpen, activeTab, navbarOpacity, navbarTranslateY]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const onBackPress = () => {
+      if (activeTab === 'profile') {
+        onTabChange('wallet');
+        return true;
+      }
+      return false;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [activeTab, onTabChange]);
 
   const walletAnimatedStyle = useAnimatedStyle(() => ({
     opacity: 1 - secureTransition.value,

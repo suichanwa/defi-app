@@ -121,7 +121,7 @@ export const createWalletStyles = (colors: ReturnType<typeof useTheme>['colors']
       fontSize: 34,
       fontWeight: '800',
       color: colors.text,
-      marginBottom: 10,
+      marginBottom: 4,
       letterSpacing: -1,
     },
     addressText: {
@@ -140,7 +140,7 @@ export const createWalletStyles = (colors: ReturnType<typeof useTheme>['colors']
     actionsRow: {
       flexDirection: 'row',
       gap: 8,
-      marginTop: 8,
+      marginTop: 4,
     },
     actionButton: {
       flex: 1,

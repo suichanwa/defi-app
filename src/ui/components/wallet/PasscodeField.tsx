@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { Pressable, Text, View, StyleSheet, TextInput } from 'react-native';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { InteractionManager, Pressable, Text, View, StyleSheet, TextInput } from 'react-native';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '@theme/ThemeProvider';
 
@@ -25,11 +25,17 @@ export default function PasscodeField({
   const PASSCODE_LENGTH = 6;
   const inputRef = useRef<TextInput>(null);
 
+  const focusInput = useCallback(() => {
+    InteractionManager.runAfterInteractions(() => {
+      inputRef.current?.focus();
+    });
+  }, []);
+
   useEffect(() => {
     if (isActive || autoFocus) {
-      inputRef.current?.focus();
+      focusInput();
     }
-  }, [autoFocus, isActive]);
+  }, [autoFocus, focusInput, isActive]);
 
   return (
     <View style={localStyles.container}>
@@ -43,6 +49,7 @@ export default function PasscodeField({
         keyboardType="number-pad"
         maxLength={PASSCODE_LENGTH}
         autoFocus={autoFocus}
+        showSoftInputOnFocus
         secureTextEntry={false}
         style={localStyles.hiddenInput}
         onFocus={onActivate}
@@ -53,7 +60,7 @@ export default function PasscodeField({
         style={localStyles.dotsContainer}
         onPress={() => {
           onActivate?.();
-          inputRef.current?.focus();
+          focusInput();
         }}
       >
         {Array.from({ length: PASSCODE_LENGTH }).map((_, index) => (
