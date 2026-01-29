@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   changeWalletPassword,
   createInitialWalletKey,
@@ -6,63 +6,14 @@ import {
   WalletKeyNotFoundError,
   WalletPasswordError,
   WalletReencryptError,
+  saveProfileSettings,
 } from '@services';
 import type { AvatarType, LanguageCode, ThemePreference } from '@app-types/profile';
 import type { EncryptedWalletKey } from '@app-types/wallet';
-import { saveProfileSettings } from '@services';
-
-type SecurityState = {
-  walletKey: EncryptedWalletKey | null;
-  setupPassword: string;
-  setupConfirm: string;
-  currentPassword: string;
-  newPassword: string;
-  confirmPassword: string;
-  loading: boolean;
-  message: string | null;
-  error: string | null;
-};
-
-type SecurityAction =
-  | { type: 'SET_FIELD'; key: keyof SecurityState; value: string }
-  | { type: 'SET_WALLET'; walletKey: EncryptedWalletKey | null }
-  | { type: 'START' }
-  | { type: 'SUCCESS'; message: string }
-  | { type: 'FAIL'; error: string };
-
-const PASSWORD_MIN = 8;
-
-const initialState: SecurityState = {
-  walletKey: null,
-  setupPassword: '',
-  setupConfirm: '',
-  currentPassword: '',
-  newPassword: '',
-  confirmPassword: '',
-  loading: false,
-  message: null,
-  error: null,
-};
-
-function securityReducer(state: SecurityState, action: SecurityAction): SecurityState {
-  switch (action.type) {
-    case 'SET_FIELD':
-      return { ...state, [action.key]: action.value };
-    case 'SET_WALLET':
-      return { ...state, walletKey: action.walletKey };
-    case 'START':
-      return { ...state, loading: true, message: null, error: null };
-    case 'SUCCESS':
-      return { ...state, loading: false, message: action.message, error: null };
-    case 'FAIL':
-      return { ...state, loading: false, message: null, error: action.error };
-    default:
-      return state;
-  }
-}
-
-const validateNewPassword = (value: string) =>
-  value.length < PASSWORD_MIN ? `Password must be at least ${PASSWORD_MIN} characters.` : null;
+import { useFormFields } from './useFormFields';
+import { useAsyncAction } from './useAsyncAction';
+import { createPasswordMatchSchema } from '@utils/passwordValidation';
+import { z } from 'zod';
 
 type WalletSecurityArgs = {
   alias: string;
@@ -72,127 +23,192 @@ type WalletSecurityArgs = {
   onWalletKeyCreated?: (seed: string) => void;
 };
 
-export function useWalletSecurity({ alias, avatarType, themePreference, language, onWalletKeyCreated }: WalletSecurityArgs) {
-  const [state, dispatch] = useReducer(securityReducer, initialState);
+type SetupFields = {
+  setupPassword: string;
+  setupConfirm: string;
+};
 
+type ChangeFields = {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+};
+
+// Memoize schemas outside component
+const setupSchema = createPasswordMatchSchema<keyof SetupFields>('setupPassword', 'setupConfirm');
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+  confirmPassword: z.string(),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
+});
+
+export function useWalletSecurity({
+  alias,
+  avatarType,
+  themePreference,
+  language,
+  onWalletKeyCreated,
+}: WalletSecurityArgs) {
+  const [walletKey, setWalletKey] = useState<EncryptedWalletKey | null>(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  
+  const setupFields = useFormFields<SetupFields>({
+    setupPassword: '',
+    setupConfirm: '',
+  });
+  
+  const changeFields = useFormFields<ChangeFields>({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  
+  const asyncAction = useAsyncAction();
+
+  // Optimized wallet loading with abort controller
   useEffect(() => {
+    if (!isInitialLoad) return;
+    
     let mounted = true;
-    loadEncryptedWalletKey().then((key) => {
-      if (mounted) {
-        dispatch({ type: 'SET_WALLET', walletKey: key });
+    const controller = new AbortController();
+
+    const loadWallet = async () => {
+      try {
+        const key = await loadEncryptedWalletKey();
+        if (mounted && !controller.signal.aborted) {
+          setWalletKey(key);
+          setIsInitialLoad(false);
+        }
+      } catch (error) {
+        if (mounted && !controller.signal.aborted) {
+          setWalletKey(null);
+          setIsInitialLoad(false);
+        }
       }
-    });
+    };
+
+    loadWallet();
+
     return () => {
       mounted = false;
+      controller.abort();
     };
+  }, [isInitialLoad]);
+
+  const handleWalletError = useCallback((error: unknown): never => {
+    if (error instanceof WalletPasswordError) {
+      throw new Error('Current password is incorrect.');
+    }
+    if (error instanceof WalletKeyNotFoundError) {
+      throw new Error('No local wallet key found.');
+    }
+    if (error instanceof WalletReencryptError) {
+      throw new Error('Unable to verify the new password.');
+    }
+    throw new Error('Unexpected error updating password.');
   }, []);
 
-  const setField = (key: keyof SecurityState, value: string) => dispatch({ type: 'SET_FIELD', key, value });
+  const changePassword = useCallback(async () => {
+    const validation = changePasswordSchema.safeParse(changeFields.fields);
 
-  const changePassword = async () => {
-    dispatch({ type: 'START' });
-    if (!state.currentPassword || !state.newPassword || !state.confirmPassword) {
-      dispatch({ type: 'FAIL', error: 'Fill in all password fields.' });
+    if (!validation.success) {
+      asyncAction.setError(validation.error.issues[0]?.message ?? 'Validation failed');
       return;
     }
-    const policyError = validateNewPassword(state.newPassword);
-    if (policyError) {
-      dispatch({ type: 'FAIL', error: policyError });
-      return;
-    }
-    if (state.newPassword !== state.confirmPassword) {
-      dispatch({ type: 'FAIL', error: 'New password entries do not match.' });
-      return;
-    }
-    try {
-      const updated = await changeWalletPassword(state.currentPassword, state.newPassword);
-      dispatch({ type: 'SET_WALLET', walletKey: updated });
-      dispatch({ type: 'SET_FIELD', key: 'currentPassword', value: '' });
-      dispatch({ type: 'SET_FIELD', key: 'newPassword', value: '' });
-      dispatch({ type: 'SET_FIELD', key: 'confirmPassword', value: '' });
-      dispatch({ type: 'SUCCESS', message: 'Wallet password updated.' });
-    } catch (error) {
-      if (error instanceof WalletPasswordError) {
-        dispatch({ type: 'FAIL', error: 'Current password is incorrect.' });
-        return;
-      }
-      if (error instanceof WalletKeyNotFoundError) {
-        dispatch({ type: 'FAIL', error: 'No local wallet key found.' });
-        return;
-      }
-      if (error instanceof WalletReencryptError) {
-        dispatch({ type: 'FAIL', error: 'Unable to verify the new password.' });
-        return;
-      }
-      dispatch({ type: 'FAIL', error: 'Unexpected error updating password.' });
-    }
-  };
 
-  const createWalletKey = async () => {
-    dispatch({ type: 'START' });
-    if (!state.setupPassword || !state.setupConfirm) {
-      dispatch({ type: 'FAIL', error: 'Enter and confirm a password.' });
+    const { currentPassword, newPassword } = validation.data;
+
+    const result = await asyncAction.execute(
+      () => changeWalletPassword(currentPassword, newPassword).catch(handleWalletError),
+      'Wallet password updated.'
+    );
+
+    if (result) {
+      setWalletKey(result);
+      changeFields.resetFields();
+    }
+  }, [changeFields.fields, asyncAction, handleWalletError, changeFields]);
+
+  const createWalletKey = useCallback(async () => {
+    const validation = setupSchema.safeParse(setupFields.fields);
+    
+    if (!validation.success) {
+      asyncAction.setError(validation.error.issues[0]?.message ?? 'Validation failed');
       return;
     }
-    const policyError = validateNewPassword(state.setupPassword);
-    if (policyError) {
-      dispatch({ type: 'FAIL', error: policyError });
-      return;
-    }
-    if (state.setupPassword !== state.setupConfirm) {
-      dispatch({ type: 'FAIL', error: 'Password entries do not match.' });
-      return;
-    }
-    try {
-      const created = await createInitialWalletKey(state.setupPassword);
-      dispatch({ type: 'SET_WALLET', walletKey: created });
-      dispatch({ type: 'SET_FIELD', key: 'setupPassword', value: '' });
-      dispatch({ type: 'SET_FIELD', key: 'setupConfirm', value: '' });
+
+    const { setupPassword } = validation.data;
+
+    const result = await asyncAction.execute(
+      () => createInitialWalletKey(setupPassword),
+      'Encrypted wallet key created.'
+    );
+
+    if (result) {
+      setWalletKey(result);
+      setupFields.resetFields();
+      
+      // Run profile save in background (non-blocking)
       if (avatarType === 'identicon') {
-        await saveProfileSettings({
+        saveProfileSettings({
           alias: alias.trim(),
           avatarType,
-          avatarSeed: created.id,
+          avatarSeed: result.id,
           themePreference,
           language,
-        });
-        onWalletKeyCreated?.(created.id);
+        }).catch(console.error);
+        
+        onWalletKeyCreated?.(result.id);
       }
-      dispatch({ type: 'SUCCESS', message: 'Encrypted wallet key created.' });
-    } catch (error) {
-      dispatch({ type: 'FAIL', error: error instanceof Error ? error.message : 'Unable to create wallet key.' });
     }
-  };
+  }, [setupFields.fields, asyncAction, alias, avatarType, themePreference, language, onWalletKeyCreated, setupFields]);
 
-  const reload = async () => {
-    dispatch({ type: 'START' });
-    try {
-      const key = await loadEncryptedWalletKey();
-      dispatch({ type: 'SET_WALLET', walletKey: key });
-      dispatch({ type: 'SUCCESS', message: 'Wallet state refreshed.' });
-    } catch (error) {
-      dispatch({ type: 'FAIL', error: error instanceof Error ? error.message : 'Unable to reload wallet key.' });
-    }
-  };
+  const reload = useCallback(async () => {
+    const result = await asyncAction.execute(
+      () => loadEncryptedWalletKey(),
+      'Wallet state refreshed.'
+    );
+    if (result) setWalletKey(result);
+  }, [asyncAction]);
 
-  const clearWallet = async () => {
-    dispatch({ type: 'SET_WALLET', walletKey: null });
-    dispatch({ type: 'SUCCESS', message: 'Local wallet key removed.' });
-  };
+  const clearWallet = useCallback(() => {
+    setWalletKey(null);
+    asyncAction.clear();
+  }, [asyncAction]);
 
-  return {
-    state,
-    actions: {
-      setField,
+  // Memoize return value
+  return useMemo(
+    () => ({
+      walletKey,
+      setupFields,
+      changeFields,
+      actions: { 
+        changePassword, 
+        createWalletKey, 
+        reload, 
+        clearWallet 
+      },
+      status: {
+        loading: asyncAction.loading,
+        message: asyncAction.message,
+        error: asyncAction.error,
+      },
+    }),
+    [
+      walletKey,
+      setupFields,
+      changeFields,
       changePassword,
       createWalletKey,
       reload,
       clearWallet,
-    },
-    status: {
-      loading: state.loading,
-      message: state.message,
-      error: state.error,
-    },
-  };
+      asyncAction.loading,
+      asyncAction.message,
+      asyncAction.error,
+    ]
+  );
 }
