@@ -31,3 +31,8 @@ export const getExplorerAddressUrl = (chain: ChainConfig, address: string) => {
   }
   return `${chain.explorerBaseUrl}/address/${address}`;
 };
+
+export const getActiveWalletType = () => {
+  const chain = getActiveChain();
+  return isSolanaChain(chain) ? 'solana' : 'ethereum';
+};

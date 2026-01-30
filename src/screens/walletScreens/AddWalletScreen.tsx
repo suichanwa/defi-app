@@ -69,7 +69,7 @@ export default function AddScreen() {
       .join(' ');
 
   const passcodePolicy = (value: string) => {
-    if (!/^\d{6}$/.test(value)) return 'Passcode must be 6 digits.';
+    if (!/^\d{6}$/.test(value)) return 'Passcode must be exactly 6 digits.';
     return null;
   };
 
@@ -115,25 +115,53 @@ export default function AddScreen() {
   };
 
   const handleCreate = async () => {
+    console.log('=== handleCreate called ===');
+    console.log('walletPassword:', walletPassword, 'length:', walletPassword.length);
+    console.log('walletPasswordConfirm:', walletPasswordConfirm, 'length:', walletPasswordConfirm.length);
+    
     resetFlowMessages();
+    
+    // Validate passcode length
+    if (walletPassword.length !== 6) {
+      console.log('Error: Passcode length not 6');
+      setFlowError('Passcode must be exactly 6 digits.');
+      return;
+    }
+    
+    // Validate passcode is numeric
     const policy = passcodePolicy(walletPassword);
     if (policy) {
+      console.log('Error: Policy violation:', policy);
       setFlowError(policy);
       return;
     }
+    
+    // Validate confirm passcode
+    if (walletPasswordConfirm.length !== 6) {
+      console.log('Error: Confirm passcode length not 6');
+      setFlowError('Please enter confirmation passcode.');
+      return;
+    }
+    
+    // Validate passcodes match
     if (walletPassword !== walletPasswordConfirm) {
+      console.log('Error: Passcodes do not match');
       setFlowError('Passcodes do not match.');
       return;
     }
+    
+    console.log('All validations passed, creating wallet...');
     setIsSubmitting(true);
     try {
       const { mnemonic } = await createWallet(walletPassword);
+      console.log('Wallet created successfully');
       const normalized = normalizeMnemonic(mnemonic);
       startBackupConfirm(normalized);
       setWalletPassword('');
       setWalletPasswordConfirm('');
       setFlowMessage('Wallet created. Back up your recovery phrase.');
     } catch (error) {
+      console.error('Error creating wallet:', error);
       setFlowError(walletErrorMessage(error, 'create'));
     } finally {
       setIsSubmitting(false);
@@ -152,15 +180,29 @@ export default function AddScreen() {
       setFlowError('Mnemonic must be 12 or 24 words.');
       return;
     }
+    
+    if (walletPassword.length !== 6) {
+      setFlowError('Passcode must be exactly 6 digits.');
+      return;
+    }
+    
     const policy = passcodePolicy(walletPassword);
     if (policy) {
       setFlowError(policy);
       return;
     }
+    
+    // Validate confirm passcode
+    if (walletPasswordConfirm.length !== 6) {
+      setFlowError('Please enter confirmation passcode.');
+      return;
+    }
+    
     if (walletPassword !== walletPasswordConfirm) {
       setFlowError('Passcodes do not match.');
       return;
     }
+    
     setIsSubmitting(true);
     try {
       await importWallet(phrase, walletPassword);
@@ -193,12 +235,17 @@ export default function AddScreen() {
       return;
     }
     setIsSubmitting(true);
-    await confirmBackup();
-    setBackupMnemonic(null);
-    setBackupSkipped(false);
-    setFlowMessage('Recovery phrase confirmed.');
-    setFlow('create-success');
-    setIsSubmitting(false);
+    try {
+      await confirmBackup();
+      setBackupMnemonic(null);
+      setBackupSkipped(false);
+      setFlowMessage('Recovery phrase confirmed.');
+      setFlow('create-success');
+    } catch (error) {
+      setFlowError(error instanceof Error ? error.message : 'Unable to confirm recovery phrase.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleSkipBackup = async () => {

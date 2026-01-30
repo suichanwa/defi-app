@@ -1,37 +1,10 @@
-import { gcm } from '@noble/ciphers/aes';
-import { randomBytes } from '@noble/ciphers/webcrypto';
-import { pbkdf2 } from '@noble/hashes/pbkdf2';
-import { sha256 } from '@noble/hashes/sha256';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
 import type { EncryptedWalletKey, WalletKind, WalletRecordMeta } from '@app-types/wallet';
 import { getJson, removeKey, setJson } from './storage';
 import { getActiveWalletType } from '@config/chain';
 
-const PBKDF2_ITERATIONS = 10000;
+const PBKDF2_ITERATIONS = 100000;
 const SALT_LENGTH = 16;
 const IV_LENGTH = 12;
-const TAG_LENGTH = 16;
-
-export class WalletKeyNotFoundError extends Error {
-  constructor(message = 'No wallet key found in storage.') {
-    super(message);
-    this.name = 'WalletKeyNotFoundError';
-  }
-}
-
-export class WalletPasswordError extends Error {
-  constructor(message = 'Incorrect wallet password.') {
-    super(message);
-    this.name = 'WalletPasswordError';
-  }
-}
-
-export class WalletReencryptError extends Error {
-  constructor(message = 'Failed to re-encrypt the wallet key.') {
-    super(message);
-    this.name = 'WalletReencryptError';
-  }
-}
 
 const getStorageKey = (walletType: WalletKind) => `wallet.records.${walletType}.v1`;
 const getActiveWalletKey = (walletType: WalletKind) => `wallet.active.${walletType}.v1`;
@@ -95,27 +68,59 @@ export async function saveEncryptedWalletKey(
   await setActiveWalletId(record.id, walletType);
 }
 
-// OPTIMIZED: Faster key derivation
-function deriveKey(password: string, salt: Uint8Array): Uint8Array {
-  return pbkdf2(sha256, password, salt, {
-    c: PBKDF2_ITERATIONS,
-    dkLen: 32,
-  });
+async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+  const passwordKey = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits', 'deriveKey']
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: salt.buffer as ArrayBuffer,
+      iterations: PBKDF2_ITERATIONS,
+      hash: 'SHA-256',
+    },
+    passwordKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+function bufferToHex(buffer: ArrayBuffer): string {
+  return Array.from(new Uint8Array(buffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function hexToBuffer(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
+  }
+  return bytes;
 }
 
 export async function encryptWalletKey(privateKey: string, password: string): Promise<EncryptedWalletKey> {
-  const salt = randomBytes(SALT_LENGTH);
-  const iv = randomBytes(IV_LENGTH);
-  const key = deriveKey(password, salt);
+  const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+  const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
+  const key = await deriveKey(password, salt);
 
   const plaintext = new TextEncoder().encode(privateKey);
-  const cipher = gcm(key, iv);
-  const ciphertext = cipher.encrypt(plaintext);
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: iv.buffer as ArrayBuffer },
+    key,
+    plaintext.buffer as ArrayBuffer
+  );
 
   const payload = {
-    salt: bytesToHex(salt),
-    iv: bytesToHex(iv),
-    ciphertext: bytesToHex(ciphertext),
+    salt: bufferToHex(salt.buffer as ArrayBuffer),
+    iv: bufferToHex(iv.buffer as ArrayBuffer),
+    ciphertext: bufferToHex(ciphertext),
   };
 
   return {
@@ -128,18 +133,21 @@ export async function encryptWalletKey(privateKey: string, password: string): Pr
 
 export async function decryptWalletKey(encryptedJson: string, password: string): Promise<string> {
   const payload = JSON.parse(encryptedJson);
-  const salt = hexToBytes(payload.salt);
-  const iv = hexToBytes(payload.iv);
-  const ciphertext = hexToBytes(payload.ciphertext);
+  const salt = hexToBuffer(payload.salt);
+  const iv = hexToBuffer(payload.iv);
+  const ciphertext = hexToBuffer(payload.ciphertext);
 
-  const key = deriveKey(password, salt);
+  const key = await deriveKey(password, salt);
 
   try {
-    const cipher = gcm(key, iv);
-    const plaintext = cipher.decrypt(ciphertext);
+    const plaintext = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: iv.buffer as ArrayBuffer },
+      key,
+      ciphertext.buffer as ArrayBuffer
+    );
     return new TextDecoder().decode(plaintext);
   } catch (error) {
-    throw new WalletPasswordError('Incorrect password or corrupted data.');
+    throw new Error('Incorrect password or corrupted data.');
   }
 }
 

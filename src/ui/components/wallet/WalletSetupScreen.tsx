@@ -34,7 +34,7 @@ type Props = {
   onChangeConfirmWord1: (value: string) => void;
   onChangeConfirmWord2: (value: string) => void;
   onToggleBackup: () => void;
-  onCreate: () => void;
+  onCreate: () => void;  // ✅ Changed from (value: string) => void
   onImport: () => void;
   onUnlock: () => void;
   onConfirmBackup: () => void;
@@ -185,6 +185,8 @@ export default function WalletSetupScreen({
     }
   }, [flow, isSubmitting, onUnlock, status, unlockPassword]);
 
+  // COMMENT OUT OR REMOVE THIS useEffect - it's auto-submitting with the wrong handler
+  /*
   useEffect(() => {
     if (flow !== 'create-passcode' || isSubmitting) return;
     if (walletPassword.length < PASSCODE_LENGTH || walletPasswordConfirm.length < PASSCODE_LENGTH) {
@@ -199,6 +201,7 @@ export default function WalletSetupScreen({
     lastAutoCreate.current = walletPasswordConfirm;
     onCreate();
   }, [flow, isSubmitting, onCreate, walletPassword, walletPasswordConfirm]);
+  */
 
   const effectivePasscodeField =
     activePasscodeField ??
@@ -302,6 +305,7 @@ export default function WalletSetupScreen({
   }
 
   if (flow === 'create-passcode') {
+    console.log('=== WalletSetupScreen: Rendering create-passcode ===');
     return (
       <ScreenTransition triggerKey={`${status}-${flow}`}>
         <WalletCreatePasscodeCard
@@ -314,7 +318,10 @@ export default function WalletSetupScreen({
           renderProgress={() => renderProgress(1)}
           onChangeWalletPassword={handlePasscodeChange}
           onChangeWalletPasswordConfirm={handlePasscodeConfirmChange}
-          onCreate={onCreate}
+          onCreate={() => {
+            console.log('=== WalletSetupScreen: onCreate wrapper called, forwarding to parent ===');
+            onCreate();  // ✅ Now correctly calls without parameters
+          }}
           onBackToMenu={onBackToMenu}
           isPrimaryActive={effectivePasscodeField === 'primary'}
           isConfirmActive={effectivePasscodeField === 'confirm'}

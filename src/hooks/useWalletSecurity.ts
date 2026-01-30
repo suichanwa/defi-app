@@ -3,9 +3,6 @@ import {
   changeWalletPassword,
   createInitialWalletKey,
   loadEncryptedWalletKey,
-  WalletKeyNotFoundError,
-  WalletPasswordError,
-  WalletReencryptError,
   saveProfileSettings,
 } from '@services';
 import type { AvatarType, LanguageCode, ThemePreference } from '@app-types/profile';
@@ -34,7 +31,6 @@ type ChangeFields = {
   confirmPassword: string;
 };
 
-// Memoize schemas outside component
 const setupSchema = createPasswordMatchSchema<keyof SetupFields>('setupPassword', 'setupConfirm');
 
 const changePasswordSchema = z.object({
@@ -69,48 +65,31 @@ export function useWalletSecurity({
   
   const asyncAction = useAsyncAction();
 
-  // Optimized wallet loading with abort controller
   useEffect(() => {
     if (!isInitialLoad) return;
     
     let mounted = true;
     const controller = new AbortController();
 
-    const loadWallet = async () => {
-      try {
-        const key = await loadEncryptedWalletKey();
+    loadEncryptedWalletKey()
+      .then((key) => {
         if (mounted && !controller.signal.aborted) {
           setWalletKey(key);
           setIsInitialLoad(false);
         }
-      } catch (error) {
+      })
+      .catch(() => {
         if (mounted && !controller.signal.aborted) {
           setWalletKey(null);
           setIsInitialLoad(false);
         }
-      }
-    };
-
-    loadWallet();
+      });
 
     return () => {
       mounted = false;
       controller.abort();
     };
   }, [isInitialLoad]);
-
-  const handleWalletError = useCallback((error: unknown): never => {
-    if (error instanceof WalletPasswordError) {
-      throw new Error('Current password is incorrect.');
-    }
-    if (error instanceof WalletKeyNotFoundError) {
-      throw new Error('No local wallet key found.');
-    }
-    if (error instanceof WalletReencryptError) {
-      throw new Error('Unable to verify the new password.');
-    }
-    throw new Error('Unexpected error updating password.');
-  }, []);
 
   const changePassword = useCallback(async () => {
     const validation = changePasswordSchema.safeParse(changeFields.fields);
@@ -123,7 +102,7 @@ export function useWalletSecurity({
     const { currentPassword, newPassword } = validation.data;
 
     const result = await asyncAction.execute(
-      () => changeWalletPassword(currentPassword, newPassword).catch(handleWalletError),
+      () => changeWalletPassword(currentPassword, newPassword),
       'Wallet password updated.'
     );
 
@@ -131,7 +110,7 @@ export function useWalletSecurity({
       setWalletKey(result);
       changeFields.resetFields();
     }
-  }, [changeFields.fields, asyncAction, handleWalletError, changeFields]);
+  }, [changeFields.fields, asyncAction, changeFields]);
 
   const createWalletKey = useCallback(async () => {
     const validation = setupSchema.safeParse(setupFields.fields);
@@ -152,7 +131,6 @@ export function useWalletSecurity({
       setWalletKey(result);
       setupFields.resetFields();
       
-      // Run profile save in background (non-blocking)
       if (avatarType === 'identicon') {
         saveProfileSettings({
           alias: alias.trim(),
@@ -180,7 +158,6 @@ export function useWalletSecurity({
     asyncAction.clear();
   }, [asyncAction]);
 
-  // Memoize return value
   return useMemo(
     () => ({
       walletKey,

@@ -43,6 +43,46 @@ export default function WalletCreatePasscodeCard({
 }: WalletCreatePasscodeCardProps) {
   const { colors } = useTheme();
 
+  const handlePasswordChange = (value: string) => {
+    console.log('=== WalletCreatePasscodeCard: Password Changed ===');
+    console.log('New value:', value);
+    console.log('Length:', value.length);
+    console.log('Type:', typeof value);
+    onChangeWalletPassword(value);
+  };
+
+  const handlePasswordConfirmChange = (value: string) => {
+    console.log('=== WalletCreatePasscodeCard: Password Confirm Changed ===');
+    console.log('New value:', value);
+    console.log('Length:', value.length);
+    console.log('Type:', typeof value);
+    onChangeWalletPasswordConfirm(value);
+  };
+
+  const handleCreatePress = () => {
+    console.log('=== WalletCreatePasscodeCard: Create Button Pressed ===');
+    console.log('walletPassword:', walletPassword, 'length:', walletPassword.length);
+    console.log('walletPasswordConfirm:', walletPasswordConfirm, 'length:', walletPasswordConfirm.length);
+    console.log('isSubmitting:', isSubmitting);
+    console.log('isPrimaryActive:', isPrimaryActive);
+    console.log('isConfirmActive:', isConfirmActive);
+    console.log('Calling onCreate...');
+    onCreate();
+  };
+
+  console.log('=== WalletCreatePasscodeCard Render ===');
+  console.log('Props:', {
+    walletPassword,
+    walletPasswordLength: walletPassword.length,
+    walletPasswordConfirm,
+    walletPasswordConfirmLength: walletPasswordConfirm.length,
+    flowError,
+    flowMessage,
+    isSubmitting,
+    isPrimaryActive,
+    isConfirmActive,
+  });
+
   return (
     <View style={[localStyles.container, { backgroundColor: colors.background }]}>
       <Text style={[styles.setupTitle, localStyles.title]}>Create a wallet</Text>
@@ -55,7 +95,7 @@ export default function WalletCreatePasscodeCard({
         <PasscodeField
           label="Enter Passcode"
           value={walletPassword}
-          onChange={onChangeWalletPassword}
+          onChange={handlePasswordChange}
           autoFocus={isPrimaryActive}
           isActive={isPrimaryActive}
           onActivate={onActivatePrimary}
@@ -64,7 +104,7 @@ export default function WalletCreatePasscodeCard({
         <PasscodeField
           label="Confirm Passcode"
           value={walletPasswordConfirm}
-          onChange={onChangeWalletPasswordConfirm}
+          onChange={handlePasswordConfirmChange}
           autoFocus={isConfirmActive}
           isActive={isConfirmActive}
           onActivate={onActivateConfirm}
@@ -77,7 +117,7 @@ export default function WalletCreatePasscodeCard({
       <View style={localStyles.buttonGroup}>
         <TouchableOpacity
           style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}
-          onPress={onCreate}
+          onPress={handleCreatePress}
           activeOpacity={0.9}
           disabled={isSubmitting}
         >
