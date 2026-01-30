@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo } from 'react';
-import { Keyboard, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@theme/ThemeProvider';
 import { createWalletStyles } from '@styles/WalletStyles';
@@ -23,14 +23,8 @@ export default function WalletTokenSearchOverlay({ visible, onClose }: WalletTok
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const { query, setQuery, filteredTokens, loading, error, refresh } = useTokenSearch(visible);
 
-  useEffect(() => {
-    if (visible) return;
-    Keyboard.dismiss();
-    setQuery('');
-  }, [setQuery, visible]);
-
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose} onDismiss={onClose}>
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={[localStyles.container, { backgroundColor: colors.background }]}>
         <View style={localStyles.headerRow}>
           <TouchableOpacity
