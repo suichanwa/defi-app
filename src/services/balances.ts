@@ -1,9 +1,8 @@
-import { Contract, utils } from 'ethers';
+import { Contract, formatEther, formatUnits } from 'ethers';
 import type { TokenInfo } from '../config/tokens';
 import { getProvider } from './provider';
 
 const erc20Abi = ['function balanceOf(address owner) view returns (uint256)'];
-const { formatEther, formatUnits } = utils;
 
 export async function fetchNativeBalance(address: string): Promise<string> {
   const provider = getProvider();

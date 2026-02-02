@@ -1,4 +1,11 @@
 import 'react-native-get-random-values';
+import { Buffer } from 'buffer';
+global.Buffer = Buffer;
+
+// Add process polyfill
+import process from 'process';
+global.process = process;
+
 import { LogBox } from 'react-native';
 import './global.css';
 import 'react-native-reanimated';

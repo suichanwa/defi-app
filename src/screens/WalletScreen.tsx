@@ -406,36 +406,81 @@ export default function WalletScreen() {
   };
 
   const handleCreate = async () => {
+    console.log('=== WalletScreen: handleCreate START ===');
+    console.log('walletPassword:', walletPassword, 'length:', walletPassword.length);
+    console.log('walletPasswordConfirm:', walletPasswordConfirm, 'length:', walletPasswordConfirm.length);
+    
     resetFlowMessages();
+    
+    console.log('Running passcodePolicy...');
     const policy = passcodePolicy(walletPassword);
+    console.log('passcodePolicy result:', policy);
+    
     if (policy) {
+      console.log('ERROR: Policy validation failed:', policy);
       setFlowError(policy);
       setShowErrorDialog(true);
       return;
     }
+    
     if (walletPassword !== walletPasswordConfirm) {
+      console.log('ERROR: Passcodes do not match');
       setFlowError('Passcodes do not match.');
       setShowErrorDialog(true);
       return;
     }
+    
+    console.log('✅ Validation passed');
+    console.log('Setting isSubmitting to true');
     setIsSubmitting(true);
+    
+    console.log('Starting slow message...');
     startSlowMessage('Yeah, this might take a moment...');
+    
+    console.log('Entering try block...');
     try {
       const passcode = walletPassword;
-      const { mnemonic } = await createWallet(passcode);
+      console.log('About to call createWallet...');
+      console.log('createWallet type:', typeof createWallet);
+      console.log('createWallet:', createWallet);
+      
+      const result = await createWallet(passcode);
+      
+      console.log('✅ createWallet returned:', result);
+      
+      if (!result || !result.mnemonic) {
+        console.error('❌ Invalid result from createWallet:', result);
+        throw new Error('Wallet creation returned invalid data');
+      }
+      
+      const { mnemonic } = result;
+      console.log('✅ Mnemonic received, length:', mnemonic.split(' ').length);
+      
       const normalized = normalizeMnemonic(mnemonic);
       setBackupSkipped(false);
       startBackupConfirm(normalized);
       setWalletPassword('');
       setWalletPasswordConfirm('');
       setFlowMessage('Wallet created. Back up your recovery phrase.');
+      
       if (biometricsAvailable) {
         await saveBiometricPassword(passcode);
       }
+      
+      console.log('✅ Wallet creation complete');
     } catch (error) {
+      console.error('❌ ERROR in handleCreate catch block');
+      console.error('Error:', error);
+      console.error('Error type:', typeof error);
+      console.error('Error instanceof Error:', error instanceof Error);
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      }
       setFlowError(walletErrorMessage(error, 'create'));
       setShowErrorDialog(true);
     } finally {
+      console.log('handleCreate finally block');
       clearSlowMessage();
       setIsSubmitting(false);
     }

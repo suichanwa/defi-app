@@ -1,9 +1,4 @@
 import { match } from 'ts-pattern';
-import {
-  WalletKeyNotFoundError,
-  WalletPasswordError,
-  WalletReencryptError,
-} from '../services/walletKeyStore';
 import { RpcConfigurationError } from '../services/provider';
 import { getActiveChain } from '../config/chain';
 
@@ -74,7 +69,6 @@ export function walletErrorMessage(error: unknown, action: WalletAction): string
   const rpcMessage = rpcErrorMessage(error);
   if (rpcMessage) return rpcMessage;
 
-  // Custom wallet key errors
   if (error instanceof WalletPasswordError) return 'Incorrect passcode for this wallet.';
   if (error instanceof WalletKeyNotFoundError) return 'No local wallet key found. Create or import first.';
   if (error instanceof WalletReencryptError) return 'Unable to verify the new passcode. Try another one.';

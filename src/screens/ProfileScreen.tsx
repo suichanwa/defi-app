@@ -61,7 +61,7 @@ export default function ProfileScreen() {
     onWalletKeyCreated: profile.actions.setAvatarSeed,
   });
 
-  const identiconSeed = security.state.walletKey?.id ?? profile.state.avatarSeed;
+  const identiconSeed = security.walletKey?.id ?? profile.state.avatarSeed;
   const identicon = useMemo(() => buildIdenticon(identiconSeed || 'seed'), [identiconSeed]);
   useEffect(() => {
     if (Platform.OS !== 'android') return;
@@ -196,19 +196,19 @@ export default function ProfileScreen() {
           scrollStyle={profile.styles.scrollStyle}
           cardStyle={profile.styles.cardStyle}
           onBack={() => setView('home')}
-          walletKey={security.state.walletKey}
-          setupPassword={security.state.setupPassword}
-          setupConfirm={security.state.setupConfirm}
-          currentPassword={security.state.currentPassword}
-          newPassword={security.state.newPassword}
-          confirmPassword={security.state.confirmPassword}
+          walletKey={security.walletKey}
+          setupPassword={security.setupFields.fields.setupPassword}
+          setupConfirm={security.setupFields.fields.setupConfirm}
+          currentPassword={security.changeFields.fields.currentPassword}
+          newPassword={security.changeFields.fields.newPassword}
+          confirmPassword={security.changeFields.fields.confirmPassword}
           securityMessage={security.status.message}
           securityError={security.status.error}
-          onChangeSetupPassword={(value) => security.actions.setField('setupPassword', value)}
-          onChangeSetupConfirm={(value) => security.actions.setField('setupConfirm', value)}
-          onChangeCurrentPassword={(value) => security.actions.setField('currentPassword', value)}
-          onChangeNewPassword={(value) => security.actions.setField('newPassword', value)}
-          onChangeConfirmPassword={(value) => security.actions.setField('confirmPassword', value)}
+          onChangeSetupPassword={(value) => security.setupFields.setField('setupPassword', value)}
+          onChangeSetupConfirm={(value) => security.setupFields.setField('setupConfirm', value)}
+          onChangeCurrentPassword={(value) => security.changeFields.setField('currentPassword', value)}
+          onChangeNewPassword={(value) => security.changeFields.setField('newPassword', value)}
+          onChangeConfirmPassword={(value) => security.changeFields.setField('confirmPassword', value)}
           onCreateWalletKey={security.actions.createWalletKey}
           onChangePassword={security.actions.changePassword}
         />

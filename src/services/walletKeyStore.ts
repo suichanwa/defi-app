@@ -1,97 +1,43 @@
-import type { EncryptedWalletKey, WalletKind, WalletRecordMeta } from '@app-types/wallet';
-import { getJson, removeKey, setJson } from './storage';
-import { getActiveWalletType } from '@config/chain';
+import type { EncryptedWalletKey, WalletRecordMeta, WalletKind } from '../types/wallet';
+import { getJson, setJson } from './storage';
+import { getActiveWalletType } from './activeWalletType';
+import aesjs from 'aes-js';
+import { pbkdf2 as noblePbkdf2 } from '@noble/hashes/pbkdf2.js';
+import { sha256 as nobleSha256 } from '@noble/hashes/sha2.js';
+import { Buffer } from 'buffer';
 
 const PBKDF2_ITERATIONS = 100000;
 const SALT_LENGTH = 16;
-const IV_LENGTH = 12;
+const IV_LENGTH = 16;
 
 const getStorageKey = (walletType: WalletKind) => `wallet.records.${walletType}.v1`;
 const getActiveWalletKey = (walletType: WalletKind) => `wallet.active.${walletType}.v1`;
 
-export async function loadWalletRecords(
-  walletType: WalletKind = getActiveWalletType(),
-): Promise<WalletRecordMeta[]> {
-  const records = await getJson<EncryptedWalletKey[]>(getStorageKey(walletType));
-  if (!records) return [];
-  return records.map((r) => {
-    const { encryptedJson, ...meta } = r;
-    return meta;
-  });
-}
-
-export async function getActiveWalletId(walletType: WalletKind = getActiveWalletType()): Promise<string | null> {
-  return getJson<string>(getActiveWalletKey(walletType));
-}
-
-export async function setActiveWalletId(
-  walletId: string,
-  walletType: WalletKind = getActiveWalletType(),
-): Promise<void> {
-  await setJson(getActiveWalletKey(walletType), walletId);
-}
-
-export async function loadEncryptedWalletKeyById(
-  walletId: string,
-  walletType: WalletKind = getActiveWalletType(),
-): Promise<EncryptedWalletKey | null> {
-  const records = await getJson<EncryptedWalletKey[]>(getStorageKey(walletType));
-  if (!records) return null;
-  return records.find((r) => r.id === walletId) ?? null;
-}
-
-export async function loadEncryptedWalletKey(
-  walletType: WalletKind = getActiveWalletType(),
-): Promise<EncryptedWalletKey | null> {
-  const activeId = await getActiveWalletId(walletType);
-  if (activeId) {
-    const record = await loadEncryptedWalletKeyById(activeId, walletType);
-    if (record) return record;
-  }
-  const records = await getJson<EncryptedWalletKey[]>(getStorageKey(walletType));
-  if (!records || records.length === 0) return null;
-  return records[0];
-}
-
-export async function saveEncryptedWalletKey(
-  record: EncryptedWalletKey,
-  walletType: WalletKind = record.walletType ?? getActiveWalletType(),
-): Promise<void> {
-  const records = (await getJson<EncryptedWalletKey[]>(getStorageKey(walletType))) ?? [];
-  const index = records.findIndex((r) => r.id === record.id);
-  if (index >= 0) {
-    records[index] = record;
+function getRandomBytes(length: number): Uint8Array {
+  const bytes = new Uint8Array(length);
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    crypto.getRandomValues(bytes);
   } else {
-    records.push(record);
+    for (let i = 0; i < length; i++) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
   }
-  await setJson(getStorageKey(walletType), records);
-  await setActiveWalletId(record.id, walletType);
+  return bytes;
 }
 
-async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
-  const passwordKey = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(password),
-    'PBKDF2',
-    false,
-    ['deriveBits', 'deriveKey']
-  );
-
-  return crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt: salt.buffer as ArrayBuffer,
-      iterations: PBKDF2_ITERATIONS,
-      hash: 'SHA-256',
-    },
-    passwordKey,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt']
-  );
+function deriveKey(password: string, salt: Uint8Array): Uint8Array {
+  const passwordStr = String(password);
+  const passwordBytes = new TextEncoder().encode(passwordStr);
+  
+  const derivedKey = noblePbkdf2(nobleSha256, passwordBytes, salt, {
+    c: PBKDF2_ITERATIONS,
+    dkLen: 32,
+  });
+  
+  return derivedKey;
 }
 
-function bufferToHex(buffer: ArrayBuffer): string {
+function bufferToHex(buffer: ArrayBuffer | Uint8Array): string {
   return Array.from(new Uint8Array(buffer))
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
@@ -100,90 +46,268 @@ function bufferToHex(buffer: ArrayBuffer): string {
 function hexToBuffer(hex: string): Uint8Array {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
-    bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
+    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
   }
   return bytes;
 }
 
+export async function loadWalletRecords(
+  walletType?: WalletKind,
+): Promise<WalletRecordMeta[]> {
+  const type = walletType ?? await getActiveWalletType();
+  const records = await getJson<EncryptedWalletKey[]>(getStorageKey(type));
+  if (!records) return [];
+  return records.map((r: EncryptedWalletKey) => ({
+    id: r.id,
+    label: (r as any).label ?? 'Wallet',
+    color: (r as any).color ?? '#4f46e5',
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+    walletType: r.walletType,
+  }));
+}
+
+export async function getActiveWalletId(walletType?: WalletKind): Promise<string | null> {
+  const type = walletType ?? await getActiveWalletType();
+  return getJson<string>(getActiveWalletKey(type));
+}
+
+export async function setActiveWalletId(
+  walletId: string,
+  walletType?: WalletKind,
+): Promise<void> {
+  const type = walletType ?? await getActiveWalletType();
+  await setJson(getActiveWalletKey(type), walletId);
+}
+
+export async function loadEncryptedWalletKeyById(
+  walletId: string,
+  walletType?: WalletKind,
+): Promise<EncryptedWalletKey | null> {
+  const type = walletType ?? await getActiveWalletType();
+  const records = await getJson<EncryptedWalletKey[]>(getStorageKey(type));
+  if (!records) return null;
+  return records.find((r: EncryptedWalletKey) => r.id === walletId) ?? null;
+}
+
+export async function loadEncryptedWalletKey(
+  walletType?: WalletKind,
+): Promise<EncryptedWalletKey | null> {
+  const type = walletType ?? await getActiveWalletType();
+  const activeId = await getActiveWalletId(type);
+  if (activeId) {
+    return loadEncryptedWalletKeyById(activeId, type);
+  }
+  const records = await getJson<EncryptedWalletKey[]>(getStorageKey(type));
+  if (!records || records.length === 0) return null;
+  return records[0];
+}
+
+export async function saveEncryptedWalletKey(
+  record: EncryptedWalletKey,
+  walletType?: WalletKind,
+): Promise<void> {
+  const type = walletType ?? record.walletType ?? await getActiveWalletType();
+  const records = (await getJson<EncryptedWalletKey[]>(getStorageKey(type))) ?? [];
+  const index = records.findIndex((r: EncryptedWalletKey) => r.id === record.id);
+  if (index >= 0) {
+    records[index] = record;
+  } else {
+    records.push(record);
+  }
+  await setJson(getStorageKey(type), records);
+  await setActiveWalletId(record.id, type);
+}
+
 export async function encryptWalletKey(privateKey: string, password: string): Promise<EncryptedWalletKey> {
-  const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
-  const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
-  const key = await deriveKey(password, salt);
-
-  const plaintext = new TextEncoder().encode(privateKey);
-  const ciphertext = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: iv.buffer as ArrayBuffer },
-    key,
-    plaintext.buffer as ArrayBuffer
-  );
-
-  const payload = {
-    salt: bufferToHex(salt.buffer as ArrayBuffer),
-    iv: bufferToHex(iv.buffer as ArrayBuffer),
-    ciphertext: bufferToHex(ciphertext),
+  // Validate inputs
+  if (!privateKey || typeof privateKey !== 'string') {
+    throw new Error('Private key must be a non-empty string');
+  }
+  if (!password || typeof password !== 'string') {
+    throw new Error('Password must be a non-empty string');
+  }
+  
+  const salt = getRandomBytes(SALT_LENGTH);
+  const iv = getRandomBytes(IV_LENGTH);
+  
+  const key = deriveKey(password, salt);
+  
+  const textBytes = aesjs.utils.utf8.toBytes(privateKey);
+  const aesCtr = new aesjs.ModeOfOperation.ctr(key, new aesjs.Counter(iv));
+  const encryptedBytes = aesCtr.encrypt(textBytes);
+  
+  const encrypted = {
+    version: 1,
+    algorithm: 'aes-256-ctr',
+    salt: bufferToHex(salt),
+    iv: bufferToHex(iv),
+    ciphertext: bufferToHex(encryptedBytes),
   };
-
+  
+  const now = new Date().toISOString();
   return {
-    id: `wallet_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
-    encryptedJson: JSON.stringify(payload),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+    id: Date.now().toString(),
+    encryptedJson: JSON.stringify(encrypted),
+    createdAt: now,
+    updatedAt: now,
+  } as EncryptedWalletKey;
 }
 
 export async function decryptWalletKey(encryptedJson: string, password: string): Promise<string> {
-  const payload = JSON.parse(encryptedJson);
-  const salt = hexToBuffer(payload.salt);
-  const iv = hexToBuffer(payload.iv);
-  const ciphertext = hexToBuffer(payload.ciphertext);
-
-  const key = await deriveKey(password, salt);
-
-  try {
-    const plaintext = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: iv.buffer as ArrayBuffer },
-      key,
-      ciphertext.buffer as ArrayBuffer
-    );
-    return new TextDecoder().decode(plaintext);
-  } catch (error) {
-    throw new Error('Incorrect password or corrupted data.');
+  // Validate inputs
+  if (!password || typeof password !== 'string') {
+    throw new Error('Password must be a non-empty string');
   }
+  
+  const data = JSON.parse(encryptedJson);
+  
+  if (data.version !== 1 || data.algorithm !== 'aes-256-ctr') {
+    throw new Error('Unsupported encryption version or algorithm');
+  }
+  
+  const salt = hexToBuffer(data.salt);
+  const iv = hexToBuffer(data.iv);
+  const ciphertext = hexToBuffer(data.ciphertext);
+  
+  const key = deriveKey(password, salt);
+  
+  const aesCtr = new aesjs.ModeOfOperation.ctr(key, new aesjs.Counter(iv));
+  const decryptedBytes = aesCtr.decrypt(ciphertext);
+  const decryptedText = aesjs.utils.utf8.fromBytes(decryptedBytes);
+  
+  return decryptedText;
+}
+
+export async function createInitialWalletKey(password: string): Promise<EncryptedWalletKey> {
+  const { Wallet } = await import('ethers');
+  const wallet = Wallet.createRandom();
+  const encryptedJson = await wallet.encrypt(password);
+  
+  const now = new Date().toISOString();
+  const record: EncryptedWalletKey = {
+    id: wallet.address,
+    encryptedJson,
+    createdAt: now,
+    updatedAt: now,
+    backupCompleted: false,
+    walletType: 'ethereum',
+  };
+  
+  await saveEncryptedWalletKey(record);
+  return record;
+}
+
+export async function markBackupCompleted(walletType?: WalletKind): Promise<void> {
+  const type = walletType ?? await getActiveWalletType();
+  const activeId = await getActiveWalletId(type);
+  if (!activeId) return;
+  
+  const records = (await getJson<EncryptedWalletKey[]>(getStorageKey(type))) ?? [];
+  const index = records.findIndex((r: EncryptedWalletKey) => r.id === activeId);
+  if (index >= 0) {
+    records[index] = { ...records[index], backupCompleted: true, updatedAt: new Date().toISOString() };
+    await setJson(getStorageKey(type), records);
+  }
+}
+
+export async function clearWallet(walletType?: WalletKind): Promise<void> {
+  const type = walletType ?? await getActiveWalletType();
+  await setJson(getStorageKey(type), []);
+  await setJson(getActiveWalletKey(type), null);
+}
+
+export async function importSolanaWalletRecord(
+  mnemonic: string,
+  password: string,
+  walletType: WalletKind = 'solana'
+): Promise<{ record: EncryptedWalletKey; keypair: any; mnemonic: string }> {
+  const { Keypair } = await import('@solana/web3.js');
+  const { mnemonicToSeedSync } = await import('bip39');
+  
+  const seed = mnemonicToSeedSync(mnemonic);
+  const seedBytes = seed.slice(0, 32);
+  const keypair = Keypair.fromSeed(seedBytes);
+  
+  const privateKeyBase58 = Buffer.from(keypair.secretKey).toString('base64');
+  const encrypted = await encryptWalletKey(privateKeyBase58, password);
+  
+  const record: EncryptedWalletKey = {
+    ...encrypted,
+    id: keypair.publicKey.toBase58(),
+    walletType,
+    backupCompleted: false,
+  };
+  
+  await saveEncryptedWalletKey(record, walletType);
+  return { record, keypair, mnemonic };
+}
+
+export async function unlockSolanaWallet(
+  encryptedJson: string,
+  password: string
+): Promise<{ keypair: any; mnemonic: string | null }> {
+  const { Keypair } = await import('@solana/web3.js');
+  
+  const decrypted = await decryptWalletKey(encryptedJson, password);
+  const secretKeyBuffer = Buffer.from(decrypted, 'base64');
+  const keypair = Keypair.fromSecretKey(secretKeyBuffer);
+  
+  return { keypair, mnemonic: null };
+}
+
+export async function createSolanaWalletRecord(
+  password: string,
+  walletType: WalletKind = 'solana'
+): Promise<{ record: EncryptedWalletKey; keypair: any; mnemonic: string }> {
+  const { Keypair } = await import('@solana/web3.js');
+  const { generateMnemonic, mnemonicToSeedSync } = await import('bip39');
+  
+  const mnemonic = generateMnemonic();
+  const seed = mnemonicToSeedSync(mnemonic);
+  const seedBytes = seed.slice(0, 32);
+  const keypair = Keypair.fromSeed(seedBytes);
+  
+  const privateKeyBase58 = Buffer.from(keypair.secretKey).toString('base64');
+  const encrypted = await encryptWalletKey(privateKeyBase58, password);
+  
+  const record: EncryptedWalletKey = {
+    ...encrypted,
+    id: keypair.publicKey.toBase58(),
+    walletType,
+    backupCompleted: false,
+  };
+  
+  await saveEncryptedWalletKey(record, walletType);
+  return { record, keypair, mnemonic };
 }
 
 export async function removeWalletRecord(
   walletId: string,
-  walletType: WalletKind = getActiveWalletType(),
+  walletType?: WalletKind,
 ): Promise<void> {
-  const records = (await getJson<EncryptedWalletKey[]>(getStorageKey(walletType))) ?? [];
-  const filtered = records.filter((r) => r.id !== walletId);
+  const type = walletType ?? await getActiveWalletType();
+  const records = (await getJson<EncryptedWalletKey[]>(getStorageKey(type))) ?? [];
+  const filtered = records.filter((r: EncryptedWalletKey) => r.id !== walletId);
+  await setJson(getStorageKey(type), filtered);
   
-  if (filtered.length === 0) {
-    await removeKey(getStorageKey(walletType));
-    await removeKey(getActiveWalletKey(walletType));
-  } else {
-    await setJson(getStorageKey(walletType), filtered);
-    const activeId = await getActiveWalletId(walletType);
-    if (activeId === walletId && filtered.length > 0) {
-      await setActiveWalletId(filtered[0].id, walletType);
-    }
+  const activeId = await getActiveWalletId(type);
+  if (activeId === walletId && filtered.length > 0) {
+    await setActiveWalletId(filtered[0].id, type);
   }
 }
 
 export async function updateWalletRecordMeta(
   walletId: string,
   updates: Partial<Pick<WalletRecordMeta, 'label' | 'color'>>,
-  walletType: WalletKind = getActiveWalletType(),
+  walletType?: WalletKind,
 ): Promise<WalletRecordMeta[]> {
-  const records = (await getJson<EncryptedWalletKey[]>(getStorageKey(walletType))) ?? [];
-  const updated = records.map((r) =>
-    r.id === walletId
-      ? { ...r, ...updates, updatedAt: new Date().toISOString() }
-      : r
-  );
-  await setJson(getStorageKey(walletType), updated);
-  return updated.map((r) => {
-    const { encryptedJson, ...meta } = r;
-    return meta;
-  });
+  const type = walletType ?? await getActiveWalletType();
+  const records = (await getJson<EncryptedWalletKey[]>(getStorageKey(type))) ?? [];
+  const index = records.findIndex((r: EncryptedWalletKey) => r.id === walletId);
+  if (index >= 0) {
+    records[index] = { ...records[index], ...updates };
+    await setJson(getStorageKey(type), records);
+  }
+  return loadWalletRecords(type);
 }

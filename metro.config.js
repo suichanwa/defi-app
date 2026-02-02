@@ -1,11 +1,19 @@
-const { withNativeWind } = require('nativewind/metro');
-const {
-  getSentryExpoConfig
-} = require("@sentry/react-native/metro");
+const { getDefaultConfig } = require('expo/metro-config');
 
-const config = getSentryExpoConfig(__dirname);
+const config = getDefaultConfig(__dirname);
 
-// Avoid Metro export-map warnings from deep imports in some deps (e.g. noble/hashes).
-config.resolver.unstable_enablePackageExports = false;
+config.resolver.extraNodeModules = {
+  crypto: require.resolve('crypto-browserify'),
+  stream: require.resolve('readable-stream'),
+  buffer: require.resolve('buffer'),
+  events: require.resolve('events'),
+  util: require.resolve('util'),
+  assert: require.resolve('assert'),
+  string_decoder: require.resolve('string_decoder'),
+  process: require.resolve('process/browser'),
+};
 
-module.exports = withNativeWind(config, { input: './global.css' });
+// Allow importing from @noble/hashes subpaths
+config.resolver.sourceExts = [...config.resolver.sourceExts, 'cjs'];
+
+module.exports = config;

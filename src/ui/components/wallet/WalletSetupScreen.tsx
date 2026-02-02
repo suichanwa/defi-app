@@ -185,8 +185,6 @@ export default function WalletSetupScreen({
     }
   }, [flow, isSubmitting, onUnlock, status, unlockPassword]);
 
-  // COMMENT OUT OR REMOVE THIS useEffect - it's auto-submitting with the wrong handler
-  /*
   useEffect(() => {
     if (flow !== 'create-passcode' || isSubmitting) return;
     if (walletPassword.length < PASSCODE_LENGTH || walletPasswordConfirm.length < PASSCODE_LENGTH) {
@@ -201,7 +199,6 @@ export default function WalletSetupScreen({
     lastAutoCreate.current = walletPasswordConfirm;
     onCreate();
   }, [flow, isSubmitting, onCreate, walletPassword, walletPasswordConfirm]);
-  */
 
   const effectivePasscodeField =
     activePasscodeField ??

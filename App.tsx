@@ -19,6 +19,7 @@ import { NotificationProvider } from './src/context/NotificationProvider';
 import { NavVisibilityProvider, useNavVisibility } from './src/context/NavVisibilityProvider';
 import { QRReceiveProvider } from './src/context/QRReceiveProvider';
 import { ChainProvider } from './src/context/ChainProvider';
+import 'react-native-get-random-values';
 
 Sentry.init({
   dsn: 'https://005462e44419a10cf92b86000ff8c484@o4510659003940864.ingest.de.sentry.io/4510659569778768',

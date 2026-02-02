@@ -117,6 +117,7 @@ export default function AddScreen() {
   const handleCreate = async () => {
     console.log('=== handleCreate called ===');
     console.log('walletPassword:', walletPassword, 'length:', walletPassword.length);
+    console.log('walletPassword type:', typeof walletPassword);
     console.log('walletPasswordConfirm:', walletPasswordConfirm, 'length:', walletPasswordConfirm.length);
     
     resetFlowMessages();
@@ -151,6 +152,7 @@ export default function AddScreen() {
     }
     
     console.log('All validations passed, creating wallet...');
+    console.log('About to call createWallet with password type:', typeof walletPassword);
     setIsSubmitting(true);
     try {
       const { mnemonic } = await createWallet(walletPassword);
@@ -162,6 +164,11 @@ export default function AddScreen() {
       setFlowMessage('Wallet created. Back up your recovery phrase.');
     } catch (error) {
       console.error('Error creating wallet:', error);
+      console.error('Error type:', typeof error);
+      console.error('Error instanceof Error:', error instanceof Error);
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+      }
       setFlowError(walletErrorMessage(error, 'create'));
     } finally {
       setIsSubmitting(false);

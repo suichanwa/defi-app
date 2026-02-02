@@ -1,4 +1,4 @@
-import { providers } from 'ethers';
+import { Provider } from 'ethers';
 import { getActiveChain, isEthereumChain } from '../config/chain';
 
 export class RpcConfigurationError extends Error {
@@ -7,8 +7,9 @@ export class RpcConfigurationError extends Error {
     this.name = 'RpcConfigurationError';
   }
 }
+  
+let provider: Provider.JsonRpcProvider | null = null;
 
-let provider: providers.JsonRpcProvider | null = null;
 
 export function getProvider(): providers.JsonRpcProvider {
   if (provider) return provider;
