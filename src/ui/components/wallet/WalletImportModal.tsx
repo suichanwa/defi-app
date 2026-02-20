@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createWalletStyles } from '@styles/WalletStyles';
@@ -55,6 +55,39 @@ export default function WalletImportModal({
   onActivatePrimary,
   onActivateConfirm,
 }: WalletImportModalProps) {
+  const [words, setWords] = useState<string[]>(Array(12).fill(''));
+  const [activeWordIndex, setActiveWordIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!visible) {
+      setWords(Array(12).fill(''));
+    } else if (mnemonicInput) {
+      const parentWords = mnemonicInput.split(' ').filter(Boolean);
+      if (parentWords.join(' ') !== words.filter(Boolean).join(' ')) {
+        const newWords = Array(12).fill('');
+        parentWords.forEach((w, i) => { if (i < 12) newWords[i] = w; });
+        setWords(newWords);
+      }
+    }
+  }, [visible, mnemonicInput]);
+
+  const handleWordChange = (text: string, index: number) => {
+    const pasted = text.trim().split(/\s+/);
+    if (pasted.length > 1) {
+      const newWords = [...words];
+      pasted.forEach((w, i) => {
+        if (index + i < 12) newWords[index + i] = w.replace(/[^a-zA-Z]/g, '').toLowerCase();
+      });
+      setWords(newWords);
+      onChangeMnemonic(newWords.filter(Boolean).join(' '));
+      return;
+    }
+    const newWords = [...words];
+    newWords[index] = text.replace(/[^a-zA-Z]/g, '').toLowerCase();
+    setWords(newWords);
+    onChangeMnemonic(newWords.filter(Boolean).join(' '));
+  };
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
@@ -65,16 +98,31 @@ export default function WalletImportModal({
               <Ionicons name="close" size={20} color={colors.text} />
             </TouchableOpacity>
           </View>
-          <Text style={styles.modalSubtitle}>Paste your 12 or 24 word recovery phrase.</Text>
-          <TextInput
-            value={mnemonicInput}
-            onChangeText={onChangeMnemonic}
-            placeholder="Recovery phrase"
-            placeholderTextColor="#94a3b8"
-            style={[styles.input, styles.modalInput]}
-            multiline
-            autoCapitalize="none"
-          />
+          <Text style={styles.modalSubtitle}>Enter or paste your 12 word recovery phrase.</Text>
+          <View style={styles.mnemonicGrid}>
+            {words.map((word, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.mnemonicInputCell,
+                  activeWordIndex === index && styles.mnemonicInputCellFocused,
+                ]}
+              >
+                <Text style={styles.mnemonicIndex}>{index + 1}.</Text>
+                <TextInput
+                  value={word}
+                  onChangeText={(text) => handleWordChange(text, index)}
+                  onFocus={() => setActiveWordIndex(index)}
+                  onBlur={() => setActiveWordIndex(null)}
+                  style={styles.mnemonicInputField}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  placeholderTextColor={colors.text + '40'}
+                  returnKeyType={index === 11 ? 'done' : 'next'}
+                />
+              </View>
+            ))}
+          </View>
           <PasscodeField
             label="Passcode"
             value={walletPassword}

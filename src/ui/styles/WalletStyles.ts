@@ -9,7 +9,7 @@ export const createWalletStyles = (colors: ReturnType<typeof useTheme>['colors']
       paddingTop: 24,
       paddingBottom: 120,
     },
-    
+
     // Header styles
     headerRow: {
       flexDirection: 'row',
@@ -77,7 +77,7 @@ export const createWalletStyles = (colors: ReturnType<typeof useTheme>['colors']
       shadowRadius: 16,
       elevation: 8,
     },
-    
+
     // Main wallet card
     walletCard: {
       backgroundColor: colors.card,
@@ -391,6 +391,28 @@ export const createWalletStyles = (colors: ReturnType<typeof useTheme>['colors']
       fontWeight: '700',
       color: colors.text,
     },
+    mnemonicInputCell: {
+      flex: 1,
+      minWidth: '30%',
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRadius: 12,
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    mnemonicInputCellFocused: {
+      borderColor: colors.accent,
+    },
+    mnemonicInputField: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.text,
+      padding: 0,
+    },
     checkboxRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -434,6 +456,44 @@ export const createWalletStyles = (colors: ReturnType<typeof useTheme>['colors']
       fontWeight: '700',
       color: '#ffffff',
       letterSpacing: 0.3,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+      justifyContent: 'flex-end',
+    },
+    modalScroll: {
+      flex: 1,
+    },
+    modalCard: {
+      backgroundColor: colors.card,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      padding: 24,
+      paddingBottom: 40,
+      marginTop: 'auto',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 16,
+    },
+    modalTitle: {
+      fontSize: 22,
+      fontWeight: '800',
+      color: colors.text,
+    },
+    modalSubtitle: {
+      fontSize: 15,
+      color: colors.muted,
+      marginBottom: 24,
+      lineHeight: 22,
+      fontWeight: '500',
+    },
+    modalInput: {
+      height: 100,
+      textAlignVertical: 'top',
     },
     secondaryButton: {
       backgroundColor: 'transparent',

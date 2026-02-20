@@ -1,10 +1,11 @@
 import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { useTheme } from '@theme/ThemeProvider';
 import { createWalletStyles } from '@styles/WalletStyles';
+import { useNavVisibility } from '@context/NavVisibilityProvider';
 
 type WalletStackParamList = {
   WalletHome: undefined;
@@ -23,10 +24,29 @@ export default function SwapScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const navigation = useNavigation<StackNavigationProp<WalletStackParamList, 'Swap'>>();
+  const { setNavHidden } = useNavVisibility();
+
+  useFocusEffect(
+    React.useCallback(() => {
+      setNavHidden(true);
+      return () => setNavHidden(false);
+    }, [setNavHidden]),
+  );
 
   return (
     <View style={[localStyles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={[styles.scrollContent, localStyles.scrollContent]}>
+        <View style={localStyles.header}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={[localStyles.backButton, { borderColor: colors.border }]}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="chevron-back" size={18} color={colors.text} />
+          </TouchableOpacity>
+          <View style={localStyles.headerSpacer} />
+        </View>
+
         <Text style={[localStyles.title, { color: colors.text }]}>Swap</Text>
         <Text style={[localStyles.subtitle, { color: colors.muted }]}>Exchange one token for another</Text>
 
@@ -69,6 +89,22 @@ const localStyles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 40,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+  },
+  headerSpacer: {
+    flex: 1,
   },
   title: {
     fontSize: 24,

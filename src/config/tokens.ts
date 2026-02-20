@@ -3,7 +3,7 @@ export type TokenInfo = {
   name: string;
   address: string;
   decimals: number;
-  priceSymbol?: string; // for mapping to Binance tickers
+  priceSymbol?: string; 
 };
 
 export const ERC20_TOKENS: TokenInfo[] = [

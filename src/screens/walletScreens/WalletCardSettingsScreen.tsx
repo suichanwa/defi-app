@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { useTheme } from '@theme/ThemeProvider';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useWalletSession } from '@context/WalletSessionProvider';
+import { useNavVisibility } from '@context/NavVisibilityProvider';
 
 type WalletStackParamList = {
   WalletHome: undefined;
@@ -31,9 +32,17 @@ export default function WalletCardSettingsScreen() {
   const { walletId } = (route.params ?? {}) as { walletId: string };
   const { wallets, updateWalletMeta } = useWalletSession();
   const wallet = wallets.find((item) => item.id === walletId);
+  const { setNavHidden } = useNavVisibility();
 
   const [name, setName] = useState(wallet?.label ?? `Wallet`);
   const [color, setColor] = useState(wallet?.color ?? COLOR_OPTIONS[0]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      setNavHidden(true);
+      return () => setNavHidden(false);
+    }, [setNavHidden]),
+  );
 
   const handleSave = async () => {
     await updateWalletMeta(walletId, { label: name.trim() || `Wallet`, color });
