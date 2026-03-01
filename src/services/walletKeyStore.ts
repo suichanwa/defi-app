@@ -212,9 +212,19 @@ export async function markBackupCompleted(walletType?: WalletKind): Promise<void
 }
 
 export async function clearWallet(walletType?: WalletKind): Promise<void> {
-  const type = walletType ?? await getActiveWalletType();
-  await setJson(getStorageKey(type), []);
-  await setJson(getActiveWalletKey(type), null);
+  if (walletType) {
+    await setJson(getStorageKey(walletType), []);
+    await setJson(getActiveWalletKey(walletType), null);
+    return;
+  }
+
+  // Full local reset path: wipe all supported wallet namespaces.
+  await Promise.all(
+    (['ethereum', 'solana'] as WalletKind[]).flatMap((type) => [
+      setJson(getStorageKey(type), []),
+      setJson(getActiveWalletKey(type), null),
+    ]),
+  );
 }
 
 export async function importSolanaWalletRecord(

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, ScrollView, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Alert, Animated, ScrollView, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { createStackNavigator, StackNavigationProp } from '@react-navigation/stack';
 import { NavigationContainer } from '@react-navigation/native';
 import { createWalletStyles } from '@styles/WalletStyles';
@@ -37,6 +37,10 @@ import WalletCardCarousel, { WalletActionItem } from './walletScreens/components
 import WalletSearchBar from './walletScreens/components/WalletSearchBar';
 import WalletTabSelector, { WalletTab } from './walletScreens/components/WalletTabSelector';
 import WalletTokenSearchOverlay from './walletScreens/components/WalletTokenSearchOverlay';
+import { clearProfileSettings } from '@services/profileStore';
+import { clearRewardsCache } from '@services/rewardsStore';
+import { signOut as authSignOut } from '@services/auth';
+import { appFeatures } from '@config/appFeatures';
 
 type WalletStackParamList = {
   WalletHome: undefined;
@@ -77,9 +81,15 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
   const [airdropMessage, setAirdropMessage] = useState<string | null>(null);
   const [airdropTick, setAirdropTick] = useState(0);
   const { errorMessage, errorTitle, errorVariant, isErrorVisible, handleError, clearError } = useApiError();
-  const handleActivateWallet = (walletId: string) => {
+  const handleActivateWallet = async (walletId: string) => {
     if (walletId && walletId !== activeWalletId) {
-      switchWallet(walletId);
+      try {
+        await switchWallet(walletId);
+      } catch (error) {
+        handleError(error, {
+          defaultMessage: 'Unable to activate this wallet. Unlock it with its passcode and try again.',
+        });
+      }
     }
   };
 
@@ -283,6 +293,7 @@ export default function WalletScreen() {
     createWallet,
     importWallet,
     confirmBackup,
+    forgetWallet,
   } = useWalletSession();
 
   const [flow, setFlow] = useState<
@@ -306,6 +317,7 @@ export default function WalletScreen() {
 
   const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const biometricInFlightRef = useRef(false);
+  const resetInFlightRef = useRef(false);
 
   const animatePasscodeUnlock = async (passcode: string) => {
     setUnlockPassword('');
@@ -330,6 +342,7 @@ export default function WalletScreen() {
     const tryBiometricUnlock = async () => {
       if (status !== 'locked') return;
       if (biometricInFlightRef.current) return;
+      if (resetInFlightRef.current) return;
 
       try {
         const canUse = await canUseBiometrics();
@@ -341,7 +354,7 @@ export default function WalletScreen() {
         startSlowMessage('Yeah, this might take a moment...');
         await animatePasscodeUnlock(stored);
         await unlock(stored);
-        if (!cancelled) {
+        if (!cancelled && !resetInFlightRef.current) {
           setFlow('menu');
           setUnlockPassword('');
         }
@@ -349,8 +362,10 @@ export default function WalletScreen() {
         // Silent fail
       } finally {
         biometricInFlightRef.current = false;
-        clearSlowMessage();
-        setIsSubmitting(false);
+        if (!resetInFlightRef.current) {
+          clearSlowMessage();
+          setIsSubmitting(false);
+        }
       }
     };
 
@@ -640,6 +655,47 @@ export default function WalletScreen() {
     canUseBiometrics().then(setBiometricsAvailable).catch(() => setBiometricsAvailable(false));
   }, []);
 
+  const executeStartFresh = async () => {
+    if (isSubmitting) return;
+    resetInFlightRef.current = true;
+    setIsSubmitting(true);
+    clearSlowMessage();
+    resetFlowMessages();
+    setFlowError(null);
+    setShowErrorDialog(false);
+    try {
+      await Promise.allSettled([authSignOut(), clearProfileSettings(), clearRewardsCache()]);
+      await forgetWallet();
+      setFlow('menu');
+      setUnlockPassword('');
+      setWalletPassword('');
+      setWalletPasswordConfirm('');
+      setMnemonicInput('');
+      setBackupMnemonic(null);
+      setBackupAcknowledged(false);
+      setBackupSkipped(false);
+      setConfirmWord1('');
+      setConfirmWord2('');
+    } catch (error) {
+      setFlowError(walletErrorMessage(error, 'unlock'));
+      setShowErrorDialog(true);
+    } finally {
+      resetInFlightRef.current = false;
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleStartFresh = () => {
+    Alert.alert(
+      'Delete local data?',
+      'This will remove all wallets and local account data from this device. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => void executeStartFresh() },
+      ],
+    );
+  };
+
   if (status !== 'unlocked' || backupMnemonic) {
     return (
       <ScrollView contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}>
@@ -678,6 +734,8 @@ export default function WalletScreen() {
           onCreate={handleCreate}
           onImport={handleImport}
           onUnlock={handleUnlock}
+          onStartFresh={handleStartFresh}
+          showStartFresh={appFeatures.showStartFreshOnLockScreen}
           onConfirmBackup={handleConfirmBackup}
           onBackToMenu={() => {
             resetFlowMessages();

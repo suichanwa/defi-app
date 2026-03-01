@@ -25,6 +25,7 @@ import { useWalletSecurity } from '@hooks/useWalletSecurity';
 import { useTheme } from '@theme/ThemeProvider';
 import { buildIdenticon } from '@utils/identicon';
 import type { LocalSession } from '@hooks/useProfileAuth';
+import { APP_VARIANT, appFeatures } from '@config/appFeatures';
 
 type ProfileView =
   | 'home'
@@ -257,7 +258,7 @@ export default function ProfileScreen() {
       );
       break;
     case 'developer':
-      content = (
+      content = appFeatures.showDeveloperTab ? (
         <>
           <DeveloperTab
             scrollStyle={profile.styles.scrollStyle}
@@ -285,6 +286,22 @@ export default function ProfileScreen() {
             }}
           />
         </>
+      ) : (
+        <ProfileHomeTab
+          scrollStyle={profile.styles.scrollStyle}
+          cardStyle={profile.styles.cardStyle}
+          profileSource={profile.state.profileSource}
+          onOpenPersonalization={() => setView('personalization')}
+          onOpenAuth={() => setView('auth')}
+          onOpenSecurity={() => setView('security')}
+          onOpenRewards={() => setView('rewards')}
+          onOpenTransactionHistory={() => setView('transactionHistory')}
+          onOpenLocalization={() => setView('localization')}
+          onOpenAbout={() => setView('about')}
+          onOpenChangelog={() => setView('changelog')}
+          showDeveloper={false}
+          buildLabel={`${APP_VARIANT} build`}
+        />
       );
       break;
     case 'about':
@@ -317,10 +334,11 @@ export default function ProfileScreen() {
           onOpenRewards={() => setView('rewards')}
           onOpenTransactionHistory={() => setView('transactionHistory')}
           onOpenLocalization={() => setView('localization')}
-          onOpenDeveloper={() => setView('developer')}
+          onOpenDeveloper={appFeatures.showDeveloperTab ? () => setView('developer') : undefined}
+          showDeveloper={appFeatures.showDeveloperTab}
           onOpenAbout={() => setView('about')}
           onOpenChangelog={() => setView('changelog')}
-          buildLabel="dev build 0.19.2"
+          buildLabel={`${APP_VARIANT} build`}
         />
       );
   }

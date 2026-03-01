@@ -1,9 +1,8 @@
 import React from 'react';
-import { Text, View, StyleSheet } from 'react-native';
+import { Text, View, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '@theme/ThemeProvider';
-import FlowMessage from './FlowMessage';
 import PasscodeField from './PasscodeField';
 import WalletLoadingOverlay from './WalletLoadingOverlay';
 
@@ -17,6 +16,9 @@ type WalletUnlockCardProps = {
   onUnlock: () => void;
   isUnlockActive: boolean;
   onActivateUnlock: () => void;
+  onStartFresh: () => void;
+  isStartFreshDisabled?: boolean;
+  showStartFresh?: boolean;
 };
 
 export default function WalletUnlockCard({
@@ -29,16 +31,41 @@ export default function WalletUnlockCard({
   onUnlock,
   isUnlockActive,
   onActivateUnlock,
+  onStartFresh,
+  isStartFreshDisabled = false,
+  showStartFresh = true,
 }: WalletUnlockCardProps) {
   const { colors } = useTheme();
 
   return (
     <View style={[localStyles.container, { backgroundColor: colors.background }]}>
-      <View style={localStyles.header}>
-        <Text style={[styles.setupTitle, localStyles.title, { color: colors.text }]}>Welcome back</Text>
-        <Text style={[styles.setupSubtitle, localStyles.subtitle, { color: colors.muted }]}>
-          Enter your passcode to unlock
-        </Text>
+      <View style={localStyles.headerRow}>
+        <View style={localStyles.headerSpacer} />
+        <View style={localStyles.header}>
+          <Text style={[styles.setupTitle, localStyles.title, { color: colors.text }]}>Welcome back</Text>
+          <Text style={[styles.setupSubtitle, localStyles.subtitle, { color: colors.muted }]}>
+            Enter your passcode to unlock
+          </Text>
+        </View>
+        {showStartFresh ? (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={onStartFresh}
+            disabled={isStartFreshDisabled}
+            style={localStyles.startFreshButton}
+          >
+            <Text
+              style={[
+                localStyles.startFreshText,
+                { color: isStartFreshDisabled ? colors.muted : '#ef4444' },
+              ]}
+            >
+              Start fresh
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={localStyles.startFreshButton} />
+        )}
       </View>
 
       <View style={localStyles.passcodeSection}>
@@ -72,9 +99,26 @@ const localStyles = StyleSheet.create({
     paddingTop: 60,
     justifyContent: 'flex-start',
   },
-  header: {
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     marginBottom: 48,
+  },
+  header: {
+    flex: 1,
     alignItems: 'center',
+  },
+  headerSpacer: {
+    minWidth: 82,
+  },
+  startFreshButton: {
+    minWidth: 82,
+    alignItems: 'flex-end',
+    paddingTop: 10,
+  },
+  startFreshText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   title: {
     textAlign: 'center',

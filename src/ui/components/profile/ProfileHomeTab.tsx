@@ -14,7 +14,8 @@ type ProfileHomeTabProps = {
   onOpenRewards: () => void;
   onOpenTransactionHistory: () => void;
   onOpenLocalization: () => void;
-  onOpenDeveloper: () => void;
+  onOpenDeveloper?: () => void;
+  showDeveloper?: boolean;
   onOpenAbout: () => void;
   onOpenChangelog: () => void;
   buildLabel: string;
@@ -31,6 +32,7 @@ export default function ProfileHomeTab({
   onOpenTransactionHistory,
   onOpenLocalization,
   onOpenDeveloper,
+  showDeveloper = true,
   onOpenAbout,
   onOpenChangelog,
   buildLabel,
@@ -139,18 +141,20 @@ export default function ProfileHomeTab({
         </View>
       </TouchableOpacity>
 
-      <TouchableOpacity style={cardStyle} onPress={onOpenDeveloper} activeOpacity={0.85}>
-        <View style={styles.cardRow}>
-          <View style={styles.cardIcon}>
-            <Ionicons name="code-slash-outline" size={22} color={colors.accent} />
+      {showDeveloper && onOpenDeveloper ? (
+        <TouchableOpacity style={cardStyle} onPress={onOpenDeveloper} activeOpacity={0.85}>
+          <View style={styles.cardRow}>
+            <View style={styles.cardIcon}>
+              <Ionicons name="code-slash-outline" size={22} color={colors.accent} />
+            </View>
+            <View style={styles.cardBody}>
+              <Text style={styles.cardTitle}>Developer</Text>
+              <Text style={styles.cardSubtitle}>Debug tools, local resets, and account actions.</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.muted} />
           </View>
-          <View style={styles.cardBody}>
-            <Text style={styles.cardTitle}>Developer</Text>
-            <Text style={styles.cardSubtitle}>Debug tools, local resets, and account actions.</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.muted} />
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      ) : null}
 
       <TouchableOpacity style={cardStyle} onPress={onOpenAbout} activeOpacity={0.85}>
         <View style={styles.cardRow}>

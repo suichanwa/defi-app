@@ -307,13 +307,27 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
   };
 
   const switchWallet = async (walletId: string) => {
-    await setActiveWalletId(walletId);
-    setActiveWalletIdState(walletId);
-    if (status === 'unlocked' && lastPasswordRef.current) {
+    if (status === 'unlocked') {
+      const previousActiveId = activeWalletId;
       const record = await loadEncryptedWalletKeyById(walletId);
-      if (record) {
-        await hydrateUnlockedWallet(record, lastPasswordRef.current);
+      if (record && lastPasswordRef.current) {
+        try {
+          await hydrateUnlockedWallet(record, lastPasswordRef.current);
+          await setActiveWalletId(walletId);
+          setActiveWalletIdState(walletId);
+        } catch {
+          if (previousActiveId) {
+            await setActiveWalletId(previousActiveId);
+            setActiveWalletIdState(previousActiveId);
+          }
+          throw new Error('This wallet uses a different passcode. Unlock it with its own passcode first.');
+        }
+      } else {
+        throw new Error('Unlock the current wallet before switching accounts.');
       }
+    } else {
+      await setActiveWalletId(walletId);
+      setActiveWalletIdState(walletId);
     }
     await refreshWallets();
   };

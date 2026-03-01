@@ -37,6 +37,8 @@ type Props = {
   onCreate: () => void;  // ✅ Changed from (value: string) => void
   onImport: () => void;
   onUnlock: () => void;
+  onStartFresh: () => void;
+  showStartFresh?: boolean;
   onConfirmBackup: () => void;
   onBackToMenu: () => void;
   onGoCreate: () => void;
@@ -104,6 +106,8 @@ export default function WalletSetupScreen({
   onCreate,
   onImport,
   onUnlock,
+  onStartFresh,
+  showStartFresh = true,
   onConfirmBackup,
   onBackToMenu,
   onGoCreate,
@@ -362,6 +366,9 @@ export default function WalletSetupScreen({
           onUnlock={onUnlock}
           isUnlockActive={effectivePasscodeField === 'unlock'}
           onActivateUnlock={() => setActivePasscodeField('unlock')}
+          onStartFresh={onStartFresh}
+          isStartFreshDisabled={isSubmitting}
+          showStartFresh={showStartFresh}
         />
       </ScreenTransition>
     );

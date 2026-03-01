@@ -69,10 +69,6 @@ export function walletErrorMessage(error: unknown, action: WalletAction): string
   const rpcMessage = rpcErrorMessage(error);
   if (rpcMessage) return rpcMessage;
 
-  if (error instanceof WalletPasswordError) return 'Incorrect passcode for this wallet.';
-  if (error instanceof WalletKeyNotFoundError) return 'No local wallet key found. Create or import first.';
-  if (error instanceof WalletReencryptError) return 'Unable to verify the new passcode. Try another one.';
-
   const err = error as EthersError;
   const code = err?.code ?? '';
   const reason = err?.reason ?? '';
