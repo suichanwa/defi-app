@@ -1,4 +1,4 @@
-import { Provider } from 'ethers';
+import { JsonRpcProvider } from 'ethers';
 import { getActiveChain, isEthereumChain } from '../config/chain';
 
 export class RpcConfigurationError extends Error {
@@ -8,10 +8,9 @@ export class RpcConfigurationError extends Error {
   }
 }
   
-let provider: Provider.JsonRpcProvider | null = null;
+let provider: JsonRpcProvider | null = null;
 
-
-export function getProvider(): providers.JsonRpcProvider {
+export function getProvider(): JsonRpcProvider {
   if (provider) return provider;
   const chain = getActiveChain();
   if (!isEthereumChain(chain)) {
@@ -24,7 +23,7 @@ export function getProvider(): providers.JsonRpcProvider {
   if (rpcUrl.includes('YOUR_KEY')) {
     throw new RpcConfigurationError('Ethereum RPC URL uses a placeholder key. Update ETHEREUM_RPC_URL.');
   }
-  provider = new providers.JsonRpcProvider(rpcUrl, {
+  provider = new JsonRpcProvider(rpcUrl, {
     name: chain.name,
     chainId: chain.chainId,
   });

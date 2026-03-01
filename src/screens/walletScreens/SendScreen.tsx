@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, View, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { useTheme } from '@theme/ThemeProvider';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useChain } from '@context/ChainProvider';
 import { useWalletSession } from '@context/WalletSessionProvider';
+import { useNavVisibility } from '@context/NavVisibilityProvider';
 import { ERC20_TOKENS } from '@config/tokens';
 import { fetchNativeBalance, fetchTokenBalances } from '@services/balances';
 import { fetchSolBalance } from '@services/solanaBalances';
@@ -28,11 +29,12 @@ export default function SendScreen() {
   const navigation = useNavigation<StackNavigationProp<WalletStackParamList, 'Send'>>();
   const { chain } = useChain();
   const { status, address } = useWalletSession();
+  const { setNavHidden } = useNavVisibility();
   const [coins, setCoins] = useState(() => buildDefaultTokens(chain));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<string[]>(['ETH', 'XRP', 'SOL', 'DOGE']);
 
-  const history = ['ETH', 'XRP', 'SOL', 'DODGE'];
   const filteredCoins = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return coins;
@@ -42,6 +44,13 @@ export default function SendScreen() {
       return symbol.includes(query) || name.includes(query);
     });
   }, [coins, search]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      setNavHidden(true);
+      return () => setNavHidden(false);
+    }, [setNavHidden]),
+  );
 
   useEffect(() => {
     setCoins(buildDefaultTokens(chain));
@@ -93,6 +102,16 @@ export default function SendScreen() {
     return value.toLocaleString('en-US', { maximumFractionDigits: 6 });
   };
 
+  const commitSearchToHistory = () => {
+    const trimmed = search.trim();
+    if (!trimmed) return;
+    const entry = trimmed.toUpperCase();
+    setHistory((prev) => {
+      const next = [entry, ...prev.filter((item) => item !== entry)];
+      return next.slice(0, 6);
+    });
+  };
+
   return (
     <View style={localStyles.container}>
       <ScrollView contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}>
@@ -107,23 +126,30 @@ export default function SendScreen() {
             style={styles.searchInput}
             value={search}
             onChangeText={setSearch}
+            onSubmitEditing={commitSearchToHistory}
+            returnKeyType="search"
           />
-          <TouchableOpacity activeOpacity={0.7}>
+          <TouchableOpacity activeOpacity={0.7} onPress={commitSearchToHistory}>
             <Ionicons name="copy-outline" size={20} color={colors.muted} />
           </TouchableOpacity>
         </View>
 
         <View style={localStyles.sectionRow}>
           <Text style={[localStyles.sectionTitle, { color: colors.text }]}>Search History</Text>
-          <TouchableOpacity activeOpacity={0.7}>
+          <TouchableOpacity activeOpacity={0.7} onPress={() => setHistory([])}>
             <Ionicons name="trash-outline" size={18} color={colors.muted} />
           </TouchableOpacity>
         </View>
         <View style={localStyles.chipRow}>
           {history.map((item) => (
-            <View key={item} style={[localStyles.chip, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TouchableOpacity
+              key={item}
+              activeOpacity={0.7}
+              onPress={() => setSearch(item)}
+              style={[localStyles.chip, { backgroundColor: colors.card, borderColor: colors.border }]}
+            >
               <Text style={[localStyles.chipText, { color: colors.text }]}>{item}</Text>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
 
@@ -186,7 +212,7 @@ const buildDefaultTokens = (chain: ChainConfig): TokenBalance[] => [
         name: token.name,
         symbol: token.symbol,
         amount: 0,
-        color: token.symbol === 'USDC' ? '#0ea5e9' : '#f59e0b',
+        color: token.color ?? '#f59e0b',
       }))
     : []),
 ];

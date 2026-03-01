@@ -11,6 +11,9 @@ import { useWalletSession } from '@context/WalletSessionProvider';
 import { sendSolTransfer } from '@services/solanaTransfers';
 import { Keypair } from '@solana/web3.js';
 import { t } from '@i18n';
+import { HDNodeWallet, isAddress, Wallet } from 'ethers';
+import { getErc20TokenBySymbol } from '@config/tokens';
+import { sendErc20Transfer, sendEthTransfer } from '@services/ethereumTransfers';
 
 type RouteParams = {
   symbol: string;
@@ -42,6 +45,13 @@ export default function SendCryptoScreen() {
   const { setNavHidden } = useNavVisibility();
   const { chain } = useChain();
   const { wallet } = useWalletSession();
+  const selectedToken = useMemo(
+    () =>
+      chain.kind === 'ethereum' && symbol && symbol !== chain.nativeToken.symbol
+        ? getErc20TokenBySymbol(symbol)
+        : null,
+    [chain, symbol],
+  );
 
   useFocusEffect(
     React.useCallback(() => {
@@ -55,7 +65,7 @@ export default function SendCryptoScreen() {
     setFormError(null);
     const trimmedAddress = address.trim();
     const amountValue = Number(amount);
-    const availableValue = Number(balance ?? '0');
+    const availableValue = Number((balance ?? '0').replace(/,/g, ''));
 
     if (!trimmedAddress) {
       setFormError(t('wallet.sendCrypto.errors.enterRecipient'));
@@ -69,24 +79,42 @@ export default function SendCryptoScreen() {
       setFormError(t('wallet.sendCrypto.errors.insufficientBalance'));
       return;
     }
-    if (symbol && symbol !== 'SOL') {
-      setFormError(t('wallet.sendCrypto.errors.onlySolSupported'));
-      return;
-    }
-    if (chain.kind !== 'solana') {
-      setFormError(t('wallet.sendCrypto.errors.solanaRequired'));
-      return;
-    }
-    if (!wallet || !(wallet instanceof Keypair)) {
-      setFormError(t('wallet.sendCrypto.errors.walletLocked'));
-      return;
-    }
-
     setIsSubmitting(true);
     try {
-      const signature = await sendSolTransfer(wallet, trimmedAddress, amountValue);
+      let signature = '';
+
+      if (chain.kind === 'solana') {
+        if (symbol && symbol !== 'SOL') {
+          setFormError(t('wallet.sendCrypto.errors.onlySolSupported'));
+          return;
+        }
+        if (!wallet || !(wallet instanceof Keypair)) {
+          setFormError(t('wallet.sendCrypto.errors.walletLocked'));
+          return;
+        }
+        signature = await sendSolTransfer(wallet, trimmedAddress, amountValue);
+      } else {
+        if (!isAddress(trimmedAddress)) {
+          setFormError('Enter a valid Ethereum address.');
+          return;
+        }
+        if (symbol && symbol !== chain.nativeToken.symbol && !selectedToken) {
+          setFormError('Token is not configured for transfers yet.');
+          return;
+        }
+        if (!wallet || wallet instanceof Keypair || (!(wallet instanceof Wallet) && !(wallet instanceof HDNodeWallet))) {
+          setFormError('Wallet is locked. Unlock to send.');
+          return;
+        }
+        if (selectedToken) {
+          signature = await sendErc20Transfer(wallet, selectedToken, trimmedAddress, amountValue);
+        } else {
+          signature = await sendEthTransfer(wallet, trimmedAddress, amountValue);
+        }
+      }
+
       navigation.navigate('SendCryptoComplete', {
-        symbol: symbol ?? 'SOL',
+        symbol: symbol ?? chain.nativeToken.symbol,
         amount: amountValue.toString(),
         toAddress: trimmedAddress,
         signature,

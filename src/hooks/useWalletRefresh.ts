@@ -45,7 +45,7 @@ const buildDefaultTokens = (chain: ChainConfig): TokenBalance[] => [
         symbol: token.symbol,
         amount: 0,
         pair: token.priceSymbol,
-        color: token.symbol === 'USDC' ? '#0ea5e9' : '#f59e0b',
+        color: token.color ?? '#f59e0b',
       }))
     : []),
 ];
