@@ -33,6 +33,15 @@ export default function SendScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const history = ['ETH', 'XRP', 'SOL', 'DODGE'];
+  const filteredCoins = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return coins;
+    return coins.filter((coin) => {
+      const symbol = coin.symbol.toLowerCase();
+      const name = coin.name.toLowerCase();
+      return symbol.includes(query) || name.includes(query);
+    });
+  }, [coins, search]);
 
   useEffect(() => {
     setCoins(buildDefaultTokens(chain));
@@ -121,7 +130,7 @@ export default function SendScreen() {
         <Text style={[localStyles.sectionTitle, { color: colors.text, marginTop: 16 }]}>Coin List</Text>
         {error && <Text style={styles.errorText}>{error}</Text>}
         <View style={styles.listCard}>
-          {coins.map((coin, index) => (
+          {filteredCoins.map((coin, index) => (
             <TouchableOpacity
               key={coin.symbol}
               activeOpacity={0.7}
@@ -132,7 +141,7 @@ export default function SendScreen() {
                   balance: formatAmount(coin.amount),
                 })
               }
-              style={[styles.tokenRow, index !== coins.length - 1 && styles.tokenRowSpacing]}
+              style={[styles.tokenRow, index !== filteredCoins.length - 1 && styles.tokenRowSpacing]}
             >
               <View style={[styles.tokenIcon, { backgroundColor: `${coin.color}22`, borderColor: coin.color }]}>
                 <Text style={[localStyles.tokenIconText, { color: coin.color }]}>{coin.symbol[0]}</Text>
@@ -147,6 +156,11 @@ export default function SendScreen() {
               </View>
             </TouchableOpacity>
           ))}
+          {!filteredCoins.length && (
+            <View style={styles.tokenRow}>
+              <Text style={styles.tokenSymbol}>No matching coins found.</Text>
+            </View>
+          )}
         </View>
       </ScrollView>
     </View>

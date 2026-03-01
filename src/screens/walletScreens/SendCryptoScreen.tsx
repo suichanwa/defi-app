@@ -10,6 +10,7 @@ import { useChain } from '@context/ChainProvider';
 import { useWalletSession } from '@context/WalletSessionProvider';
 import { sendSolTransfer } from '@services/solanaTransfers';
 import { Keypair } from '@solana/web3.js';
+import { t } from '@i18n';
 
 type RouteParams = {
   symbol: string;
@@ -57,27 +58,27 @@ export default function SendCryptoScreen() {
     const availableValue = Number(balance ?? '0');
 
     if (!trimmedAddress) {
-      setFormError('Enter a recipient address.');
+      setFormError(t('wallet.sendCrypto.errors.enterRecipient'));
       return;
     }
     if (!Number.isFinite(amountValue) || amountValue <= 0) {
-      setFormError('Enter a valid amount.');
+      setFormError(t('wallet.sendCrypto.errors.enterAmount'));
       return;
     }
     if (Number.isFinite(availableValue) && amountValue > availableValue) {
-      setFormError('Insufficient balance.');
+      setFormError(t('wallet.sendCrypto.errors.insufficientBalance'));
       return;
     }
     if (symbol && symbol !== 'SOL') {
-      setFormError('Only SOL transfers are supported on devnet right now.');
+      setFormError(t('wallet.sendCrypto.errors.onlySolSupported'));
       return;
     }
     if (chain.kind !== 'solana') {
-      setFormError('Solana devnet is required for sending right now.');
+      setFormError(t('wallet.sendCrypto.errors.solanaRequired'));
       return;
     }
     if (!wallet || !(wallet instanceof Keypair)) {
-      setFormError('Wallet is locked. Unlock to send.');
+      setFormError(t('wallet.sendCrypto.errors.walletLocked'));
       return;
     }
 
@@ -91,7 +92,7 @@ export default function SendCryptoScreen() {
         signature,
       });
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'Unable to send transaction.');
+      setFormError(error instanceof Error ? error.message : t('wallet.sendCrypto.errors.unableToSend'));
     } finally {
       setIsSubmitting(false);
     }
@@ -109,12 +110,18 @@ export default function SendCryptoScreen() {
           >
             <Ionicons name="chevron-back" size={20} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[localStyles.title, { color: colors.text }]}>Send {symbol ?? 'Crypto'}</Text>
+          <Text style={[localStyles.title, { color: colors.text }]}>
+            {t('wallet.sendCrypto.title', {
+              symbol: symbol ?? t('wallet.sendCrypto.fallbackSymbol'),
+            })}
+          </Text>
           <View style={localStyles.headerSpacer} />
         </View>
 
         <View style={localStyles.fieldGroup}>
-          <Text style={[localStyles.label, { color: colors.text }]}>Address/Invoice</Text>
+          <Text style={[localStyles.label, { color: colors.text }]}>
+            {t('wallet.sendCrypto.addressLabel')}
+          </Text>
           <View
             style={[
               localStyles.inputRow,
@@ -122,7 +129,7 @@ export default function SendCryptoScreen() {
             ]}
           >
             <TextInput
-              placeholder="Long press to paste"
+              placeholder={t('wallet.sendCrypto.addressPlaceholder')}
               placeholderTextColor={colors.muted}
               value={address}
               onChangeText={setAddress}
@@ -137,7 +144,9 @@ export default function SendCryptoScreen() {
         </View>
 
         <View style={localStyles.fieldGroup}>
-          <Text style={[localStyles.label, { color: colors.text }]}>Network</Text>
+          <Text style={[localStyles.label, { color: colors.text }]}>
+            {t('wallet.sendCrypto.networkLabel')}
+          </Text>
           <TouchableOpacity
             activeOpacity={0.8}
             style={[
@@ -147,14 +156,16 @@ export default function SendCryptoScreen() {
             onPress={() => setNetwork(network)}
           >
             <Text style={[localStyles.placeholder, { color: colors.muted }]}>
-              Automatically match the network
+              {t('wallet.sendCrypto.networkPlaceholder')}
             </Text>
             <Ionicons name="chevron-down" size={18} color={colors.muted} />
           </TouchableOpacity>
         </View>
 
         <View style={localStyles.fieldGroup}>
-          <Text style={[localStyles.label, { color: colors.text }]}>Withdraw Amount</Text>
+          <Text style={[localStyles.label, { color: colors.text }]}>
+            {t('wallet.sendCrypto.amountLabel')}
+          </Text>
           <View
             style={[
               localStyles.inputRow,
@@ -162,7 +173,7 @@ export default function SendCryptoScreen() {
             ]}
           >
             <TextInput
-              placeholder="Minimum 0"
+              placeholder={t('wallet.sendCrypto.amountPlaceholder')}
               placeholderTextColor={colors.muted}
               value={amount}
               onChangeText={setAmount}
@@ -172,12 +183,16 @@ export default function SendCryptoScreen() {
             <View style={localStyles.amountSuffix}>
               <Text style={[localStyles.suffixText, { color: colors.text }]}>{symbol ?? 'BTC'}</Text>
               <TouchableOpacity activeOpacity={0.7}>
-                <Text style={[localStyles.maxText, { color: colors.accent }]}>Max</Text>
+                <Text style={[localStyles.maxText, { color: colors.accent }]}>
+                  {t('wallet.sendCrypto.max')}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
           <View style={localStyles.availableRow}>
-            <Text style={[localStyles.availableLabel, { color: colors.muted }]}>Available</Text>
+            <Text style={[localStyles.availableLabel, { color: colors.muted }]}>
+              {t('wallet.sendCrypto.available')}
+            </Text>
             <Text style={[localStyles.availableValue, { color: colors.text }]}>{balance ?? '0.00'}</Text>
           </View>
         </View>
@@ -190,7 +205,9 @@ export default function SendCryptoScreen() {
           onPress={handleSend}
           disabled={isSubmitting}
         >
-          <Text style={styles.primaryButtonText}>{isSubmitting ? 'Sending...' : 'Withdraw'}</Text>
+          <Text style={styles.primaryButtonText}>
+            {isSubmitting ? t('wallet.sendCrypto.sending') : t('wallet.sendCrypto.withdraw')}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
