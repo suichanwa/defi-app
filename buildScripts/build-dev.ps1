@@ -1,5 +1,5 @@
 # Build and Preview Script (Development) for DeFi AI App
-# Run with: .\build-dev.ps1
+# Run with: \.\\buildScripts\\build-dev.ps1
 
 Write-Host "Starting DeFi AI App DEV build..." -ForegroundColor Cyan
 
