@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '@theme/ThemeProvider';
-import type { WalletRecordMeta } from '@types/wallet';
+import type { WalletRecordMeta } from '@app-types/wallet';
 
 export type WalletActionItem = {
   label: string;

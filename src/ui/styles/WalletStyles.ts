@@ -511,11 +511,32 @@ export const createWalletStyles = (colors: ReturnType<typeof useTheme>['colors']
       color: colors.text,
       letterSpacing: 0.3,
     },
+    summaryRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    summaryLabel: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.muted,
+      marginRight: 12,
+      flexShrink: 0,
+    },
+    summaryValue: {
+      flex: 1,
+      textAlign: 'right',
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.text,
+    },
     buttonDisabled: {
       opacity: 0.5,
     },
 
-    // Progress indicator
     progressContainer: {
       marginBottom: 24,
     },

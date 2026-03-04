@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, ScrollView, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { createStackNavigator, StackNavigationProp } from '@react-navigation/stack';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '../theme/ThemeProvider';
 import { useChain } from '../context/ChainProvider';
@@ -41,6 +41,7 @@ import { clearProfileSettings } from '@services/profileStore';
 import { clearRewardsCache } from '@services/rewardsStore';
 import { signOut as authSignOut } from '@services/auth';
 import { appFeatures } from '@config/appFeatures';
+import { useNavVisibility } from '@context/NavVisibilityProvider';
 
 type WalletStackParamList = {
   WalletHome: undefined;
@@ -75,6 +76,7 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const { chain, chainKey, setChainKey } = useChain();
   const { status, address, wallets, activeWalletId, switchWallet, registerActivity } = useWalletSession();
+  const { setNavHidden } = useNavVisibility();
   const { width } = useWindowDimensions();
   const cardWidth = Math.max(0, width - 40);
   const [isAirdropLoading, setIsAirdropLoading] = useState(false);
@@ -87,7 +89,7 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
         await switchWallet(walletId);
       } catch (error) {
         handleError(error, {
-          defaultMessage: 'Unable to activate this wallet. Unlock it with its passcode and try again.',
+          defaultMessage: 'Unable to activate this wallet. Try unlocking it again.',
         });
       }
     }
@@ -131,6 +133,12 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
   } = useWalletRefresh(chain, status, address, airdropTick, 15000);
   const [activeTab, setActiveTab] = useState<WalletTab>('tokens');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      setNavHidden(false);
+    }, [setNavHidden]),
+  );
 
   const totalValueAnimated = useRef(new Animated.Value(0)).current;
   const [displayTotal, setDisplayTotal] = useState(0);
@@ -209,7 +217,6 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
       onScrollEndDrag={onScrollEndDrag}
       onMomentumScrollEnd={onMomentumScrollEnd}
       onTouchStart={registerActivity}
-      onScroll={registerActivity}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
     >
@@ -287,8 +294,6 @@ export default function WalletScreen() {
     status,
     address,
     wallet,
-    recoveryPhrase,
-    backupCompleted,
     unlock,
     createWallet,
     importWallet,
@@ -375,12 +380,6 @@ export default function WalletScreen() {
       cancelled = true;
     };
   }, [status, unlock]);
-
-  useEffect(() => {
-    if (status !== 'unlocked' || backupCompleted || backupMnemonic) return;
-    if (!recoveryPhrase) return;
-    startBackupConfirm(normalizeMnemonic(recoveryPhrase));
-  }, [status, backupCompleted, backupMnemonic, recoveryPhrase]);
 
   const resetFlowMessages = () => {
     setFlowError(null);

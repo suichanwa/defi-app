@@ -13,7 +13,6 @@ type BottomNavBarProps = {
 export default function BottomNavBar({ activeTab, onTabChange }: BottomNavBarProps) {
   const { colors } = useTheme();
   
-  // Animation values for each tab
   const walletScale = useRef(new Animated.Value(activeTab === 'wallet' ? 1 : 0.9)).current;
   const secureChatScale = useRef(new Animated.Value(activeTab === 'secureChat' ? 1 : 0.9)).current;
   const profileScale = useRef(new Animated.Value(activeTab === 'profile' ? 1 : 0.9)).current;

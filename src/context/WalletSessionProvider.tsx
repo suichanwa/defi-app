@@ -308,27 +308,38 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
 
   const switchWallet = async (walletId: string) => {
     if (status === 'unlocked') {
-      const previousActiveId = activeWalletId;
       const record = await loadEncryptedWalletKeyById(walletId);
-      if (record && lastPasswordRef.current) {
+      if (!record) {
+        throw new Error('Wallet record not found.');
+      }
+
+      if (lastPasswordRef.current) {
         try {
           await hydrateUnlockedWallet(record, lastPasswordRef.current);
           await setActiveWalletId(walletId);
           setActiveWalletIdState(walletId);
+          await refreshWallets();
+          return;
         } catch {
-          if (previousActiveId) {
-            await setActiveWalletId(previousActiveId);
-            setActiveWalletIdState(previousActiveId);
-          }
-          throw new Error('This wallet uses a different passcode. Unlock it with its own passcode first.');
+          // Fall through to explicit unlock mode for the selected wallet.
         }
-      } else {
-        throw new Error('Unlock the current wallet before switching accounts.');
       }
-    } else {
+
       await setActiveWalletId(walletId);
       setActiveWalletIdState(walletId);
+      clearLockTimer();
+      setWallet(null);
+      setAddress(null);
+      setRecoveryPhrase(null);
+      setBackupCompletedState(Boolean(record.backupCompleted));
+      setStatus('locked');
+      lastPasswordRef.current = null;
+      await refreshWallets();
+      return;
     }
+
+    await setActiveWalletId(walletId);
+    setActiveWalletIdState(walletId);
     await refreshWallets();
   };
 
