@@ -11,6 +11,7 @@ type WalletHeaderSectionProps = {
   fetchingChain: boolean;
   address: string | null;
   isAirdropLoading: boolean;
+  airdropCooldownMsRemaining?: number;
   onToggleNetwork: () => void;
   onAirdrop: () => void;
 };
@@ -20,6 +21,7 @@ export default function WalletHeaderSection({
   fetchingChain,
   address,
   isAirdropLoading,
+  airdropCooldownMsRemaining = 0,
   onToggleNetwork,
   onAirdrop,
 }: WalletHeaderSectionProps) {
@@ -27,6 +29,8 @@ export default function WalletHeaderSection({
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const { width } = useWindowDimensions();
   const pillsMaxWidth = Math.min(200, Math.floor(width * 0.48));
+  const cooldownSeconds = Math.ceil(airdropCooldownMsRemaining / 1000);
+  const isCooldownActive = cooldownSeconds > 0;
 
   return (
     <View style={styles.headerRow}>
@@ -41,10 +45,14 @@ export default function WalletHeaderSection({
             activeOpacity={0.8}
             style={[localStyles.airdropButton, { borderColor: colors.border }]}
             onPress={onAirdrop}
-            disabled={isAirdropLoading || !address}
+            disabled={isAirdropLoading || !address || isCooldownActive}
           >
             <Text style={[localStyles.airdropButtonText, { color: colors.text }]}>
-              {isAirdropLoading ? 'Airdropping...' : 'Airdrop 1 SOL'}
+              {isAirdropLoading
+                ? 'Airdropping...'
+                : isCooldownActive
+                ? `Try again in ${cooldownSeconds}s`
+                : 'Airdrop 1 SOL'}
             </Text>
           </TouchableOpacity>
         )}

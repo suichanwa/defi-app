@@ -10,7 +10,13 @@ import type { WalletRecordMeta } from '../types/wallet';
 import WalletSetupScreen from '@components/wallet/WalletSetupScreen';
 import { walletErrorMessage } from '../utils/walletErrors';
 import ErrorDialog from '@components/common/ErrorDialog';
-import { requestSolAirdrop } from '../services/solanaAirdrop';
+import {
+  AIRDROP_ERROR_COOLDOWN_MS,
+  SOL_AIRDROP_AMOUNT,
+  getAirdropErrorMessage,
+  isAirdropRateLimited,
+  requestSolAirdrop,
+} from '@services/airdrop';
 import useApiError from '../hooks/useApiError';
 import useWalletRefresh from '../hooks/useWalletRefresh';
 import {
@@ -82,16 +88,29 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
   const [isAirdropLoading, setIsAirdropLoading] = useState(false);
   const [airdropMessage, setAirdropMessage] = useState<string | null>(null);
   const [airdropTick, setAirdropTick] = useState(0);
+  const [airdropCooldownUntil, setAirdropCooldownUntil] = useState<number | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [activatingWalletId, setActivatingWalletId] = useState<string | null>(null);
+  const [viewedIndex, setViewedIndex] = useState(0);
+  const hasInitializedViewedIndex = useRef(false);
   const { errorMessage, errorTitle, errorVariant, isErrorVisible, handleError, clearError } = useApiError();
   const handleActivateWallet = async (walletId: string) => {
-    if (walletId && walletId !== activeWalletId) {
-      try {
-        await switchWallet(walletId);
-      } catch (error) {
-        handleError(error, {
-          defaultMessage: 'Unable to activate this wallet. Try unlocking it again.',
-        });
+    if (!walletId || walletId === activeWalletId || walletId === activatingWalletId) {
+      return;
+    }
+    setActivatingWalletId(walletId);
+    try {
+      await switchWallet(walletId);
+      const nextIndex = walletList.findIndex((wallet) => wallet.id === walletId);
+      if (nextIndex >= 0) {
+        setViewedIndex(nextIndex);
       }
+    } catch (error) {
+      handleError(error, {
+        defaultMessage: 'Unable to activate this wallet. Try unlocking it again.',
+      });
+    } finally {
+      setActivatingWalletId((current) => (current === walletId ? null : current));
     }
   };
 
@@ -117,6 +136,36 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
     const index = walletList.findIndex((record) => record.id === activeWalletId);
     return index >= 0 ? index : 0;
   }, [walletList, activeWalletId]);
+
+  useEffect(() => {
+    if (walletList.length === 0) {
+      if (viewedIndex !== 0) {
+        setViewedIndex(0);
+      }
+      hasInitializedViewedIndex.current = false;
+      return;
+    }
+    const maxIndex = walletList.length - 1;
+    if (viewedIndex > maxIndex) {
+      setViewedIndex(maxIndex);
+      return;
+    }
+    if (viewedIndex < 0) {
+      setViewedIndex(0);
+      return;
+    }
+    if (walletList.length === 1 && viewedIndex !== 0) {
+      setViewedIndex(0);
+    }
+  }, [walletList.length, viewedIndex]);
+
+  useEffect(() => {
+    if (!walletList.length) return;
+    if (!hasInitializedViewedIndex.current) {
+      setViewedIndex(activeIndex);
+      hasInitializedViewedIndex.current = true;
+    }
+  }, [walletList.length, activeIndex]);
 
   const {
     prices,
@@ -180,7 +229,22 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
 
   useEffect(() => {
     setAirdropMessage(null);
+    setAirdropCooldownUntil(null);
   }, [chain]);
+
+  useEffect(() => {
+    if (!airdropCooldownUntil) return;
+    if (airdropCooldownUntil <= nowMs) {
+      setAirdropCooldownUntil(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setNowMs(Date.now());
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [airdropCooldownUntil, nowMs]);
+
+  const airdropCooldownMsRemaining = Math.max(0, (airdropCooldownUntil ?? 0) - nowMs);
 
   const handleToggleNetwork = async () => {
     if (chainKey === 'solanaDevnet') {
@@ -194,15 +258,20 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
 
   const handleAirdrop = async () => {
     if (!address || chain.kind !== 'solana' || chain.cluster !== 'devnet') return;
+    if (airdropCooldownMsRemaining > 0) return;
     setIsAirdropLoading(true);
     setAirdropMessage(null);
     try {
-      await requestSolAirdrop(address, 1);
+      await requestSolAirdrop({ address, amountSol: SOL_AIRDROP_AMOUNT, commitment: 'confirmed' });
       setAirdropMessage('Airdrop requested. Balance will update shortly.');
       setAirdropTick((prev) => prev + 1);
     } catch (error) {
+      const defaultMessage = getAirdropErrorMessage(error);
+      if (isAirdropRateLimited(error)) {
+        setAirdropCooldownUntil(Date.now() + AIRDROP_ERROR_COOLDOWN_MS);
+      }
       handleError(error, {
-        defaultMessage: 'Airdrop failed. Try again.',
+        defaultMessage,
         rateLimitMessage: 'Airdrop rate limited. Please wait a moment and try again.',
       });
     } finally {
@@ -225,6 +294,7 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
         fetchingChain={fetchingChain}
         address={address}
         isAirdropLoading={isAirdropLoading}
+        airdropCooldownMsRemaining={airdropCooldownMsRemaining}
         onToggleNetwork={handleToggleNetwork}
         onAirdrop={handleAirdrop}
       />
@@ -240,7 +310,7 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
       <WalletCardCarousel
         walletList={walletList}
         activeWalletId={activeWalletId}
-        activeIndex={activeIndex}
+        viewedIndex={viewedIndex}
         cardWidth={cardWidth}
         displayTotal={displayTotal}
         formatCurrency={formatCurrency}
@@ -255,6 +325,8 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
         onEditWallet={(walletId) => navigation.navigate('WalletCardSettings', { walletId })}
         onSettingsWallet={(walletId) => navigation.navigate('WalletSettings', { walletId })}
         onActivateWallet={handleActivateWallet}
+        activatingWalletId={activatingWalletId}
+        onViewedIndexChange={setViewedIndex}
       />
 
       <WalletSearchBar onFocus={() => setIsSearchOpen(true)} />

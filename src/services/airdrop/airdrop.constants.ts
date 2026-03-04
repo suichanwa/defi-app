@@ -1,0 +1,2 @@
+export const SOL_AIRDROP_AMOUNT = 1;
+export const AIRDROP_ERROR_COOLDOWN_MS = 30_000;

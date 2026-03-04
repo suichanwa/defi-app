@@ -2,7 +2,7 @@ import type { EncryptedWalletKey, WalletRecordMeta, WalletKind } from '../types/
 import { getJson, setJson } from './storage';
 import { getActiveWalletType } from './activeWalletType';
 import aesjs from 'aes-js';
-import { pbkdf2 as noblePbkdf2 } from '@noble/hashes/pbkdf2.js';
+import { pbkdf2Async as noblePbkdf2Async } from '@noble/hashes/pbkdf2.js';
 import { sha256 as nobleSha256 } from '@noble/hashes/sha2.js';
 import { Buffer } from 'buffer';
 
@@ -25,11 +25,11 @@ function getRandomBytes(length: number): Uint8Array {
   return bytes;
 }
 
-function deriveKey(password: string, salt: Uint8Array): Uint8Array {
+async function deriveKey(password: string, salt: Uint8Array): Promise<Uint8Array> {
   const passwordStr = String(password);
   const passwordBytes = new TextEncoder().encode(passwordStr);
   
-  const derivedKey = noblePbkdf2(nobleSha256, passwordBytes, salt, {
+  const derivedKey = await noblePbkdf2Async(nobleSha256, passwordBytes, salt, {
     c: PBKDF2_ITERATIONS,
     dkLen: 32,
   });
@@ -131,7 +131,7 @@ export async function encryptWalletKey(privateKey: string, password: string): Pr
   const salt = getRandomBytes(SALT_LENGTH);
   const iv = getRandomBytes(IV_LENGTH);
   
-  const key = deriveKey(password, salt);
+  const key = await deriveKey(password, salt);
   
   const textBytes = aesjs.utils.utf8.toBytes(privateKey);
   const aesCtr = new aesjs.ModeOfOperation.ctr(key, new aesjs.Counter(iv));
@@ -170,7 +170,7 @@ export async function decryptWalletKey(encryptedJson: string, password: string):
   const iv = hexToBuffer(data.iv);
   const ciphertext = hexToBuffer(data.ciphertext);
   
-  const key = deriveKey(password, salt);
+  const key = await deriveKey(password, salt);
   
   const aesCtr = new aesjs.ModeOfOperation.ctr(key, new aesjs.Counter(iv));
   const decryptedBytes = aesCtr.decrypt(ciphertext);

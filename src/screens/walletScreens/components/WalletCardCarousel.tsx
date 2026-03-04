@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import { ActivityIndicator, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '@theme/ThemeProvider';
@@ -13,21 +13,23 @@ export type WalletActionItem = {
 type WalletCardCarouselProps<TAction extends WalletActionItem> = {
   walletList: WalletRecordMeta[];
   activeWalletId: string | null;
-  activeIndex: number;
+  viewedIndex: number;
   cardWidth: number;
   displayTotal: number;
   formatCurrency: (value: number) => string;
   actions: TAction[];
-  onActionPress: (action: TAction) => void;
-  onEditWallet: (walletId: string) => void;
-  onSettingsWallet: (walletId: string) => void;
-  onActivateWallet: (walletId: string) => void;
+  onActionPress: (action: TAction) => void | Promise<void>;
+  onEditWallet: (walletId: string) => void | Promise<void>;
+  onSettingsWallet: (walletId: string) => void | Promise<void>;
+  onActivateWallet: (walletId: string) => Promise<void>;
+  activatingWalletId: string | null;
+  onViewedIndexChange: (index: number) => void;
 };
 
 export default function WalletCardCarousel<TAction extends WalletActionItem>({
   walletList,
   activeWalletId,
-  activeIndex,
+  viewedIndex,
   cardWidth,
   displayTotal,
   formatCurrency,
@@ -36,15 +38,34 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
   onEditWallet,
   onSettingsWallet,
   onActivateWallet,
+  activatingWalletId,
+  onViewedIndexChange,
 }: WalletCardCarouselProps<TAction>) {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const walletScrollRef = useRef<ScrollView>(null);
+  const runAsync = useCallback((fn: () => void | Promise<void>) => {
+    Promise.resolve(fn()).catch((error) => {
+      console.error('[WalletCardCarousel] async handler failed', error);
+    });
+  }, []);
 
   useEffect(() => {
     if (!walletList.length || !cardWidth) return;
-    walletScrollRef.current?.scrollTo({ x: activeIndex * cardWidth, animated: false });
-  }, [activeIndex, cardWidth, walletList.length]);
+    walletScrollRef.current?.scrollTo({ x: viewedIndex * cardWidth, animated: false });
+  }, [viewedIndex, cardWidth, walletList.length]);
+
+  const handleMomentumScrollEnd = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (!cardWidth || walletList.length === 0) return;
+      const nextIndex = Math.round(event.nativeEvent.contentOffset.x / cardWidth);
+      const clampedIndex = Math.max(0, Math.min(nextIndex, walletList.length - 1));
+      if (clampedIndex !== viewedIndex) {
+        onViewedIndexChange(clampedIndex);
+      }
+    },
+    [cardWidth, walletList.length, viewedIndex, onViewedIndexChange],
+  );
 
   return (
     <View style={styles.cardWrapper}>
@@ -53,24 +74,21 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handleMomentumScrollEnd}
         onContentSizeChange={() => {
           if (!cardWidth || !walletList.length) return;
-          walletScrollRef.current?.scrollTo({ x: activeIndex * cardWidth, animated: false });
-        }}
-        onMomentumScrollEnd={(event) => {
-          if (!cardWidth || walletList.length <= 1) return;
-          const nextIndex = Math.round(event.nativeEvent.contentOffset.x / cardWidth);
-          const nextWallet = walletList[nextIndex];
-          if (nextWallet) {
-            onActivateWallet(nextWallet.id);
-          }
+          walletScrollRef.current?.scrollTo({ x: viewedIndex * cardWidth, animated: false });
         }}
       >
         {walletList.map((wallet, index) => {
           const isActive = wallet.id === activeWalletId || (!activeWalletId && index === 0);
+          const isActivating = wallet.id === activatingWalletId;
           return (
             <View key={wallet.id} style={{ width: cardWidth }}>
-              <View
+              <TouchableOpacity
+                activeOpacity={0.92}
+                disabled={isActive || isActivating}
+                onPress={() => runAsync(() => onActivateWallet(wallet.id))}
                 style={[
                   styles.walletCard,
                   {
@@ -86,14 +104,14 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
                     <TouchableOpacity
                       activeOpacity={0.7}
                       style={[localStyles.editButton, { borderColor: colors.border }]}
-                      onPress={() => onEditWallet(wallet.id)}
+                      onPress={() => runAsync(() => onEditWallet(wallet.id))}
                     >
                       <MaterialCommunityIcons name="pencil" size={16} color={colors.text} />
                     </TouchableOpacity>
                     <TouchableOpacity
                       activeOpacity={0.7}
                       style={[localStyles.settingsButton, { borderColor: colors.border }]}
-                      onPress={() => onSettingsWallet(wallet.id)}
+                      onPress={() => runAsync(() => onSettingsWallet(wallet.id))}
                     >
                       <MaterialCommunityIcons name="cog" size={16} color={colors.text} />
                     </TouchableOpacity>
@@ -101,18 +119,12 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
                 </View>
                 <Text style={styles.balanceLabel}>Total value</Text>
                 <Text style={styles.balance}>{isActive ? formatCurrency(displayTotal) : '--'}</Text>
-                {!isActive && (
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    style={[localStyles.activateButton, { borderColor: colors.border }]}
-                    onPress={() => onActivateWallet(wallet.id)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    pressRetentionOffset={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                  >
-                    <Text style={[localStyles.activateButtonText, { color: colors.text }]}>Activate wallet</Text>
-                  </TouchableOpacity>
+                {isActivating && (
+                  <View style={localStyles.activatingRow}>
+                    <ActivityIndicator size="small" color={colors.accent} />
+                    <Text style={[localStyles.activatingText, { color: colors.accent }]}>Activating...</Text>
+                  </View>
                 )}
-                {isActive && <View style={localStyles.activateSpacer} />}
 
                 <View style={styles.actionsRow}>
                   {actions.map((action) => (
@@ -120,7 +132,7 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
                       key={action.label}
                       style={styles.actionButton}
                       activeOpacity={0.7}
-                      onPress={() => onActionPress(action)}
+                      onPress={() => runAsync(() => onActionPress(action))}
                     >
                       <View style={styles.actionIcon}>
                         <MaterialCommunityIcons name={action.icon} size={22} color="#ffffff" />
@@ -129,7 +141,7 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
                     </TouchableOpacity>
                   ))}
                 </View>
-              </View>
+              </TouchableOpacity>
             </View>
           );
         })}
@@ -141,7 +153,7 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
               key={`wallet-dot-${wallet.id}`}
               style={[
                 localStyles.walletDot,
-                { backgroundColor: index === activeIndex ? colors.accent : colors.border },
+                { backgroundColor: index === viewedIndex ? colors.accent : colors.border },
               ]}
             />
           ))}
@@ -163,20 +175,14 @@ const localStyles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
   },
-  activateButton: {
-    marginTop: 10,
-    height: 38,
-    paddingVertical: 8,
-    borderRadius: 12,
+  activatingRow: {
+    marginTop: 8,
+    minHeight: 24,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
+    gap: 8,
   },
-  activateSpacer: {
-    marginTop: 10,
-    height: 38,
-  },
-  activateButtonText: {
+  activatingText: {
     fontSize: 13,
     fontWeight: '700',
   },
