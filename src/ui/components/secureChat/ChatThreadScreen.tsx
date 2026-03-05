@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Linking,
@@ -50,7 +50,6 @@ type Props = {
   onToggleMute?: () => void;
 };
 
-// Bottom navigation is hidden in chat threads, so no offset is needed.
 const BOTTOM_NAV_HEIGHT = 0;
 
 type SelectedProfile = {
@@ -102,9 +101,7 @@ export default function ChatThreadScreen({
 
   // Convert messages to Flyer format
   const flyerMessages = useMemo(() => {
-    return messages.map((msg) =>
-      convertToFlyerMessage(msg, currentUserId)
-    );
+    return messages.map((msg) => convertToFlyerMessage(msg, currentUserId));
   }, [messages, currentUserId]);
 
   // Sort messages newest first (Flyer requirement)
@@ -118,16 +115,17 @@ export default function ChatThreadScreen({
     [currentUserId, currentUserLabel]
   );
 
-  // Handle send text
+  // Handle send
   const handleSendPress = useCallback(
     (message: MessageType.PartialText) => {
-      // onSend reads draft from parent state, so just call it
-      onSend();
+      if (draft.trim().length > 0) {
+        onSend();
+      }
     },
-    [onSend]
+    [onSend, draft]
   );
 
-  // Handle attachment press (images/files)
+  // Handle message press (for images/files)
   const handleAttachmentPress = useCallback((message: MessageType.Any) => {
     if (message.type === 'image') {
       const imageMsg = message as MessageType.Image;
@@ -189,7 +187,7 @@ export default function ChatThreadScreen({
     }
   }, [selectedMessage, onDeleteMessage]);
 
-  // Flyer theme matching our design
+  // Flyer theme matching design
   const flyerTheme = useMemo(
     () => ({
       fonts: {
@@ -273,16 +271,15 @@ export default function ChatThreadScreen({
             theme={flyerTheme}
             onMessagePress={handleAttachmentPress}
             onMessageLongPress={handleMessageLongPress}
-            textInputProps={{
-              placeholder: 'Type a message...',
-              value: draft,
-              onChangeText: onDraftChange,
-            }}
             enableAnimation={true}
             showUserAvatars={true}
             showUserNames={true}
-            disableImageGallery={true}
-            sendButtonVisibilityMode="editing"
+            textInputProps={{
+              value: draft,
+              onChangeText: onDraftChange,
+              placeholder: 'Type a message...',
+              placeholderTextColor: colors.muted,
+            }}
           />
         </View>
       </View>
@@ -430,3 +427,4 @@ const createChatStyles = (colors: {
       color: colors.text,
     },
   });
+
