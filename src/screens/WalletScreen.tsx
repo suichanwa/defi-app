@@ -46,6 +46,7 @@ import WalletTokenSearchOverlay from './walletScreens/components/WalletTokenSear
 import { clearProfileSettings } from '@services/profileStore';
 import { clearRewardsCache } from '@services/rewardsStore';
 import { signOut as authSignOut } from '@services/auth';
+import { isMasterPasscodeSet, clearMasterPasscode } from '@services/masterPasscodeStore';
 import { appFeatures } from '@config/appFeatures';
 import { useNavVisibility } from '@context/NavVisibilityProvider';
 
@@ -391,6 +392,7 @@ export default function WalletScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [biometricsAvailable, setBiometricsAvailable] = useState(false);
+  const [hasMasterPasscode, setHasMasterPasscode] = useState(false);
 
   const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const biometricInFlightRef = useRef(false);
@@ -495,6 +497,7 @@ export default function WalletScreen() {
     console.log('=== WalletScreen: handleCreate START ===');
     console.log('walletPassword:', walletPassword, 'length:', walletPassword.length);
     console.log('walletPasswordConfirm:', walletPasswordConfirm, 'length:', walletPasswordConfirm.length);
+    console.log('hasMasterPasscode:', hasMasterPasscode);
     
     resetFlowMessages();
     
@@ -547,6 +550,7 @@ export default function WalletScreen() {
       startBackupConfirm(normalized);
       setWalletPassword('');
       setWalletPasswordConfirm('');
+      setHasMasterPasscode(true);
       setFlowMessage('Wallet created. Back up your recovery phrase.');
       
       if (biometricsAvailable) {
@@ -608,6 +612,7 @@ export default function WalletScreen() {
       setMnemonicInput('');
       setWalletPassword('');
       setWalletPasswordConfirm('');
+      setHasMasterPasscode(true);
       setFlowMessage('Wallet imported.');
       setFlow('create-success');
       if (biometricsAvailable) {
@@ -724,6 +729,7 @@ export default function WalletScreen() {
 
   useEffect(() => {
     canUseBiometrics().then(setBiometricsAvailable).catch(() => setBiometricsAvailable(false));
+    isMasterPasscodeSet().then(setHasMasterPasscode).catch(() => setHasMasterPasscode(false));
   }, []);
 
   const executeStartFresh = async () => {
@@ -735,8 +741,9 @@ export default function WalletScreen() {
     setFlowError(null);
     setShowErrorDialog(false);
     try {
-      await Promise.allSettled([authSignOut(), clearProfileSettings(), clearRewardsCache()]);
+      await Promise.allSettled([authSignOut(), clearProfileSettings(), clearRewardsCache(), clearMasterPasscode()]);
       await forgetWallet();
+      setHasMasterPasscode(false);
       setFlow('menu');
       setUnlockPassword('');
       setWalletPassword('');

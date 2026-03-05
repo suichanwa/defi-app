@@ -1,6 +1,7 @@
 export * from './auth';
 export * from './avatarStorage';
 export * from './identity';
+export * from './masterPasscodeStore';
 export * from './profileRemote';
 export * from './profileStore';
 export * from './rewardsRemote';

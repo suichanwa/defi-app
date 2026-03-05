@@ -10,6 +10,7 @@ type PasscodeFieldProps = {
   autoFocus?: boolean;
   isActive?: boolean;
   onActivate?: () => void;
+  error?: string | null;
   styles: ReturnType<typeof createWalletStyles>;
 };
 
@@ -20,6 +21,7 @@ export default function PasscodeField({
   autoFocus,
   isActive,
   onActivate,
+  error,
 }: PasscodeFieldProps) {
   const { colors } = useTheme();
   const PASSCODE_LENGTH = 6;
@@ -36,6 +38,14 @@ export default function PasscodeField({
       focusInput();
     }
   }, [autoFocus, focusInput, isActive]);
+
+  // Clear input when error occurs
+  useEffect(() => {
+    if (error && value.length > 0) {
+      console.log('=== PasscodeField: Error detected, clearing input ===', label, error);
+      onChange('');
+    }
+  }, [error, value.length, onChange, label]);
 
   return (
     <View style={localStyles.container}>

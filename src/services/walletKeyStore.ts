@@ -1,6 +1,7 @@
 import type { EncryptedWalletKey, WalletRecordMeta, WalletKind } from '../types/wallet';
 import { getJson, setJson } from './storage';
 import { getActiveWalletType } from './activeWalletType';
+import { verifyOrSetMasterPasscode } from './masterPasscodeStore';
 import aesjs from 'aes-js';
 import { pbkdf2 as pbkdf2Callback } from 'pbkdf2';
 import { Buffer } from 'buffer';
@@ -184,6 +185,12 @@ export async function decryptWalletKey(encryptedJson: string, password: string):
 }
 
 export async function createInitialWalletKey(password: string): Promise<EncryptedWalletKey> {
+  // Verify or set master passcode
+  const isValid = await verifyOrSetMasterPasscode(password);
+  if (!isValid) {
+    throw new Error('Invalid master passcode');
+  }
+  
   const { Wallet } = await import('ethers');
   const wallet = Wallet.createRandom();
   const encryptedJson = await wallet.encrypt(password);
@@ -236,6 +243,12 @@ export async function importSolanaWalletRecord(
   password: string,
   walletType: WalletKind = 'solana'
 ): Promise<{ record: EncryptedWalletKey; keypair: any; mnemonic: string }> {
+  // Verify or set master passcode
+  const isValid = await verifyOrSetMasterPasscode(password);
+  if (!isValid) {
+    throw new Error('Invalid master passcode');
+  }
+  
   const { Keypair } = await import('@solana/web3.js');
   const { mnemonicToSeedSync } = await import('bip39');
   
@@ -274,6 +287,12 @@ export async function createSolanaWalletRecord(
   password: string,
   walletType: WalletKind = 'solana'
 ): Promise<{ record: EncryptedWalletKey; keypair: any; mnemonic: string }> {
+  // Verify or set master passcode
+  const isValid = await verifyOrSetMasterPasscode(password);
+  if (!isValid) {
+    throw new Error('Invalid master passcode');
+  }
+  
   const { Keypair } = await import('@solana/web3.js');
   const { generateMnemonic, mnemonicToSeedSync } = await import('bip39');
   
