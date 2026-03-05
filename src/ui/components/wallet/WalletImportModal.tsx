@@ -130,6 +130,7 @@ export default function WalletImportModal({
             autoFocus={isPrimaryActive}
             isActive={isPrimaryActive}
             onActivate={onActivatePrimary}
+            error={flowError}
             styles={styles}
           />
           <PasscodeField
@@ -139,6 +140,7 @@ export default function WalletImportModal({
             autoFocus={isConfirmActive}
             isActive={isConfirmActive}
             onActivate={onActivateConfirm}
+            error={flowError}
             styles={styles}
           />
           <NumericKeyboard

@@ -109,6 +109,7 @@ export default function WalletCreatePasscodeCard({
           autoFocus={isPrimaryActive}
           isActive={isPrimaryActive}
           onActivate={handleActivatePrimary}
+          error={flowError}
           styles={styles}
         />
         <PasscodeField
@@ -118,6 +119,7 @@ export default function WalletCreatePasscodeCard({
           autoFocus={isConfirmActive}
           isActive={isConfirmActive}
           onActivate={handleActivateConfirm}
+          error={flowError}
           styles={styles}
         />
       </View>

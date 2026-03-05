@@ -76,6 +76,7 @@ export default function WalletUnlockCard({
           autoFocus={isUnlockActive}
           isActive={isUnlockActive}
           onActivate={onActivateUnlock}
+          error={flowError}
           styles={styles}
         />
       </View>
