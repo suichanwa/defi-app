@@ -41,28 +41,45 @@ export default function PasscodeField({
     <View style={localStyles.container}>
       <Text style={[localStyles.label, { color: colors.muted }]}>{label}</Text>
       
-      {/* Hidden input for native keyboard */}
-      <TextInput
-        ref={inputRef}
-        value={value}
-        onChangeText={onChange}
-        keyboardType="number-pad"
-        maxLength={PASSCODE_LENGTH}
-        autoFocus={autoFocus}
-        showSoftInputOnFocus
-        secureTextEntry={false}
-        style={localStyles.hiddenInput}
-        onFocus={onActivate}
-      />
-      
       {/* Visual dots display */}
       <Pressable
-        style={localStyles.dotsContainer}
+        style={[
+          localStyles.dotsContainer,
+          isActive && { backgroundColor: `${colors.accent}10` }
+        ]}
         onPress={() => {
+          console.log('=== PasscodeField Pressable Pressed ===', label);
           onActivate?.();
           focusInput();
         }}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
+        {/* Hidden input overlays the dots - positioned to cover the entire pressable area */}
+        <TextInput
+          ref={inputRef}
+          value={value}
+          onChangeText={(text) => {
+            console.log('=== PasscodeField TextInput onChangeText ===', label, text);
+            onChange(text);
+          }}
+          keyboardType="number-pad"
+          maxLength={PASSCODE_LENGTH}
+          autoFocus={autoFocus}
+          showSoftInputOnFocus={true}
+          secureTextEntry={false}
+          style={localStyles.hiddenInput}
+          onFocus={() => {
+            console.log('=== PasscodeField TextInput onFocus ===', label);
+            onActivate?.();
+          }}
+          onBlur={() => {
+            console.log('=== PasscodeField TextInput onBlur ===', label);
+          }}
+          editable={true}
+          selectTextOnFocus={false}
+          caretHidden={true}
+        />
+        
         {Array.from({ length: PASSCODE_LENGTH }).map((_, index) => (
           <View
             key={index}
@@ -94,18 +111,29 @@ const localStyles = StyleSheet.create({
   },
   hiddenInput: {
     position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     opacity: 0,
-    width: 1,
-    height: 1,
+    color: 'transparent',
+    backgroundColor: 'transparent',
   },
   dotsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    minHeight: 56,
+    alignItems: 'center',
+    position: 'relative',
   },
   dot: {
     width: 16,
     height: 16,
     borderRadius: 8,
+    zIndex: -1,
   },
 });

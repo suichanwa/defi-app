@@ -8,6 +8,9 @@ const defaultSettings = (): ProfileSettings => ({
   avatarType: 'identicon',
   themePreference: 'system',
   language: 'en',
+  experimental: {
+    cardNamesEnabled: false,
+  },
   updatedAt: new Date().toISOString(),
 });
 

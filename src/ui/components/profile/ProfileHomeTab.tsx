@@ -14,6 +14,7 @@ type ProfileHomeTabProps = {
   onOpenRewards: () => void;
   onOpenTransactionHistory: () => void;
   onOpenLocalization: () => void;
+  onOpenExperimental?: () => void;
   onOpenDeveloper?: () => void;
   showDeveloper?: boolean;
   onOpenAbout: () => void;
@@ -31,6 +32,7 @@ export default function ProfileHomeTab({
   onOpenRewards,
   onOpenTransactionHistory,
   onOpenLocalization,
+  onOpenExperimental,
   onOpenDeveloper,
   showDeveloper = true,
   onOpenAbout,
@@ -140,6 +142,21 @@ export default function ProfileHomeTab({
           <Ionicons name="chevron-forward" size={20} color={colors.muted} />
         </View>
       </TouchableOpacity>
+
+      {onOpenExperimental ? (
+        <TouchableOpacity style={cardStyle} onPress={onOpenExperimental} activeOpacity={0.85}>
+          <View style={styles.cardRow}>
+            <View style={styles.cardIcon}>
+              <Ionicons name="flask-outline" size={22} color={colors.accent} />
+            </View>
+            <View style={styles.cardBody}>
+              <Text style={styles.cardTitle}>Experimental</Text>
+              <Text style={styles.cardSubtitle}>Try out new features in development.</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+          </View>
+        </TouchableOpacity>
+      ) : null}
 
       {showDeveloper && onOpenDeveloper ? (
         <TouchableOpacity style={cardStyle} onPress={onOpenDeveloper} activeOpacity={0.85}>

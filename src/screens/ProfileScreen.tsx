@@ -6,6 +6,7 @@ import {
   AuthTab,
   ChangelogTab,
   DeveloperTab,
+  ExperimentalTab,
   LocalizationTab,
   PersonalizationTab,
   ProfileHomeTab,
@@ -36,6 +37,7 @@ type ProfileView =
   | 'auth'
   | 'developer'
   | 'localization'
+  | 'experimental'
   | 'about'
   | 'changelog';
 
@@ -257,6 +259,20 @@ export default function ProfileScreen() {
         />
       );
       break;
+    case 'experimental':
+      content = (
+        <ExperimentalTab
+          scrollStyle={profile.styles.scrollStyle}
+          cardStyle={profile.styles.cardStyle}
+          onBack={() => setView('home')}
+          cardNamesEnabled={profile.state.experimental?.cardNamesEnabled ?? false}
+          onToggleCardNames={profile.actions.setCardNamesEnabled}
+          onSave={profile.actions.save}
+          message={profile.status.message}
+          error={profile.status.error}
+        />
+      );
+      break;
     case 'developer':
       content = appFeatures.showDeveloperTab ? (
         <>
@@ -297,6 +313,7 @@ export default function ProfileScreen() {
           onOpenRewards={() => setView('rewards')}
           onOpenTransactionHistory={() => setView('transactionHistory')}
           onOpenLocalization={() => setView('localization')}
+          onOpenExperimental={() => setView('experimental')}
           onOpenAbout={() => setView('about')}
           onOpenChangelog={() => setView('changelog')}
           showDeveloper={false}
@@ -334,6 +351,7 @@ export default function ProfileScreen() {
           onOpenRewards={() => setView('rewards')}
           onOpenTransactionHistory={() => setView('transactionHistory')}
           onOpenLocalization={() => setView('localization')}
+          onOpenExperimental={() => setView('experimental')}
           onOpenDeveloper={appFeatures.showDeveloperTab ? () => setView('developer') : undefined}
           showDeveloper={appFeatures.showDeveloperTab}
           onOpenAbout={() => setView('about')}

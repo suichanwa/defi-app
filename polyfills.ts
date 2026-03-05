@@ -17,26 +17,24 @@ if (typeof (global as any).BufferImpl === 'undefined') {
   (global as any).BufferImpl = Buffer;
 }
 
-// Process polyfill with environment
 import process from 'process';
 if (typeof global.process === 'undefined') {
   global.process = process;
 }
 if (!global.process.env) {
-  global.process.env = {};
+  (global.process.env as any) = { NODE_ENV: 'production' };
 }
-global.process.version = 'v16.0.0'; // Fake Node version for compatibility
-global.process.browser = true;
+(global.process as any).version = 'v16.0.0'; // Fake Node version for compatibility
+(global.process as any).browser = true;
 
-// setImmediate/clearImmediate for stream operations
 if (typeof global.setImmediate === 'undefined') {
-  global.setImmediate = (fn: (...args: unknown[]) => void, ...args: unknown[]) => {
+  (global as any).setImmediate = (fn: (...args: unknown[]) => void, ...args: unknown[]) => {
     return setTimeout(fn, 0, ...args) as unknown as NodeJS.Immediate;
   };
 }
 
 if (typeof global.clearImmediate === 'undefined') {
-  global.clearImmediate = (id: NodeJS.Immediate) => {
+  (global as any).clearImmediate = (id: NodeJS.Immediate) => {
     clearTimeout(id as unknown as NodeJS.Timeout);
   };
 }

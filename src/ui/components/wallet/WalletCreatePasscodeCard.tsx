@@ -59,6 +59,16 @@ export default function WalletCreatePasscodeCard({
     onChangeWalletPasswordConfirm(value);
   };
 
+  const handleActivatePrimary = () => {
+    console.log('=== WalletCreatePasscodeCard: Activating Primary Field ===');
+    onActivatePrimary();
+  };
+
+  const handleActivateConfirm = () => {
+    console.log('=== WalletCreatePasscodeCard: Activating Confirm Field ===');
+    onActivateConfirm();
+  };
+
   const handleCreatePress = () => {
     console.log('=== WalletCreatePasscodeCard: Create Button Pressed ===');
     console.log('walletPassword:', walletPassword, 'length:', walletPassword.length);
@@ -98,7 +108,7 @@ export default function WalletCreatePasscodeCard({
           onChange={handlePasswordChange}
           autoFocus={isPrimaryActive}
           isActive={isPrimaryActive}
-          onActivate={onActivatePrimary}
+          onActivate={handleActivatePrimary}
           styles={styles}
         />
         <PasscodeField
@@ -107,7 +117,7 @@ export default function WalletCreatePasscodeCard({
           onChange={handlePasswordConfirmChange}
           autoFocus={isConfirmActive}
           isActive={isConfirmActive}
-          onActivate={onActivateConfirm}
+          onActivate={handleActivateConfirm}
           styles={styles}
         />
       </View>

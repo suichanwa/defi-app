@@ -32,6 +32,9 @@ type ProfilePreferencesState = {
   avatarUri?: string;
   themePreference: ThemePreference;
   language: LanguageCode;
+  experimental?: {
+    cardNamesEnabled?: boolean;
+  };
   profileSource: 'local' | 'supabase';
 };
 
@@ -57,6 +60,9 @@ const initialState: ProfilePreferencesState = {
   avatarUri: undefined,
   themePreference: 'system',
   language: 'en',
+  experimental: {
+    cardNamesEnabled: false,
+  },
   profileSource: 'local',
 };
 
@@ -144,6 +150,9 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
         const mergedLanguage = normalizeLanguage(merged.language);
         const nextSeed = merged.avatarSeed ?? key?.id ?? makeSeed();
 
+        // Always use local experimental settings (never sync from Supabase)
+        const localExperimental = settings.experimental ?? { cardNamesEnabled: false };
+
         setState({
           alias: merged.alias ?? '',
           avatarType: merged.avatarType ?? 'identicon',
@@ -151,6 +160,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
           avatarUri: merged.avatarUri,
           themePreference: mergedTheme,
           language: mergedLanguage,
+          experimental: localExperimental,
           profileSource: remoteProfile ? 'supabase' : 'local',
         });
 
@@ -192,6 +202,8 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
     setState((prev) => ({ ...prev, themePreference: value }));
     await applyThemePreference(value);
   };
+  const setCardNamesEnabled = (enabled: boolean) => 
+    setState((prev) => ({ ...prev, experimental: { ...prev.experimental, cardNamesEnabled: enabled } }));
 
   const pickAvatar = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -250,17 +262,20 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
         avatarUri: state.avatarType === 'custom' ? remoteAvatarUrl : undefined,
         themePreference: state.themePreference,
         language: state.language,
+        experimental: state.experimental,
         updatedAt: new Date().toISOString(),
       };
-      // Always save locally first
+      // Always save locally first (including experimental settings)
       await saveProfileSettings(settings);
       setStatus({ loading: false, message: 'Profile saved locally.', error: null });
 
       // If signed in with Supabase, also save remotely (non-blocking)
+      // Exclude experimental settings from remote sync - keep them local-only
       const userId = session?.user?.id;
       if (userId && isSupabaseConfigured) {
         // Run in background, don't block UI
-        upsertRemoteProfile(userId, settings)
+        const { experimental: _, ...settingsWithoutExperimental } = settings;
+        upsertRemoteProfile(userId, settingsWithoutExperimental)
           .then(() => {
             setState((prev) => ({ ...prev, profileSource: 'supabase' }));
             setStatus({ loading: false, message: 'Profile saved.', error: null });
@@ -357,6 +372,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
         avatarUri: undefined,
         themePreference: 'system',
         language: 'en',
+        experimental: { cardNamesEnabled: false },
       });
       await loadProfile(() => true);
       updateStatus({ loading: false, message: 'Profile settings reset.', error: null });
@@ -375,6 +391,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
       setAvatarUri,
       setLanguage,
       setThemePreference,
+      setCardNamesEnabled,
       pickAvatar,
       save,
       reload: () => loadProfile(() => true),

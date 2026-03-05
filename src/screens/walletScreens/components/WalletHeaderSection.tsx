@@ -42,12 +42,28 @@ export default function WalletHeaderSection({
         <NetworkBadge onPress={onToggleNetwork} />
         {chain.kind === 'solana' && chain.cluster === 'devnet' && (
           <TouchableOpacity
-            activeOpacity={0.8}
-            style={[localStyles.airdropButton, { borderColor: colors.border }]}
+            activeOpacity={0.7}
+            style={[
+              localStyles.airdropButton, 
+              { 
+                borderColor: colors.border,
+                backgroundColor: isCooldownActive || isAirdropLoading || !address 
+                  ? colors.border 
+                  : colors.background,
+                opacity: isCooldownActive || isAirdropLoading || !address ? 0.6 : 1,
+              }
+            ]}
             onPress={onAirdrop}
             disabled={isAirdropLoading || !address || isCooldownActive}
           >
-            <Text style={[localStyles.airdropButtonText, { color: colors.text }]}>
+            <Text style={[
+              localStyles.airdropButtonText, 
+              { 
+                color: isCooldownActive || isAirdropLoading || !address 
+                  ? colors.muted 
+                  : colors.text 
+              }
+            ]}>
               {isAirdropLoading
                 ? 'Airdropping...'
                 : isCooldownActive
@@ -80,14 +96,18 @@ const localStyles = StyleSheet.create({
     alignSelf: 'flex-end',
   },
   airdropButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 14,      // Increased from 12
+    paddingVertical: 8,         // Increased from 6
     borderRadius: 16,
     borderWidth: 1,
-    maxWidth: 140,
+    minWidth: 100,             // Added minimum width
+    minHeight: 32,             // Added minimum height for better touch target
+    alignItems: 'center',      // Center text
+    justifyContent: 'center',  // Center text
   },
   airdropButtonText: {
     fontSize: 12,
     fontWeight: '700',
+    textAlign: 'center',       // Ensure text is centered
   },
 });

@@ -2,6 +2,7 @@ export { default as AboutAppTab } from './AboutAppTab';
 export { default as AuthTab } from './AuthTab';
 export { default as ChangelogTab } from './ChangelogTab';
 export { default as DeveloperTab } from './DeveloperTab';
+export { default as ExperimentalTab } from './ExperimentalTab';
 export { default as LocalizationTab } from './LocalizationTab';
 export { default as PersonalizationTab } from './PersonalizationTab';
 export { default as ProfileHomeTab } from './ProfileHomeTab';

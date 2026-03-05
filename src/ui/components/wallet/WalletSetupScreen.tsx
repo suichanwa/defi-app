@@ -295,6 +295,10 @@ export default function WalletSetupScreen({
 
   if (flow === 'create-passcode') {
     console.log('=== WalletSetupScreen: Rendering create-passcode ===');
+    console.log('activePasscodeField:', activePasscodeField);
+    console.log('effectivePasscodeField:', effectivePasscodeField);
+    console.log('isPrimaryActive:', effectivePasscodeField === 'primary');
+    console.log('isConfirmActive:', effectivePasscodeField === 'confirm');
     return (
       <ScreenTransition triggerKey={`${status}-${flow}`}>
         <WalletCreatePasscodeCard
@@ -314,8 +318,14 @@ export default function WalletSetupScreen({
           onBackToMenu={onBackToMenu}
           isPrimaryActive={effectivePasscodeField === 'primary'}
           isConfirmActive={effectivePasscodeField === 'confirm'}
-          onActivatePrimary={() => setActivePasscodeField('primary')}
-          onActivateConfirm={() => setActivePasscodeField('confirm')}
+          onActivatePrimary={() => {
+            console.log('=== WalletSetupScreen: onActivatePrimary called ===');
+            setActivePasscodeField('primary');
+          }}
+          onActivateConfirm={() => {
+            console.log('=== WalletSetupScreen: onActivateConfirm called ===');
+            setActivePasscodeField('confirm');
+          }}
         />
       </ScreenTransition>
     );

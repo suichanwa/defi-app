@@ -10,5 +10,8 @@ export type ProfileSettings = {
   avatarSeed?: string;
   themePreference: ThemePreference;
   language: LanguageCode;
+  experimental?: {
+    cardNamesEnabled?: boolean;
+  };
   updatedAt: string;
 };
