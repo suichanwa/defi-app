@@ -1,36 +1,22 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
-  FlatList,
-  Keyboard,
   KeyboardAvoidingView,
   Linking,
   Platform,
   StyleSheet,
   Text,
-  Image,
   TouchableOpacity,
   View,
 } from 'react-native';
-import Animated, {
-  FadeInDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-  interpolate,
-  Extrapolation,
-} from 'react-native-reanimated';
+import { Chat, MessageType } from '@flyerhq/react-native-chat-ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { ChatAvatarSource, ChatMessage, ChatThread, ServerInfo } from '@app-types/securechat-types/secureChat';
 import { useTheme } from '@theme/ThemeProvider';
-import { CHAT_HISTORY_SCROLL_THRESHOLD } from '@constants/secureChat.constants';
-import ChatAvatar from '@components/secureChat/ChatAvatar';
-import ChatInputBar from '@components/secureChat/ChatInputBar';
 import ChatThreadHeader from '@components/secureChat/ChatThreadHeader';
 import ViewProfileModal from '@components/secureChat/ViewProfileModal';
 import ChatImageViewer from '@components/secureChat/ChatImageViewer';
-import MessageSettingsMenu from '@components/secureChat/MessageSettingsMenu';
+import { convertToFlyerMessage, sortMessagesByNewest } from '@utils/flyerChatAdapter';
 
 type Props = {
   chat: ChatThread | null;
@@ -66,13 +52,6 @@ type Props = {
 
 // Bottom navigation is hidden in chat threads, so no offset is needed.
 const BOTTOM_NAV_HEIGHT = 0;
-
-// Spring config for smooth animations
-const SPRING_CONFIG = {
-  damping: 20,
-  stiffness: 200,
-  mass: 0.5,
-};
 
 type SelectedProfile = {
   name: string;
@@ -114,20 +93,63 @@ export default function ChatThreadScreen({
 }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createChatStyles(colors), [colors]);
-  const flatListRef = useRef<FlatList>(null);
   const insets = useSafeAreaInsets();
   const isIOS = Platform.OS === 'ios';
-  const isInitialMount = useRef(true);
-  const prevMessagesLength = useRef(messages.length);
-
-  // Animated values
-  const keyboardHeight = useSharedValue(0);
-  const inputFocused = useSharedValue(0);
 
   const [selectedProfile, setSelectedProfile] = useState<SelectedProfile>(null);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
-  const lastLoadMoreAtRef = useRef(0);
+  const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(null);
 
+  // Convert messages to Flyer format
+  const flyerMessages = useMemo(() => {
+    return messages.map((msg) =>
+      convertToFlyerMessage(msg, currentUserId)
+    );
+  }, [messages, currentUserId]);
+
+  // Sort messages newest first (Flyer requirement)
+  const sortedMessages = useMemo(() => sortMessagesByNewest(flyerMessages), [flyerMessages]);
+
+  // Current user for Flyer
+  const flyerUser = useMemo(
+    () => ({
+      id: currentUserId ?? currentUserLabel ?? 'current-user',
+    }),
+    [currentUserId, currentUserLabel]
+  );
+
+  // Handle send text
+  const handleSendPress = useCallback(
+    (message: MessageType.PartialText) => {
+      // onSend reads draft from parent state, so just call it
+      onSend();
+    },
+    [onSend]
+  );
+
+  // Handle attachment press (images/files)
+  const handleAttachmentPress = useCallback((message: MessageType.Any) => {
+    if (message.type === 'image') {
+      const imageMsg = message as MessageType.Image;
+      setSelectedImageUri(imageMsg.uri);
+    } else if (message.type === 'file') {
+      const fileMsg = message as MessageType.File;
+      Linking.openURL(fileMsg.uri).catch(() => undefined);
+    }
+  }, []);
+
+  // Handle message long press for actions
+  const handleMessageLongPress = useCallback(
+    (message: MessageType.Any) => {
+      // Find original message
+      const originalMsg = messages.find((m) => m.id === message.id);
+      if (!originalMsg) return;
+      setSelectedMessage(originalMsg);
+    },
+    [messages]
+  );
+
+  // Check if user can manage message
   const canManageMessage = useCallback(
     (message: ChatMessage) => {
       if (message.outgoing === true) return true;
@@ -135,129 +157,79 @@ export default function ChatThreadScreen({
       if (currentUserLabel && message.author === currentUserLabel) return true;
       return false;
     },
-    [currentUserId, currentUserLabel],
+    [currentUserId, currentUserLabel]
   );
 
-  const handleAvatarPress = useCallback((msg: ChatMessage) => {
-    const isCurrentUser = msg.outgoing === true;
-    const avatarSource = resolveAvatar(msg);
-    const authorName = resolveAuthorName(msg);
-    
-    // Generate userId for the message author
-    const messageUserId = msg.authorId ?? `anon-${msg.author?.replace(/[^a-zA-Z0-9]/g, '-') ?? 'unknown'}`;
-    
-    setSelectedProfile({
-      name: authorName,
-      userId: isCurrentUser ? currentUserId : messageUserId,
-      avatarSource,
-      isOnline: true,
-    });
-  }, [resolveAvatar, resolveAuthorName, currentUserId]);
-
-  const scrollToBottom = useCallback((animated = true) => {
-    if (flatListRef.current && messages.length > 0) {
-      flatListRef.current.scrollToEnd({ animated });
+  // Handle message actions
+  const handleCopyMessage = useCallback(() => {
+    if (selectedMessage) {
+      onCopyMessage?.(selectedMessage);
+      setSelectedMessage(null);
     }
-  }, [messages.length]);
+  }, [selectedMessage, onCopyMessage]);
 
-  // Scroll to bottom on initial load (no animation)
-  useEffect(() => {
-    if (isInitialMount.current && messages.length > 0) {
-      isInitialMount.current = false;
-      // Use requestAnimationFrame for more reliable timing
-      requestAnimationFrame(() => {
-        scrollToBottom(false);
-      });
+  const handleReplyMessage = useCallback(() => {
+    if (selectedMessage) {
+      onReplyMessage?.(selectedMessage);
+      setSelectedMessage(null);
     }
-  }, [messages.length, scrollToBottom]);
+  }, [selectedMessage, onReplyMessage]);
 
-  // Scroll to bottom when new messages arrive
-  useEffect(() => {
-    if (!isInitialMount.current && messages.length > prevMessagesLength.current) {
-      // New message added, scroll with animation
-      requestAnimationFrame(() => {
-        scrollToBottom(true);
-      });
+  const handleEditMessage = useCallback(() => {
+    if (selectedMessage) {
+      onEditMessage?.(selectedMessage);
+      setSelectedMessage(null);
     }
-    prevMessagesLength.current = messages.length;
-  }, [messages.length, scrollToBottom]);
+  }, [selectedMessage, onEditMessage]);
 
-  // Handle keyboard events with smooth animation
-  useEffect(() => {
-    const showEvent = isIOS ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = isIOS ? 'keyboardWillHide' : 'keyboardDidHide';
+  const handleDeleteMessage = useCallback(() => {
+    if (selectedMessage) {
+      onDeleteMessage?.(selectedMessage);
+      setSelectedMessage(null);
+    }
+  }, [selectedMessage, onDeleteMessage]);
 
-    const showListener = Keyboard.addListener(showEvent, (e) => {
-      const height = e.endCoordinates.height;
-      const extraPadding = -20;
-      const targetHeight = isIOS ? 0 : height - BOTTOM_NAV_HEIGHT + extraPadding;
-
-      // Animate keyboard height change
-      keyboardHeight.value = withSpring(targetHeight, SPRING_CONFIG);
-      inputFocused.value = withTiming(1, { duration: 250 });
-
-      // Scroll after keyboard animation starts
-      requestAnimationFrame(() => {
-        scrollToBottom(true);
-      });
-    });
-
-    const hideListener = Keyboard.addListener(hideEvent, () => {
-      keyboardHeight.value = withSpring(0, SPRING_CONFIG);
-      inputFocused.value = withTiming(0, { duration: 200 });
-    });
-
-    return () => {
-      showListener.remove();
-      hideListener.remove();
-    };
-  }, [isIOS, keyboardHeight, inputFocused, scrollToBottom]);
-
-  // Animated style for container margin
-  const containerAnimatedStyle = useAnimatedStyle(() => ({
-    marginBottom: keyboardHeight.value,
-  }));
-
-  // Animated style for input bar glow effect
-  const inputBarAnimatedStyle = useAnimatedStyle(() => {
-    const borderWidth = interpolate(
-      inputFocused.value,
-      [0, 1],
-      [1, 2],
-      Extrapolation.CLAMP
-    );
-    const shadowOpacity = interpolate(
-      inputFocused.value,
-      [0, 1],
-      [0, 0.15],
-      Extrapolation.CLAMP
-    );
-
-    return {
-      borderWidth,
-      shadowOpacity,
-      transform: [
-        {
-          scale: interpolate(
-            inputFocused.value,
-            [0, 1],
-            [1, 1.01],
-            Extrapolation.CLAMP
-          ),
-        },
-      ],
-    };
-  });
-
-  // Animated style for messages list when keyboard opens
-  const messagesAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(
-      inputFocused.value,
-      [0, 0.5, 1],
-      [1, 0.98, 1],
-      Extrapolation.CLAMP
-    ),
-  }));
+  // Flyer theme matching our design
+  const flyerTheme = useMemo(
+    () => ({
+      fonts: {
+        dateDividerTextStyle: { fontSize: 11, color: colors.muted },
+        emptyChatPlaceholderTextStyle: { fontSize: 15, color: colors.muted },
+        inputTextStyle: { fontSize: 15, color: colors.text },
+        receivedMessageBodyTextStyle: { fontSize: 15, color: colors.text },
+        receivedMessageCaptionTextStyle: { fontSize: 13, color: colors.text },
+        receivedMessageLinkDescriptionTextStyle: { fontSize: 12, color: colors.text },
+        receivedMessageLinkTitleTextStyle: { fontSize: 14, fontWeight: '600' as const, color: colors.text },
+        sentMessageBodyTextStyle: { fontSize: 15, color: colors.accentText },
+        sentMessageCaptionTextStyle: { fontSize: 13, color: colors.accentText },
+        sentMessageLinkDescriptionTextStyle: { fontSize: 12, color: colors.accentText },
+        sentMessageLinkTitleTextStyle: { fontSize: 14, fontWeight: '600' as const, color: colors.accentText },
+        userAvatarTextStyle: { fontSize: 12, fontWeight: '600' as const, color: colors.accentText },
+        userNameTextStyle: { fontSize: 13, fontWeight: '700' as const, color: colors.text },
+      },
+      colors: {
+        background: colors.card,
+        error: '#ef4444',
+        inputBackground: colors.background,
+        inputText: colors.text,
+        primary: colors.accent,
+        secondary: `${colors.accent}22`,
+        receivedMessageDocumentIcon: colors.text,
+        sentMessageDocumentIcon: colors.accentText,
+        userAvatarImageBackground: colors.accent,
+        userAvatarNameColors: [colors.accent, colors.text, colors.muted],
+      },
+      borders: {
+        inputBorderRadius: 12,
+        messageBorderRadius: 14,
+      },
+      insets: {
+        messageInsetsHorizontal: 12,
+        messageInsetsVertical: 10,
+      },
+    }),
+    [colors]
+  );
 
   if (!chat) {
     return (
@@ -269,114 +241,10 @@ export default function ChatThreadScreen({
     );
   }
 
-  const renderMessage = useCallback(({ item: msg }: { item: ChatMessage }) => {
-    if (msg.type === 'system') {
-      return (
-        <Animated.View entering={FadeInDown.duration(200)} style={[styles.messageBubble, styles.messageSystem]}>
-          <Text style={styles.messageText}>{msg.content}</Text>
-          <Text style={styles.messageTime}>{msg.timestamp}</Text>
-        </Animated.View>
-      );
-    }
-    const bubbleStyle = [
-      styles.messageBubble,
-      msg.outgoing ? styles.messageOutgoing : styles.messageIncoming,
-    ];
-    const authorStyle = msg.outgoing ? styles.messageTextOutgoing : styles.messageText;
-    const bodyStyle = msg.outgoing ? styles.messageBodyOutgoing : styles.messageBody;
-    const timeStyle = msg.outgoing ? styles.messageTimeOutgoing : styles.messageTime;
-    const isOutgoing = Boolean(msg.outgoing);
-    const avatarSource = resolveAvatar(msg);
-    const authorLabel = resolveAuthorName(msg);
-    const isImage = msg.type === 'image' && msg.imageUri;
-    const imageCaption = isImage && msg.content && msg.content.trim() !== 'Photo' ? msg.content : '';
-    const canManage = canManageMessage(msg);
-    const iconColor = isOutgoing ? colors.accentText : colors.text;
-    const isFile = msg.type === 'file' && msg.fileName;
-    const handleOpenFile = () => {
-      if (!msg.fileUri) return;
-      Linking.openURL(msg.fileUri).catch(() => undefined);
-    };
+  const canManage = selectedMessage ? canManageMessage(selectedMessage) : false;
+  const canEdit =
+    selectedMessage && selectedMessage.type !== 'image' && selectedMessage.type !== 'file';
 
-    return (
-      <Animated.View
-        entering={FadeInDown.duration(220)}
-        style={[styles.messageRow, isOutgoing ? styles.rowOutgoing : styles.rowIncoming]}
-      >
-        {!isOutgoing && (
-          <ChatAvatar
-            source={avatarSource}
-            variant="incoming"
-            style={styles.avatarSlotIncoming}
-            onPress={() => handleAvatarPress(msg)}
-          />
-        )}
-        <View style={bubbleStyle}>
-          <View style={styles.messageHeader}>
-            <TouchableOpacity onPress={() => handleAvatarPress(msg)} activeOpacity={0.7} style={styles.authorButton}>
-              <Text style={authorStyle} numberOfLines={1}>
-                {authorLabel}
-              </Text>
-            </TouchableOpacity>
-            <MessageSettingsMenu
-              canManage={canManage}
-              canEdit={msg.type !== 'image' && msg.type !== 'file'}
-              iconColor={iconColor}
-              onCopy={() => onCopyMessage?.(msg)}
-              onReply={() => onReplyMessage?.(msg)}
-              onEdit={onEditMessage ? () => onEditMessage(msg) : undefined}
-              onDelete={onDeleteMessage ? () => onDeleteMessage(msg) : undefined}
-            />
-          </View>
-          {isImage ? (
-            <>
-              <TouchableOpacity onPress={() => setSelectedImageUri(msg.imageUri as string)} activeOpacity={0.8}>
-                <Image source={{ uri: msg.imageUri as string }} style={styles.messageImage} resizeMode="cover" />
-              </TouchableOpacity>
-              {imageCaption ? <Text style={bodyStyle}>{imageCaption}</Text> : null}
-            </>
-          ) : isFile ? (
-            <TouchableOpacity onPress={handleOpenFile} activeOpacity={0.8} style={styles.fileRow}>
-              <MaterialCommunityIcons name="file-outline" size={18} color={iconColor} />
-              <View style={styles.fileDetails}>
-                <Text style={bodyStyle} numberOfLines={1}>
-                  {msg.fileName}
-                </Text>
-                <Text style={styles.fileMeta}>
-                  Tap to open
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ) : (
-            <Text style={bodyStyle}>{msg.content}</Text>
-          )}
-          <Text style={timeStyle}>{msg.timestamp}</Text>
-        </View>
-        {isOutgoing && (
-          <ChatAvatar
-            source={avatarSource}
-            variant="outgoing"
-            style={styles.avatarSlotOutgoing}
-            onPress={() => handleAvatarPress(msg)}
-          />
-        )}
-      </Animated.View>
-    );
-  }, [
-    canManageMessage,
-    colors.accentText,
-    colors.text,
-    handleAvatarPress,
-    onCopyMessage,
-    onDeleteMessage,
-    onEditMessage,
-    onReplyMessage,
-    resolveAvatar,
-    resolveAuthorName,
-    styles,
-  ]);
-
-  // Calculate keyboard offset for iOS
   const keyboardVerticalOffset = isIOS ? BOTTOM_NAV_HEIGHT + insets.bottom : 0;
 
   return (
@@ -385,7 +253,7 @@ export default function ChatThreadScreen({
       behavior={isIOS ? 'padding' : undefined}
       keyboardVerticalOffset={keyboardVerticalOffset}
     >
-      <Animated.View style={[styles.container, containerAnimatedStyle]}>
+      <View style={styles.container}>
         {/* Header */}
         <ChatThreadHeader
           chat={chat}
@@ -396,69 +264,61 @@ export default function ChatThreadScreen({
           typingLabel={typingLabel ?? ''}
         />
 
-        {/* Messages */}
-        <Animated.View style={[styles.messageListWrapper, messagesAnimatedStyle]}>
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            renderItem={renderMessage}
-            keyExtractor={(item) => item.id}
-            style={styles.messageList}
-            contentContainerStyle={styles.messageContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="interactive"
-            onScroll={(event) => {
-              if (!onLoadMore || isLoadingMore || !hasMoreMessages) return;
-              const offsetY = event.nativeEvent.contentOffset.y;
-              if (offsetY <= CHAT_HISTORY_SCROLL_THRESHOLD) {
-                const now = Date.now();
-                if (now - lastLoadMoreAtRef.current < 1200) return;
-                lastLoadMoreAtRef.current = now;
-                onLoadMore();
-              }
+        {/* Flyer Chat Component */}
+        <View style={styles.chatWrapper}>
+          <Chat
+            messages={sortedMessages}
+            onSendPress={handleSendPress}
+            user={flyerUser}
+            theme={flyerTheme}
+            onMessagePress={handleAttachmentPress}
+            onMessageLongPress={handleMessageLongPress}
+            textInputProps={{
+              placeholder: 'Type a message...',
+              value: draft,
+              onChangeText: onDraftChange,
             }}
-            scrollEventThrottle={16}
-            maintainVisibleContentPosition={{
-              minIndexForVisible: 0,
-              autoscrollToTopThreshold: 100,
-            }}
-            inverted={false}
-            removeClippedSubviews={Platform.OS !== 'web'}
-            initialNumToRender={12}
-            maxToRenderPerBatch={8}
-            updateCellsBatchingPeriod={50}
-            windowSize={7}
+            enableAnimation={true}
+            showUserAvatars={true}
+            showUserNames={true}
+            disableImageGallery={true}
+            sendButtonVisibilityMode="editing"
           />
-        </Animated.View>
+        </View>
+      </View>
 
-        {/* Input Bar with animation */}
-        <Animated.View
-          style={[
-            styles.inputBar,
-            {
-              borderColor: colors.accent,
-              shadowColor: colors.accent,
-              shadowOffset: { width: 0, height: 2 },
-              shadowRadius: 8,
-              elevation: 3,
-            },
-            inputBarAnimatedStyle,
-          ]}
-        >
-          <ChatInputBar
-            draft={draft}
-            onDraftChange={onDraftChange}
-            onSend={onSend}
-            onPickImage={onPickImage ?? (() => undefined)}
-            onPickFile={onPickFile}
-            onClearAttachment={onClearAttachment}
-            onClearFile={onClearFile}
-            attachmentUri={attachmentUri}
-            fileAttachment={fileAttachment}
+      {/* Message Actions Modal */}
+      {selectedMessage && (
+        <View style={styles.actionOverlay}>
+          <TouchableOpacity
+            style={styles.actionBackdrop}
+            activeOpacity={1}
+            onPress={() => setSelectedMessage(null)}
           />
-        </Animated.View>
-      </Animated.View>
+          <View style={styles.actionMenu}>
+            <TouchableOpacity style={styles.actionButton} onPress={handleCopyMessage}>
+              <MaterialCommunityIcons name="content-copy" size={20} color={colors.text} />
+              <Text style={styles.actionText}>Copy</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionButton} onPress={handleReplyMessage}>
+              <MaterialCommunityIcons name="reply" size={20} color={colors.text} />
+              <Text style={styles.actionText}>Reply</Text>
+            </TouchableOpacity>
+            {canManage && canEdit && onEditMessage && (
+              <TouchableOpacity style={styles.actionButton} onPress={handleEditMessage}>
+                <MaterialCommunityIcons name="pencil" size={20} color={colors.text} />
+                <Text style={styles.actionText}>Edit</Text>
+              </TouchableOpacity>
+            )}
+            {canManage && onDeleteMessage && (
+              <TouchableOpacity style={styles.actionButton} onPress={handleDeleteMessage}>
+                <MaterialCommunityIcons name="delete" size={20} color={'#ef4444'} />
+                <Text style={[styles.actionText, { color: '#ef4444' }]}>Delete</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
 
       <ViewProfileModal
         visible={selectedProfile !== null}
@@ -486,6 +346,7 @@ const createChatStyles = (colors: {
   border: string;
   accent: string;
   accentText: string;
+  error?: string;
 }) =>
   StyleSheet.create({
     outerContainer: {
@@ -520,130 +381,52 @@ const createChatStyles = (colors: {
       backgroundColor: colors.card,
       padding: 16,
     },
-    messageListWrapper: {
+    chatWrapper: {
       flex: 1,
       marginTop: 16,
     },
-    messageList: {
-      flex: 1,
-    },
-    messageContent: {
-      paddingBottom: 8,
-      flexGrow: 1,
-    },
-    messageRow: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      marginBottom: 10,
-    },
-    rowOutgoing: {
-      flexDirection: 'row',
-      justifyContent: 'flex-end',
-    },
-    rowIncoming: {
-      flexDirection: 'row',
-      justifyContent: 'flex-start',
-    },
-    avatarSlotIncoming: {
-      marginRight: 8,
-      marginLeft: 4,
-      marginTop: 2,
-    },
-    avatarSlotOutgoing: {
-      marginLeft: 8,
-      marginRight: 0,
-      marginTop: 2,
-    },
-    messageBubble: {
-      marginBottom: 0,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      borderRadius: 14,
-      maxWidth: '78%',
-    },
-    messageIncoming: {
-      alignSelf: 'flex-start',
-      backgroundColor: `${colors.accent}22`,
-    },
-    messageOutgoing: {
-      alignSelf: 'flex-end',
-      backgroundColor: colors.accent,
-    },
-    messageSystem: {
-      alignSelf: 'center',
-      backgroundColor: colors.border,
-    },
-    messageText: {
-      fontWeight: '700',
-      fontSize: 13,
-      color: colors.text,
-    },
-    messageTextOutgoing: {
-      fontWeight: '700',
-      fontSize: 13,
-      color: colors.accentText,
-    },
-    messageHeader: {
-      flexDirection: 'row',
+    actionOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      justifyContent: 'center',
       alignItems: 'center',
-      justifyContent: 'space-between',
+      zIndex: 1000,
     },
-    authorButton: {
-      flexShrink: 1,
-      paddingRight: 6,
+    actionBackdrop: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
     },
-    messageBody: {
-      marginTop: 4,
-      fontWeight: '500',
-      fontSize: 15,
-      color: colors.text,
-    },
-    messageBodyOutgoing: {
-      marginTop: 4,
-      fontWeight: '500',
-      fontSize: 15,
-      color: colors.accentText,
-    },
-    messageTime: {
-      marginTop: 6,
-      fontSize: 11,
-      color: colors.muted,
-    },
-    messageTimeOutgoing: {
-      marginTop: 6,
-      fontSize: 11,
-      color: colors.accentText,
-    },
-    inputBar: {
+    actionMenu: {
+      backgroundColor: colors.card,
+      borderRadius: 12,
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: 12,
-      backgroundColor: colors.card,
       padding: 8,
-      marginTop: 8,
+      minWidth: 200,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 8,
     },
-    messageImage: {
-      marginTop: 6,
-      width: 180,
-      height: 180,
-      borderRadius: 10,
-    },
-    fileRow: {
+    actionButton: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginTop: 6,
-      paddingVertical: 6,
-      paddingHorizontal: 8,
-      borderRadius: 10,
-      backgroundColor: `${colors.border}66`,
-      gap: 8,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      gap: 12,
     },
-    fileDetails: {
-      flex: 1,
-    },
-    fileMeta: {
-      marginTop: 2,
-      fontSize: 11,
-      color: colors.muted,
+    actionText: {
+      fontSize: 15,
+      fontWeight: '500',
+      color: colors.text,
     },
   });
