@@ -6,6 +6,7 @@ import { encodeChatImageContent } from '@utils/secureChatImages';
 import { uploadChatImage } from '@services/chatImageStorage';
 import { supabase as supabaseClient, isSupabaseConfigured } from '@services/supabaseClient';
 import { sendDMMessage } from '@services/directMessages';
+import { MAX_MESSAGES_IN_MEMORY } from '@constants/secureChat.constants';
 
 type TransportArgs = {
   displayLabel: string;
@@ -51,7 +52,14 @@ export function useChatTransport({
     (chatId: string, message: ChatMessage) => {
       setMessagesByChat((prev) => {
         const existing = prev[chatId] ?? [];
-        return { ...prev, [chatId]: [...existing, message] };
+        const updated = [...existing, message];
+        
+        // Limit messages in memory to prevent crashes
+        const limited = updated.length > MAX_MESSAGES_IN_MEMORY
+          ? updated.slice(-MAX_MESSAGES_IN_MEMORY)
+          : updated;
+        
+        return { ...prev, [chatId]: limited };
       });
 
       setChats((prev: any[]) =>
@@ -152,7 +160,14 @@ export function useChatTransport({
           const existing = prev[chatId] ?? [];
           const seen = existing.some((m) => m.id === optimisticId);
           if (seen) return prev;
-          return { ...prev, [chatId]: [...existing, optimisticMessage] };
+          
+          const updated = [...existing, optimisticMessage];
+          // Limit messages in memory to prevent crashes
+          const limited = updated.length > MAX_MESSAGES_IN_MEMORY
+            ? updated.slice(-MAX_MESSAGES_IN_MEMORY)
+            : updated;
+          
+          return { ...prev, [chatId]: limited };
         });
         const message = await sendDMMessage(chatId, {
           chatId,
@@ -178,7 +193,14 @@ export function useChatTransport({
             );
             const seen = withoutPending.some((m) => m.id === message.id);
             if (seen) return { ...prev, [chatId]: withoutPending };
-            return { ...prev, [chatId]: [...withoutPending, message] };
+            
+            const updated = [...withoutPending, message];
+            // Limit messages in memory to prevent crashes
+            const limited = updated.length > MAX_MESSAGES_IN_MEMORY
+              ? updated.slice(-MAX_MESSAGES_IN_MEMORY)
+              : updated;
+            
+            return { ...prev, [chatId]: limited };
           });
           markDmFetched(chatId, message.createdAt ?? null);
           await refreshDmChannels();

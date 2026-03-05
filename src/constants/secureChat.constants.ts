@@ -3,6 +3,7 @@ export const DM_POLL_INTERVAL_ACTIVE_MS = 1200;
 export const DM_POLL_INTERVAL_IDLE_MS = 3000;
 export const CHAT_HISTORY_PAGE_SIZE = 20;
 export const CHAT_HISTORY_SCROLL_THRESHOLD = 80;
+export const MAX_MESSAGES_IN_MEMORY = 200;
 export const CHAT_COMPACT_WIDTH = 720;
 export const DEFAULT_GLOBAL_CHAT_ID = 'global';
 export const DEFAULT_GLOBAL_CHAT_NAME = 'Global room';

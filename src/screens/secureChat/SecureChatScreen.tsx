@@ -161,7 +161,15 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
       setMessagesByChat((prev) => {
         const existing = prev[chatId] ?? [];
         if (existing.some((m) => m.id === message.id)) return prev;
-        return { ...prev, [chatId]: [...existing, message] };
+        const updated = [...existing, message];
+        
+        // Limit messages in memory to prevent crashes from excessive message accumulation
+        // Keep only the most recent MAX_MESSAGES_IN_MEMORY messages
+        const limited = updated.length > SecureChatConstants.MAX_MESSAGES_IN_MEMORY
+          ? updated.slice(-SecureChatConstants.MAX_MESSAGES_IN_MEMORY)
+          : updated;
+        
+        return { ...prev, [chatId]: limited };
       });
       setChats((prev) => {
         const next = prev.map((chat) =>

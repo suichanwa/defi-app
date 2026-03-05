@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import type { ChatMessage } from '@app-types/securechat-types/secureChat';
 import type { SecureChatMessageRow } from '@app-types/securechat-types/secureChatScreen';
 import { selectMessagesPage } from '@services/messageQueries';
+import { MAX_MESSAGES_IN_MEMORY } from '@constants/secureChat.constants';
 
 type HistoryState = {
   loading: boolean;
@@ -144,7 +145,15 @@ export function useRoomHistory({ pageSize, mapRow, resolveMessages, onHistoryErr
         const existing = prev[roomId] ?? [];
         const existingIds = new Set(existing.map((message) => message.id));
         const deduped = resolved.filter((message) => !existingIds.has(message.id));
-        return { ...prev, [roomId]: [...deduped, ...existing] };
+        const combined = [...deduped, ...existing];
+        
+        // Limit messages in memory to prevent crashes from excessive scrolling
+        // Keep only the most recent MAX_MESSAGES_IN_MEMORY messages
+        const limited = combined.length > MAX_MESSAGES_IN_MEMORY
+          ? combined.slice(0, MAX_MESSAGES_IN_MEMORY)
+          : combined;
+        
+        return { ...prev, [roomId]: limited };
       });
 
       setHistoryStateByChat((prev) => ({

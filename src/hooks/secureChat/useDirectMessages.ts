@@ -12,7 +12,7 @@ import {
 } from '@services/directMessages';
 import { isSupabaseConfigured, supabase } from '@services/supabaseClient';
 import { isUuid } from '@utils/secureChatUtils';
-import { DM_POLL_INTERVAL_ACTIVE_MS, DM_POLL_INTERVAL_IDLE_MS } from '@constants/secureChat.constants';
+import { DM_POLL_INTERVAL_ACTIVE_MS, DM_POLL_INTERVAL_IDLE_MS, MAX_MESSAGES_IN_MEMORY } from '@constants/secureChat.constants';
 
 type UseDirectMessagesArgs = {
   effectiveUserId: string;
@@ -97,8 +97,14 @@ export function useDirectMessages({
       if (!chatId.startsWith('dm:')) return;
       try {
         const messages = await getDMMessages(chatId, effectiveUserId);
-        setMessagesByChat((prev) => ({ ...prev, [chatId]: messages }));
-        const last = messages[messages.length - 1];
+        
+        // Limit messages in memory to prevent crashes
+        const limited = messages.length > MAX_MESSAGES_IN_MEMORY
+          ? messages.slice(-MAX_MESSAGES_IN_MEMORY)
+          : messages;
+        
+        setMessagesByChat((prev) => ({ ...prev, [chatId]: limited }));
+        const last = limited[limited.length - 1];
         if (last?.createdAt) {
           lastDmFetchRef.current[chatId] = last.createdAt;
         }
@@ -125,7 +131,14 @@ export function useDirectMessages({
         const seen = existing.some((m) => m.id === message.id);
         if (seen) return prev;
         notifyIncoming(channelId, message);
-        return { ...prev, [channelId]: [...existing, message] };
+        
+        const updated = [...existing, message];
+        // Limit messages in memory to prevent crashes
+        const limited = updated.length > MAX_MESSAGES_IN_MEMORY
+          ? updated.slice(-MAX_MESSAGES_IN_MEMORY)
+          : updated;
+        
+        return { ...prev, [channelId]: limited };
       });
 
       if (message.createdAt) {
@@ -197,7 +210,14 @@ export function useDirectMessages({
             next.push(message);
             notifyIncoming(selectedChatId, message);
           });
-          return { ...prev, [selectedChatId]: next };
+          
+          // Limit messages in memory to prevent crashes from excessive message accumulation
+          // Keep only the most recent MAX_MESSAGES_IN_MEMORY messages
+          const limited = next.length > MAX_MESSAGES_IN_MEMORY
+            ? next.slice(-MAX_MESSAGES_IN_MEMORY)
+            : next;
+          
+          return { ...prev, [selectedChatId]: limited };
         });
 
         const last = newMessages[newMessages.length - 1];
