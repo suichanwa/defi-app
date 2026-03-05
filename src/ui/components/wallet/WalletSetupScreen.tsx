@@ -189,20 +189,8 @@ export default function WalletSetupScreen({
     }
   }, [flow, isSubmitting, onUnlock, status, unlockPassword]);
 
-  useEffect(() => {
-    if (flow !== 'create-passcode' || isSubmitting) return;
-    if (walletPassword.length < PASSCODE_LENGTH || walletPasswordConfirm.length < PASSCODE_LENGTH) {
-      lastAutoCreate.current = '';
-      return;
-    }
-    if (walletPassword !== walletPasswordConfirm) {
-      lastAutoCreate.current = '';
-      return;
-    }
-    if (lastAutoCreate.current === walletPasswordConfirm) return;
-    lastAutoCreate.current = walletPasswordConfirm;
-    onCreate();
-  }, [flow, isSubmitting, onCreate, walletPassword, walletPasswordConfirm]);
+  // Removed auto-submit for wallet creation to allow manual field selection
+  // Users should explicitly press the "Create wallet" button
 
   const effectivePasscodeField =
     activePasscodeField ??
@@ -379,7 +367,7 @@ export default function WalletSetupScreen({
       <ScreenTransition triggerKey={`${status}-${flow}`}>
         <View style={styles.setupCard}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={styles.setupTitle}>Add a wallet</Text>
+            <Text style={styles.setupTitle}>Create your first wallet</Text>
             <TouchableOpacity
               onPress={() => setShowHelp(true)}
               accessibilityLabel="Wallet setup help"

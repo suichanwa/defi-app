@@ -2,8 +2,7 @@ import type { EncryptedWalletKey, WalletRecordMeta, WalletKind } from '../types/
 import { getJson, setJson } from './storage';
 import { getActiveWalletType } from './activeWalletType';
 import aesjs from 'aes-js';
-import { pbkdf2Async as noblePbkdf2Async } from '@noble/hashes/pbkdf2.js';
-import { sha256 as nobleSha256 } from '@noble/hashes/sha2.js';
+import { pbkdf2 as pbkdf2Callback } from 'pbkdf2';
 import { Buffer } from 'buffer';
 
 const PBKDF2_ITERATIONS = 100000;
@@ -28,13 +27,18 @@ function getRandomBytes(length: number): Uint8Array {
 async function deriveKey(password: string, salt: Uint8Array): Promise<Uint8Array> {
   const passwordStr = String(password);
   const passwordBytes = new TextEncoder().encode(passwordStr);
-  
-  const derivedKey = await noblePbkdf2Async(nobleSha256, passwordBytes, salt, {
-    c: PBKDF2_ITERATIONS,
-    dkLen: 32,
+
+  const derivedKey = await new Promise<Buffer>((resolve, reject) => {
+    pbkdf2Callback(passwordBytes, Buffer.from(salt), PBKDF2_ITERATIONS, 32, 'sha256', (error, key) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve(key);
+    });
   });
-  
-  return derivedKey;
+
+  return new Uint8Array(derivedKey);
 }
 
 function bufferToHex(buffer: ArrayBuffer | Uint8Array): string {

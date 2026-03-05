@@ -1,10 +1,5 @@
-import 'react-native-get-random-values';
-import { Buffer } from 'buffer';
-global.Buffer = Buffer;
-
-// Add process polyfill
-import process from 'process';
-global.process = process;
+// Load all polyfills FIRST - before any other imports
+import './polyfills';
 
 import { LogBox } from 'react-native';
 import './global.css';
