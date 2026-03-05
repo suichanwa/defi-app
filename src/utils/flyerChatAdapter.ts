@@ -7,21 +7,41 @@ import type { MessageType } from '@flyerhq/react-native-chat-ui';
 export function convertToFlyerMessage(
   msg: ChatMessage,
   currentUserId?: string
-): MessageType.Text {
+): MessageType.Text | MessageType.Image {
   const isOwn = msg.outgoing === true || 
                 (currentUserId && msg.authorId === currentUserId);
 
+  const author = {
+    id: msg.authorId || msg.author,
+    firstName: msg.author,
+  };
+
+  const createdAt = msg.createdAt ? new Date(msg.createdAt).getTime() : Date.now();
+  const status = isOwn ? 'sent' : undefined;
+
+  // Handle image messages
+  if (msg.type === 'image' && msg.imageUri) {
+    return {
+      author,
+      createdAt,
+      id: msg.id,
+      name: msg.fileName || 'image.jpg',
+      size: 0, // Size not tracked yet
+      type: 'image',
+      uri: msg.imageUri,
+      status,
+    } as MessageType.Image;
+  }
+
+  // Default to text message
   return {
-    author: {
-      id: msg.authorId || msg.author,
-      firstName: msg.author,
-    },
-    createdAt: msg.createdAt ? new Date(msg.createdAt).getTime() : Date.now(),
+    author,
+    createdAt,
     id: msg.id,
     text: msg.content,
     type: 'text',
-    status: isOwn ? 'sent' : undefined,
-  };
+    status,
+  } as MessageType.Text;
 }
 
 /**

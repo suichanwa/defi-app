@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -15,7 +16,6 @@ import type { ChatAvatarSource, ChatMessage, ChatThread, ServerInfo } from '@app
 import { useTheme } from '@theme/ThemeProvider';
 import ChatThreadHeader from '@components/secureChat/ChatThreadHeader';
 import ViewProfileModal from '@components/secureChat/ViewProfileModal';
-import ChatImageViewer from '@components/secureChat/ChatImageViewer';
 import { convertToFlyerMessage, sortMessagesByNewest } from '@utils/flyerChatAdapter';
 
 type Props = {
@@ -96,8 +96,30 @@ export default function ChatThreadScreen({
   const isIOS = Platform.OS === 'ios';
 
   const [selectedProfile, setSelectedProfile] = useState<SelectedProfile>(null);
-  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(null);
+
+  // Animation for send button
+  const sendButtonScale = useRef(new Animated.Value(draft.trim().length > 0 ? 1 : 0)).current;
+  const sendButtonOpacity = useRef(new Animated.Value(draft.trim().length > 0 ? 1 : 0)).current;
+
+  // Animate send button when draft changes
+  useEffect(() => {
+    const hasText = draft.trim().length > 0;
+
+    Animated.parallel([
+      Animated.spring(sendButtonScale, {
+        toValue: hasText ? 1 : 0,
+        friction: 6,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+      Animated.timing(sendButtonOpacity, {
+        toValue: hasText ? 1 : 0,
+        duration: 120,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [draft, sendButtonScale, sendButtonOpacity]);
 
   // Convert messages to Flyer format
   const flyerMessages = useMemo(() => {
@@ -125,16 +147,19 @@ export default function ChatThreadScreen({
     [onSend, draft]
   );
 
-  // Handle message press (for images/files)
-  const handleAttachmentPress = useCallback((message: MessageType.Any) => {
-    if (message.type === 'image') {
-      const imageMsg = message as MessageType.Image;
-      setSelectedImageUri(imageMsg.uri);
-    } else if (message.type === 'file') {
+  // Handle file message press (images are handled by Flyer UI automatically)
+  const handleMessagePress = useCallback((message: MessageType.Any) => {
+    if (message.type === 'file') {
       const fileMsg = message as MessageType.File;
       Linking.openURL(fileMsg.uri).catch(() => undefined);
     }
+    // Image messages are handled by Flyer UI's built-in image viewer
   }, []);
+
+  // Handle attachment button press (add photos/files)
+  const handleAttachmentPress = useCallback(() => {
+    onPickImage?.();
+  }, [onPickImage]);
 
   // Handle message long press for actions
   const handleMessageLongPress = useCallback(
@@ -222,8 +247,8 @@ export default function ChatThreadScreen({
         messageBorderRadius: 14,
       },
       insets: {
-        messageInsetsHorizontal: 12,
-        messageInsetsVertical: 10,
+        messageInsetsHorizontal: 10,
+        messageInsetsVertical: 8,
       },
     }),
     [colors]
@@ -269,16 +294,25 @@ export default function ChatThreadScreen({
             onSendPress={handleSendPress}
             user={flyerUser}
             theme={flyerTheme}
-            onMessagePress={handleAttachmentPress}
+            onMessagePress={handleMessagePress}
             onMessageLongPress={handleMessageLongPress}
+            onAttachmentPress={handleAttachmentPress}
+            disableImageGallery={false}
             enableAnimation={true}
+            sendButtonVisibilityMode="editing"
             showUserAvatars={true}
             showUserNames={true}
+            flatListProps={{
+              contentContainerStyle: {
+                paddingTop: 8,
+                paddingBottom: 8,
+              },
+            }}
             textInputProps={{
               value: draft,
               onChangeText: onDraftChange,
               placeholder: 'Type a message...',
-              placeholderTextColor: colors.muted,
+             placeholderTextColor: colors.muted,
             }}
           />
         </View>
@@ -326,11 +360,6 @@ export default function ChatThreadScreen({
         onClose={() => setSelectedProfile(null)}
         onStartP2P={onStartP2P}
       />
-      <ChatImageViewer
-        uri={selectedImageUri}
-        visible={selectedImageUri !== null}
-        onClose={() => setSelectedImageUri(null)}
-      />
     </KeyboardAvoidingView>
   );
 }
@@ -376,11 +405,11 @@ const createChatStyles = (colors: {
       borderWidth: 1,
       borderColor: colors.border,
       backgroundColor: colors.card,
-      padding: 16,
+      padding: 8,
     },
     chatWrapper: {
       flex: 1,
-      marginTop: 16,
+      marginTop: 8,
     },
     actionOverlay: {
       position: 'absolute',
