@@ -1,5 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { ActivityIndicator, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '@theme/ThemeProvider';
@@ -14,7 +23,6 @@ type WalletCardCarouselProps<TAction extends WalletActionItem> = {
   walletList: WalletRecordMeta[];
   activeWalletId: string | null;
   viewedIndex: number;
-  cardWidth: number;
   displayTotal: number;
   formatCurrency: (value: number) => string;
   actions: TAction[];
@@ -30,7 +38,6 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
   walletList,
   activeWalletId,
   viewedIndex,
-  cardWidth,
   displayTotal,
   formatCurrency,
   actions,
@@ -44,6 +51,8 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const walletScrollRef = useRef<ScrollView>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const pageWidth = containerWidth > 0 ? containerWidth : 0;
   const runAsync = useCallback((fn: () => void | Promise<void>) => {
     Promise.resolve(fn()).catch((error) => {
       console.error('[WalletCardCarousel] async handler failed', error);
@@ -51,40 +60,51 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
   }, []);
 
   useEffect(() => {
-    if (!walletList.length || !cardWidth) return;
-    walletScrollRef.current?.scrollTo({ x: viewedIndex * cardWidth, animated: false });
-  }, [viewedIndex, cardWidth, walletList.length]);
+    if (!walletList.length || !pageWidth) return;
+    walletScrollRef.current?.scrollTo({ x: viewedIndex * pageWidth, animated: false });
+  }, [viewedIndex, pageWidth, walletList.length]);
 
   const handleMomentumScrollEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      if (!cardWidth || walletList.length === 0) return;
-      const nextIndex = Math.round(event.nativeEvent.contentOffset.x / cardWidth);
+      if (!pageWidth || walletList.length === 0) return;
+      const nextIndex = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
       const clampedIndex = Math.max(0, Math.min(nextIndex, walletList.length - 1));
       if (clampedIndex !== viewedIndex) {
         onViewedIndexChange(clampedIndex);
       }
     },
-    [cardWidth, walletList.length, viewedIndex, onViewedIndexChange],
+    [pageWidth, walletList.length, viewedIndex, onViewedIndexChange],
   );
 
   return (
-    <View style={styles.cardWrapper}>
+    <View
+      style={styles.cardWrapper}
+      onLayout={(event) => {
+        const width = Math.round(event.nativeEvent.layout.width);
+        if (width > 0 && width !== containerWidth) {
+          setContainerWidth(width);
+        }
+      }}
+    >
       <ScrollView
         ref={walletScrollRef}
         horizontal
-        pagingEnabled
+        snapToInterval={pageWidth || undefined}
+        decelerationRate="fast"
+        disableIntervalMomentum
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={handleMomentumScrollEnd}
         onContentSizeChange={() => {
-          if (!cardWidth || !walletList.length) return;
-          walletScrollRef.current?.scrollTo({ x: viewedIndex * cardWidth, animated: false });
+          if (!pageWidth || !walletList.length) return;
+          walletScrollRef.current?.scrollTo({ x: viewedIndex * pageWidth, animated: false });
         }}
+        scrollEventThrottle={16}
       >
         {walletList.map((wallet, index) => {
           const isActive = wallet.id === activeWalletId || (!activeWalletId && index === 0);
           const isActivating = wallet.id === activatingWalletId;
           return (
-            <View key={wallet.id} style={{ width: cardWidth }}>
+            <View key={wallet.id} style={{ width: pageWidth || '100%' }}>
               <TouchableOpacity
                 activeOpacity={0.92}
                 disabled={isActive || isActivating}

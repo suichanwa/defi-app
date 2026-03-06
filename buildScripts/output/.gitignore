@@ -1,0 +1,6 @@
+# Ignore all APK and AAB files
+*.apk
+*.aab
+
+# Keep this file
+!.gitignore

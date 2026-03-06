@@ -139,11 +139,13 @@ export const createWalletStyles = (colors: ReturnType<typeof useTheme>['colors']
     // Action buttons - completely redesigned
     actionsRow: {
       flexDirection: 'row',
-      gap: 8,
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
+      rowGap: 10,
       marginTop: 4,
     },
     actionButton: {
-      flex: 1,
+      width: '48%',
       alignItems: 'center',
       paddingVertical: 12,
       paddingHorizontal: 8,

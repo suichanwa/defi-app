@@ -48,6 +48,20 @@ type WalletSession = {
 const WalletSessionContext = createContext<WalletSession | null>(null);
 
 const AUTO_LOCK_MS = 2 * 60 * 1000;
+const WALLET_SWITCH_TIMEOUT_MS = 15000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      reject(new Error(message));
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+  }) as Promise<T>;
+}
 
 export function WalletSessionProvider({ children, isWalletActive }: { children: React.ReactNode; isWalletActive: boolean }) {
   const [status, setStatus] = useState<Status>('loading');
@@ -307,40 +321,46 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
   };
 
   const switchWallet = async (walletId: string) => {
-    if (status === 'unlocked') {
-      const record = await loadEncryptedWalletKeyById(walletId);
-      if (!record) {
-        throw new Error('Wallet record not found.');
-      }
+    await withTimeout(
+      (async () => {
+        if (status === 'unlocked') {
+          const record = await loadEncryptedWalletKeyById(walletId);
+          if (!record) {
+            throw new Error('Wallet record not found.');
+          }
 
-      if (lastPasswordRef.current) {
-        try {
-          await hydrateUnlockedWallet(record, lastPasswordRef.current);
+          if (lastPasswordRef.current) {
+            try {
+              await hydrateUnlockedWallet(record, lastPasswordRef.current);
+              await setActiveWalletId(walletId);
+              setActiveWalletIdState(walletId);
+              await refreshWallets();
+              return;
+            } catch {
+              // Fall through to explicit unlock mode for the selected wallet.
+            }
+          }
+
           await setActiveWalletId(walletId);
           setActiveWalletIdState(walletId);
+          clearLockTimer();
+          setWallet(null);
+          setAddress(null);
+          setRecoveryPhrase(null);
+          setBackupCompletedState(Boolean(record.backupCompleted));
+          setStatus('locked');
+          lastPasswordRef.current = null;
           await refreshWallets();
           return;
-        } catch {
-          // Fall through to explicit unlock mode for the selected wallet.
         }
-      }
 
-      await setActiveWalletId(walletId);
-      setActiveWalletIdState(walletId);
-      clearLockTimer();
-      setWallet(null);
-      setAddress(null);
-      setRecoveryPhrase(null);
-      setBackupCompletedState(Boolean(record.backupCompleted));
-      setStatus('locked');
-      lastPasswordRef.current = null;
-      await refreshWallets();
-      return;
-    }
-
-    await setActiveWalletId(walletId);
-    setActiveWalletIdState(walletId);
-    await refreshWallets();
+        await setActiveWalletId(walletId);
+        setActiveWalletIdState(walletId);
+        await refreshWallets();
+      })(),
+      WALLET_SWITCH_TIMEOUT_MS,
+      'Wallet activation timed out. Please try again.',
+    );
   };
 
   const value = useMemo(

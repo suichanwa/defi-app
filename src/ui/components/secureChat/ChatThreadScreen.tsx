@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   KeyboardAvoidingView,
   Linking,
@@ -139,12 +140,12 @@ export default function ChatThreadScreen({
 
   // Handle send
   const handleSendPress = useCallback(
-    (message: MessageType.PartialText) => {
-      if (draft.trim().length > 0) {
+    (_message: MessageType.PartialText) => {
+      if (draft.trim().length > 0 || attachmentUri || fileAttachment) {
         onSend();
       }
     },
-    [onSend, draft]
+    [onSend, draft, attachmentUri, fileAttachment]
   );
 
   // Handle file message press (images are handled by Flyer UI automatically)
@@ -160,6 +161,13 @@ export default function ChatThreadScreen({
   const handleAttachmentPress = useCallback(() => {
     onPickImage?.();
   }, [onPickImage]);
+
+  const handleLoadOlder = useCallback(() => {
+    if (!onLoadMore) return;
+    if (isLoadingMore) return;
+    if (!hasMoreMessages) return;
+    onLoadMore();
+  }, [hasMoreMessages, isLoadingMore, onLoadMore]);
 
   // Handle message long press for actions
   const handleMessageLongPress = useCallback(
@@ -299,13 +307,25 @@ export default function ChatThreadScreen({
             onAttachmentPress={handleAttachmentPress}
             disableImageGallery={false}
             enableAnimation={true}
-            sendButtonVisibilityMode="editing"
+            sendButtonVisibilityMode={attachmentUri || fileAttachment ? 'always' : 'editing'}
             showUserAvatars={true}
             showUserNames={true}
             flatListProps={{
               contentContainerStyle: {
                 paddingTop: 8,
                 paddingBottom: 8,
+              },
+              onEndReached: handleLoadOlder,
+              onEndReachedThreshold: 0.25,
+              ListFooterComponent:
+                isLoadingMore && hasMoreMessages ? (
+                  <View style={styles.loadMoreFooter}>
+                    <ActivityIndicator size="small" color={colors.muted} />
+                    <Text style={styles.loadMoreText}>Loading older messages...</Text>
+                  </View>
+                ) : null,
+              maintainVisibleContentPosition: {
+                minIndexForVisible: 0,
               },
             }}
             textInputProps={{
@@ -410,6 +430,18 @@ const createChatStyles = (colors: {
     chatWrapper: {
       flex: 1,
       marginTop: 8,
+    },
+    loadMoreFooter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 10,
+    },
+    loadMoreText: {
+      fontSize: 12,
+      color: colors.muted,
+      fontWeight: '500',
     },
     actionOverlay: {
       position: 'absolute',

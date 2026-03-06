@@ -9,6 +9,8 @@ import {
   updatePassword as authUpdatePassword,
   type AuthSession,
 } from '../services/auth';
+import { clearProfileSettings } from '../services/profileStore';
+import { clearRewardsCache } from '../services/rewardsStore';
 
 export type LocalSession = {
   user: { id: string; email?: string };
@@ -117,6 +119,7 @@ export function useProfileAuth() {
       if (result.error) {
         setError(result.error.message);
       } else if (result.session) {
+        await Promise.allSettled([clearProfileSettings(), clearRewardsCache()]);
         setSession(result.session);
         setMessage('Signed in successfully.');
         setEmail('');
@@ -186,6 +189,7 @@ export function useProfileAuth() {
       if (result.error) {
         setError(result.error.message);
       } else if (result.session) {
+        await Promise.allSettled([clearProfileSettings(), clearRewardsCache()]);
         setSession(result.session);
         const isLocal = result.session.user?.user_metadata?.is_local_anonymous;
         setMessage(isLocal 

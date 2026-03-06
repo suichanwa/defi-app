@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, ScrollView, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Alert, Animated, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { createStackNavigator, StackNavigationProp } from '@react-navigation/stack';
 import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createWalletStyles } from '@styles/WalletStyles';
@@ -84,8 +84,6 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
   const { chain, chainKey, setChainKey } = useChain();
   const { status, address, wallets, activeWalletId, switchWallet, registerActivity } = useWalletSession();
   const { setNavHidden } = useNavVisibility();
-  const { width } = useWindowDimensions();
-  const cardWidth = Math.max(0, width - 40);
   const [isAirdropLoading, setIsAirdropLoading] = useState(false);
   const [airdropMessage, setAirdropMessage] = useState<string | null>(null);
   const [airdropTick, setAirdropTick] = useState(0);
@@ -108,7 +106,7 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
       }
     } catch (error) {
       handleError(error, {
-        defaultMessage: 'Unable to activate this wallet. Try unlocking it again.',
+        defaultMessage: 'Unable to activate this wallet right now. Please try again.',
       });
     } finally {
       setActivatingWalletId((current) => (current === walletId ? null : current));
@@ -312,7 +310,6 @@ function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<Wall
         walletList={walletList}
         activeWalletId={activeWalletId}
         viewedIndex={viewedIndex}
-        cardWidth={cardWidth}
         displayTotal={displayTotal}
         formatCurrency={formatCurrency}
         actions={walletActions}
