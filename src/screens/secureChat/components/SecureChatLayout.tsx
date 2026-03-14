@@ -98,8 +98,9 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   containerNoNav: {
-    paddingTop: 6,
-    paddingBottom: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+    paddingHorizontal: 12,
   },
   navWrapper: {
     overflow: 'hidden',

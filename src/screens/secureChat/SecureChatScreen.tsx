@@ -177,7 +177,12 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
             ? {
                 ...chat,
                 lastMessage: {
-                  text: message.type === 'image' ? 'Photo' : message.content,
+                  text:
+                    message.type === 'image'
+                      ? message.content?.trim() && message.content !== 'Photo'
+                        ? message.content
+                        : 'Photo'
+                      : message.content,
                   ts: message.timestamp,
                   from: message.author,
                   authorId: message.authorId,
@@ -196,7 +201,12 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
             isOnline: true,
             isDM: true,
             lastMessage: {
-              text: message.type === 'image' ? 'Photo' : message.content,
+              text:
+                message.type === 'image'
+                  ? message.content?.trim() && message.content !== 'Photo'
+                    ? message.content
+                    : 'Photo'
+                  : message.content,
               ts: message.timestamp,
               from: message.author,
               authorId: message.authorId,

@@ -69,11 +69,11 @@ export default function ChatInputBar({
       ) : null}
       <View style={styles.inputRow}>
         <TouchableOpacity onPress={onPickImage} style={styles.attachButton} accessibilityLabel="Attach photo">
-          <MaterialCommunityIcons name="image-outline" size={18} color={colors.accentText} />
+          <MaterialCommunityIcons name="image-outline" size={22} color={colors.accentText} />
         </TouchableOpacity>
         {onPickFile ? (
           <TouchableOpacity onPress={onPickFile} style={styles.attachButton} accessibilityLabel="Attach file">
-            <MaterialCommunityIcons name="paperclip" size={18} color={colors.accentText} />
+            <MaterialCommunityIcons name="paperclip" size={22} color={colors.accentText} />
           </TouchableOpacity>
         ) : null}
         <TextInput
@@ -85,9 +85,11 @@ export default function ChatInputBar({
           onSubmitEditing={onSend}
           returnKeyType="send"
           blurOnSubmit={false}
+          multiline
+          textAlignVertical="top"
         />
         <TouchableOpacity onPress={onSend} style={styles.sendButton} accessibilityLabel="Send message">
-          <MaterialCommunityIcons name="send" size={18} color={colors.accentText} />
+          <MaterialCommunityIcons name="send" size={20} color={colors.accentText} />
         </TouchableOpacity>
       </View>
     </View>
@@ -112,7 +114,9 @@ const createStyles = (colors: {
       paddingHorizontal: 8,
       paddingVertical: 6,
       borderRadius: 10,
-      backgroundColor: colors.border,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     attachmentThumb: {
       width: 44,
@@ -132,25 +136,41 @@ const createStyles = (colors: {
     inputRow: {
       flexDirection: 'row',
       alignItems: 'center',
+      gap: 8,
       paddingHorizontal: 12,
       paddingVertical: Platform.OS === 'ios' ? 10 : 8,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.card,
+      shadowColor: '#000',
+      shadowOpacity: 0.08,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 2,
     },
     attachButton: {
-      padding: 10,
-      borderRadius: 16,
+      padding: 12,
+      borderRadius: 18,
       backgroundColor: colors.accent,
-      marginRight: 8,
+      minWidth: 44,
+      minHeight: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     input: {
       flex: 1,
       color: colors.text,
-      minHeight: 40,
+      minHeight: 44,
       fontSize: 16,
     },
     sendButton: {
-      marginLeft: 8,
-      padding: 10,
-      borderRadius: 16,
+      padding: 12,
+      borderRadius: 18,
       backgroundColor: colors.accent,
+      minWidth: 44,
+      minHeight: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
   });

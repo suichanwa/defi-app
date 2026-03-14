@@ -1,13 +1,24 @@
 import type { ChatMessage } from '@app-types/securechat-types/secureChat';
 import type { MessageType } from '@flyerhq/react-native-chat-ui';
 
+export type FlyerMessageMeta = {
+  timeLabel?: string;
+  createdAtMs?: number;
+  caption?: string;
+};
+
+export type FlyerMessageWithMeta = (MessageType.Text | MessageType.Image) & {
+  metadata?: FlyerMessageMeta;
+};
+
 /**
  * Convert ChatMessage to Flyer Chat UI message format
  */
 export function convertToFlyerMessage(
   msg: ChatMessage,
-  currentUserId?: string
-): MessageType.Text | MessageType.Image {
+  currentUserId?: string,
+  createdAtOverrideMs?: number
+): FlyerMessageWithMeta {
   const isOwn = msg.outgoing === true || 
                 (currentUserId && msg.authorId === currentUserId);
 
@@ -16,32 +27,43 @@ export function convertToFlyerMessage(
     firstName: msg.author,
   };
 
-  const createdAt = msg.createdAt ? new Date(msg.createdAt).getTime() : Date.now();
+  const createdAtMs =
+    createdAtOverrideMs ?? (msg.createdAt ? new Date(msg.createdAt).getTime() : undefined);
   const status = isOwn ? 'sent' : undefined;
+  const rawCaption = msg.type === 'image' ? msg.content?.trim() : undefined;
+  const caption =
+    rawCaption && rawCaption !== 'Photo' && !rawCaption.startsWith('__image__:') ? rawCaption : undefined;
+  const metadata: FlyerMessageMeta = {
+    timeLabel: msg.timestamp,
+    createdAtMs: msg.createdAt ? new Date(msg.createdAt).getTime() : undefined,
+    caption,
+  };
 
   // Handle image messages
   if (msg.type === 'image' && msg.imageUri) {
     return {
       author,
-      createdAt,
       id: msg.id,
       name: msg.fileName || 'image.jpg',
       size: 0, // Size not tracked yet
       type: 'image',
       uri: msg.imageUri,
       status,
-    } as MessageType.Image;
+      metadata,
+      createdAt: createdAtMs,
+    } as FlyerMessageWithMeta;
   }
 
   // Default to text message
   return {
     author,
-    createdAt,
     id: msg.id,
     text: msg.content,
     type: 'text',
     status,
-  } as MessageType.Text;
+    metadata,
+    createdAt: createdAtMs,
+  } as FlyerMessageWithMeta;
 }
 
 /**
