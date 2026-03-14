@@ -9,6 +9,9 @@ dist/
 web-build/
 expo-env.d.ts
 rust-api/target/
+# Rust build output
+target/
+rust-wallet-core/target/
 
 # Native
 .kotlin/

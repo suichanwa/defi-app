@@ -1,10 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { useTheme } from '@theme/ThemeProvider';
 import { createWalletStyles } from '@styles/WalletStyles';
+import { useNavVisibility } from '@context/NavVisibilityProvider';
 
 type WalletStackParamList = {
   WalletHome: undefined;
@@ -23,12 +24,20 @@ export default function SendCryptoComplete() {
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const navigation = useNavigation<StackNavigationProp<WalletStackParamList, 'SendCryptoComplete'>>();
   const route = useRoute<SendCompleteRoute>();
+  const { setNavHidden } = useNavVisibility();
   const { symbol, amount, toAddress, signature } = route.params ?? {
     symbol: 'SOL',
     amount: '--',
     toAddress: '--',
     signature: '--',
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      setNavHidden(true);
+      return () => setNavHidden(false);
+    }, [setNavHidden]),
+  );
 
   const formatAddress = (value: string) => {
     if (!value || value === '--') return value;

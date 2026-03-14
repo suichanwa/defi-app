@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useMemo, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
@@ -58,7 +58,7 @@ export default function SendCryptoScreen() {
   }, [navigation]);
 
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       setNavHidden(true);
       return () => setNavHidden(false);
     }, [setNavHidden]),

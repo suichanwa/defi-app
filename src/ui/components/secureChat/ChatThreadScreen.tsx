@@ -258,6 +258,12 @@ export default function ChatThreadScreen({
         messageInsetsHorizontal: 10,
         messageInsetsVertical: 8,
       },
+      icons: {
+        attachmentButtonIcon: () => (
+          <MaterialCommunityIcons name="image-outline" size={20} color={colors.text} />
+        ),
+        sendButtonIcon: () => <MaterialCommunityIcons name="send" size={20} color={colors.text} />,
+      },
     }),
     [colors]
   );
@@ -421,6 +427,9 @@ const createChatStyles = (colors: {
     },
     container: {
       flex: 1,
+      width: '100%',
+      maxWidth: 760,
+      alignSelf: 'center',
       borderRadius: 16,
       borderWidth: 1,
       borderColor: colors.border,
@@ -429,7 +438,7 @@ const createChatStyles = (colors: {
     },
     chatWrapper: {
       flex: 1,
-      marginTop: 8,
+      marginTop: 4,
     },
     loadMoreFooter: {
       flexDirection: 'row',

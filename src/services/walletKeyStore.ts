@@ -5,6 +5,7 @@ import { verifyOrSetMasterPasscode } from './masterPasscodeStore';
 import aesjs from 'aes-js';
 import { pbkdf2 as pbkdf2Callback } from 'pbkdf2';
 import { Buffer } from 'buffer';
+import { tryRustDecryptWalletKey, tryRustEncryptWalletKey } from './rustWalletCryptoNative';
 
 const PBKDF2_ITERATIONS = 100000;
 const SALT_LENGTH = 16;
@@ -132,16 +133,27 @@ export async function encryptWalletKey(privateKey: string, password: string): Pr
   if (!password || typeof password !== 'string') {
     throw new Error('Password must be a non-empty string');
   }
-  
+
+  const rustEncryptedJson = await tryRustEncryptWalletKey(privateKey, password);
+  if (rustEncryptedJson) {
+    const now = new Date().toISOString();
+    return {
+      id: Date.now().toString(),
+      encryptedJson: rustEncryptedJson,
+      createdAt: now,
+      updatedAt: now,
+    } as EncryptedWalletKey;
+  }
+
   const salt = getRandomBytes(SALT_LENGTH);
   const iv = getRandomBytes(IV_LENGTH);
-  
+
   const key = await deriveKey(password, salt);
-  
+
   const textBytes = aesjs.utils.utf8.toBytes(privateKey);
   const aesCtr = new aesjs.ModeOfOperation.ctr(key, new aesjs.Counter(iv));
   const encryptedBytes = aesCtr.encrypt(textBytes);
-  
+
   const encrypted = {
     version: 1,
     algorithm: 'aes-256-ctr',
@@ -149,7 +161,7 @@ export async function encryptWalletKey(privateKey: string, password: string): Pr
     iv: bufferToHex(iv),
     ciphertext: bufferToHex(encryptedBytes),
   };
-  
+
   const now = new Date().toISOString();
   return {
     id: Date.now().toString(),
@@ -164,23 +176,28 @@ export async function decryptWalletKey(encryptedJson: string, password: string):
   if (!password || typeof password !== 'string') {
     throw new Error('Password must be a non-empty string');
   }
-  
+
+  const rustDecrypted = await tryRustDecryptWalletKey(encryptedJson, password);
+  if (rustDecrypted !== null) {
+    return rustDecrypted;
+  }
+
   const data = JSON.parse(encryptedJson);
-  
+
   if (data.version !== 1 || data.algorithm !== 'aes-256-ctr') {
     throw new Error('Unsupported encryption version or algorithm');
   }
-  
+
   const salt = hexToBuffer(data.salt);
   const iv = hexToBuffer(data.iv);
   const ciphertext = hexToBuffer(data.ciphertext);
-  
+
   const key = await deriveKey(password, salt);
-  
+
   const aesCtr = new aesjs.ModeOfOperation.ctr(key, new aesjs.Counter(iv));
   const decryptedBytes = aesCtr.decrypt(ciphertext);
   const decryptedText = aesjs.utils.utf8.fromBytes(decryptedBytes);
-  
+
   return decryptedText;
 }
 
