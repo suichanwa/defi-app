@@ -12,6 +12,9 @@ rust-api/target/
 # Rust build output
 target/
 rust-wallet-core/target/
+# Gradle local caches
+.gradle-local/
+.gradle-local-sandbox/
 
 # Native
 .kotlin/
