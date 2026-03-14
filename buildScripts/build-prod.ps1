@@ -14,7 +14,6 @@ try {
         npm install
     }
 
-    # Check if Android SDK is available
     if (-not $env:ANDROID_HOME) {
         Write-Host "ANDROID_HOME is not set. Please install Android SDK." -ForegroundColor Red
         exit 1
