@@ -1,16 +1,15 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
+  Keyboard,
   Linking,
-  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { Chat, ImageMessage, MessageType } from '@flyerhq/react-native-chat-ui';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardAccessoryView } from '@flyerhq/react-native-keyboard-accessory-view';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { ChatAvatarSource, ChatMessage, ChatThread, ServerInfo } from '@app-types/securechat-types/secureChat';
 import { useTheme } from '@theme/ThemeProvider';
@@ -49,9 +48,9 @@ type Props = {
   onStartP2P?: (userId: string, userName: string) => void;
   isMuted?: boolean;
   onToggleMute?: () => void;
+  onOpenConnect?: () => void;
 };
 
-const BOTTOM_NAV_HEIGHT = 0;
 const AVATAR_PALETTE = ['#2563eb', '#0ea5e9', '#14b8a6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7'];
 
 type SelectedProfile = {
@@ -91,11 +90,10 @@ export default function ChatThreadScreen({
   onStartP2P,
   isMuted,
   onToggleMute,
+  onOpenConnect,
 }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createChatStyles(colors), [colors]);
-  const insets = useSafeAreaInsets();
-  const isIOS = Platform.OS === 'ios';
 
   const [selectedProfile, setSelectedProfile] = useState<SelectedProfile>(null);
   const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(null);
@@ -363,7 +361,7 @@ export default function ChatThreadScreen({
             </View>
           ) : null}
           <View style={styles.imageContainer}>
-            <ImageMessage message={message} messageWidth={messageWidth} />
+            <ImageMessage message={message as any} messageWidth={messageWidth} />
             <View pointerEvents="none" style={styles.imageOverlay}>
               <View style={styles.imageOverlayInner}>
                 <Text style={styles.imageMetaText}>{message.name ?? 'Photo'}</Text>
@@ -426,22 +424,19 @@ export default function ChatThreadScreen({
   const canManage = selectedMessage ? canManageMessage(selectedMessage) : false;
   const canEdit =
     selectedMessage && selectedMessage.type !== 'image' && selectedMessage.type !== 'file';
-
-  const keyboardBehavior = isIOS ? 'padding' : 'height';
-  const keyboardVerticalOffset = isIOS ? BOTTOM_NAV_HEIGHT + insets.bottom : 0;
+  const handleBackPress = useCallback(() => {
+    Keyboard.dismiss();
+    setTimeout(onBack, 20);
+  }, [onBack]);
 
   return (
-    <KeyboardAvoidingView
-      style={styles.outerContainer}
-      behavior={keyboardBehavior}
-      keyboardVerticalOffset={keyboardVerticalOffset}
-    >
+    <View style={styles.outerContainer}>
       <View style={styles.container}>
         {/* Header */}
         <ChatThreadHeader
           chat={chat}
           serverInfo={serverInfo}
-          onBack={onBack}
+          onBack={handleBackPress}
           isMuted={isMuted}
           onToggleMute={onToggleMute}
           typingLabel={typingLabel ?? ''}
@@ -449,43 +444,68 @@ export default function ChatThreadScreen({
 
         {/* Flyer Chat Component */}
         <View style={styles.chatWrapper}>
-          <Chat
-            messages={sortedMessages}
-            onSendPress={handleSendPress}
-            user={flyerUser}
-            theme={flyerTheme}
-            renderBubble={renderBubble}
-            renderTextMessage={renderTextMessage}
-            renderImageMessage={renderImageMessage}
-            onMessagePress={handleMessagePress}
-            onMessageLongPress={handleMessageLongPress}
-            customBottomComponent={renderInputBar}
-            disableImageGallery={false}
-            enableAnimation={true}
-            showUserAvatars={false}
-            showUserNames={true}
-            flatListProps={{
-              contentContainerStyle: {
-                paddingTop: 6,
-                paddingBottom: 0,
-              },
-              onEndReached: handleLoadOlder,
-              onEndReachedThreshold: 0.25,
-              keyboardShouldPersistTaps: 'handled',
-              ListFooterComponent:
-                isLoadingMore && hasMoreMessages ? (
-                  <View style={styles.loadMoreFooter}>
-                    <ActivityIndicator size="small" color={colors.muted} />
-                    <Text style={styles.loadMoreText}>Loading older messages...</Text>
-                  </View>
-                ) : null,
-              maintainVisibleContentPosition: {
-                minIndexForVisible: 0,
-              },
-            }}
-          />
+          <KeyboardAccessoryView
+            useListenersOnAndroid
+            style={styles.keyboardAccessory}
+            contentContainerStyle={styles.keyboardAccessoryContent}
+            scrollableContainerStyle={styles.keyboardScrollable}
+            contentOffsetKeyboardClosed={-2}
+            contentOffsetKeyboardOpened={0}
+            renderScrollable={(panHandlers) => (
+              <Chat
+                messages={sortedMessages}
+                onSendPress={handleSendPress}
+                user={flyerUser}
+                theme={flyerTheme}
+                renderBubble={renderBubble}
+                renderTextMessage={renderTextMessage}
+                renderImageMessage={renderImageMessage}
+                onMessagePress={handleMessagePress}
+                onMessageLongPress={handleMessageLongPress}
+                customBottomComponent={() => null}
+                disableImageGallery={false}
+                enableAnimation={true}
+                showUserAvatars={false}
+                showUserNames={true}
+                flatListProps={{
+                  ...panHandlers,
+                  contentContainerStyle: {
+                    paddingTop: 6,
+                    paddingBottom: 0,
+                  },
+                  onEndReached: handleLoadOlder,
+                  onEndReachedThreshold: 0.25,
+                  keyboardShouldPersistTaps: 'handled',
+                  ListFooterComponent:
+                    isLoadingMore && hasMoreMessages ? (
+                      <View style={styles.loadMoreFooter}>
+                        <ActivityIndicator size="small" color={colors.muted} />
+                        <Text style={styles.loadMoreText}>Loading older messages...</Text>
+                      </View>
+                    ) : null,
+                  maintainVisibleContentPosition: {
+                    minIndexForVisible: 0,
+                  },
+                }}
+              />
+            )}
+          >
+            {renderInputBar()}
+          </KeyboardAccessoryView>
         </View>
       </View>
+
+      {onOpenConnect ? (
+        <TouchableOpacity
+          style={styles.floatingConnectButton}
+          onPress={onOpenConnect}
+          activeOpacity={0.9}
+          accessibilityRole="button"
+          accessibilityLabel="Open connect screen"
+        >
+          <MaterialCommunityIcons name="plus" size={22} color={colors.accentText} />
+        </TouchableOpacity>
+      ) : null}
 
       {/* Message Actions Modal */}
       {selectedMessage && (
@@ -529,7 +549,7 @@ export default function ChatThreadScreen({
         onClose={() => setSelectedProfile(null)}
         onStartP2P={onStartP2P}
       />
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -577,11 +597,26 @@ const createChatStyles = (colors: {
       borderWidth: 1,
       borderColor: colors.border,
       backgroundColor: colors.card,
-      padding: 8,
+      padding: 6,
+      overflow: 'hidden',
     },
     chatWrapper: {
       flex: 1,
-      marginTop: 4,
+      marginTop: 2,
+      borderRadius: 12,
+      overflow: 'hidden',
+      backgroundColor: colors.card,
+    },
+    keyboardScrollable: {
+      backgroundColor: colors.card,
+    },
+    keyboardAccessory: {
+      backgroundColor: colors.card,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    keyboardAccessoryContent: {
+      backgroundColor: colors.card,
     },
     bubble: {
       paddingHorizontal: 12,
@@ -726,8 +761,10 @@ const createChatStyles = (colors: {
       fontWeight: '600',
     },
     inputBarWrapper: {
-      marginTop: 8,
-      paddingBottom: 6,
+      paddingTop: 6,
+      paddingBottom: 2,
+      paddingHorizontal: 4,
+      backgroundColor: colors.card,
     },
     loadMoreFooter: {
       flexDirection: 'row',
@@ -750,6 +787,23 @@ const createChatStyles = (colors: {
       justifyContent: 'center',
       alignItems: 'center',
       zIndex: 1000,
+    },
+    floatingConnectButton: {
+      position: 'absolute',
+      right: 20,
+      bottom: 94,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.accent,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 8,
+      zIndex: 900,
     },
     actionBackdrop: {
       position: 'absolute',

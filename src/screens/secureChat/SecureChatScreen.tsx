@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, BackHandler, Platform, useWindowDimensions } from 'react-native';
+import { Alert, BackHandler, Keyboard, Platform, useWindowDimensions } from 'react-native';
 import type { ChatMessage, ChatThread, ServerInfo } from '@app-types/securechat-types/secureChat';
 import type { SecureChatMessageRow, SecureChatScreenProps } from '@app-types/securechat-types/secureChatScreen';
 import type { ToastFn } from '@app-types/securechat-types/secureChatHandleMessage';
@@ -22,15 +22,12 @@ import { useP2PDirectMessages } from '@hooks/secureChat/useP2PDirectMessages';
 import { resolveChatImageMessages } from '@utils/secureChatImages';
 import { isUuid, mapRowToMessage } from '@utils/secureChatUtils';
 import {
-  createCopyMessageHandler,
-  createDeleteMessageHandler,
-  createEditMessageHandler,
   createIncomingRoomMessageHandler,
   createIsOwnMessage,
   createNotifyIncomingMessage,
-  createReplyMessageHandler,
   createSendMessageHandler,
 } from '@services/securechat/handlemessage';
+import { createSecureChatUserActions } from '@services/securechat/userMessageActions';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import { useChatAvatar } from '../../hooks/useChatAvatar';
 import { useChatProfiles } from '../../hooks/useChatProfiles';
@@ -625,13 +622,13 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
         setTab('connect');
         setView('list');
         setConnectionLog((prev) => [
-          'Local-only accounts cannot sync DMs. Use P2P DM in the Connect tab (offer/answer + ICE).',
+          'Local-only accounts cannot sync DMs. Use P2P DM from + Connect (offer/answer + ICE).',
           ...prev,
         ]);
         scopedShowToast({
           type: 'default',
           text1: 'P2P DM required',
-          text2: 'Open Connect tab to exchange offer/answer for this DM.',
+          text2: 'Tap + to open Connect and exchange offer/answer for this DM.',
           position: 'top',
           visibilityTime: 3500,
         });
@@ -658,7 +655,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     scopedShowToast({
       type: 'default',
       text1: 'P2P DM',
-      text2: 'Use the Connect tab to exchange offer/answer.',
+      text2: 'Use + Connect to exchange offer/answer.',
       position: 'top',
       visibilityTime: 3000,
     });
@@ -764,46 +761,40 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     ],
   );
 
-  const handleCopyMessage = useMemo(
-    () => createCopyMessageHandler(Clipboard.setStringAsync, scopedShowToast),
-    [scopedShowToast],
-  );
-
-  const handleReplyMessage = useMemo(
-    () => createReplyMessageHandler(resolveAuthorName, setDraft),
-    [resolveAuthorName, setDraft],
-  );
-
-  const handleEditMessage = useMemo(
-    () => createEditMessageHandler(isOwnMessage, setEditingMessage, setDraft),
-    [isOwnMessage, setDraft, setEditingMessage],
-  );
-
-  const handleDeleteMessage = useMemo(
+  const {
+    handleCopyMessage,
+    handleReplyMessage,
+    handleEditMessage,
+    handleDeleteMessage,
+    handleToggleMute,
+  } = useMemo(
     () =>
-      createDeleteMessageHandler(
+      createSecureChatUserActions({
+        setClipboard: Clipboard.setStringAsync,
+        showToast: scopedShowToast,
+        resolveAuthorName,
+        setDraft,
         isOwnMessage,
+        setEditingMessage,
         messagesByChat,
         setMessagesByChat,
         setChats,
-        resolveAuthorName,
-        scopedShowToast,
-      ),
-    [isOwnMessage, messagesByChat, resolveAuthorName, scopedShowToast, setMessagesByChat, setChats],
+        selectedChatId: selectedChat?.id,
+        setMutedChatIds,
+      }),
+    [
+      scopedShowToast,
+      resolveAuthorName,
+      setDraft,
+      isOwnMessage,
+      setEditingMessage,
+      messagesByChat,
+      setMessagesByChat,
+      setChats,
+      selectedChat?.id,
+      setMutedChatIds,
+    ],
   );
-
-  const handleToggleMute = useCallback(() => {
-    if (!selectedChat) return;
-    setMutedChatIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(selectedChat.id)) {
-        next.delete(selectedChat.id);
-      } else {
-        next.add(selectedChat.id);
-      }
-      return next;
-    });
-  }, [selectedChat]);
 
   const handleConnectPeer = () => {
     if (!connectAddress.trim()) {
@@ -934,10 +925,16 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     setTab(tab);
   };
 
+  const handleOpenConnect = useCallback(() => {
+    setTab('connect');
+    setView('list');
+  }, [setTab, setView]);
+
   useEffect(() => {
     if (Platform.OS !== 'android' || !isActive) return;
     const onBackPress = () => {
       if (secureTab === 'chats' && chatView === 'thread') {
+        Keyboard.dismiss();
         setView('list');
         return true;
       }
@@ -1021,6 +1018,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
           onStartP2P: handleStartP2P,
           isMuted: selectedChat ? mutedChatIds.has(selectedChat.id) : false,
           onToggleMute: handleToggleMute,
+          onOpenConnect: handleOpenConnect,
         }}
         list={{
           chats: allChats,

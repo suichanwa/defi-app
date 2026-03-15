@@ -60,6 +60,7 @@ export type SecureChatThreadProps = {
   onStartP2P?: (userId: string, userName: string) => void;
   isMuted?: boolean;
   onToggleMute?: () => void;
+  onOpenConnect?: () => void;
 };
 
 export type SecureChatListProps = {

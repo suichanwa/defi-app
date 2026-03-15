@@ -14,33 +14,22 @@ type Props = {
 export default function ChatTabs({ activeTab, onTabChange, timeLabel }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const isChatsActive = activeTab === 'chats';
 
   return (
     <View style={styles.container}>
       <View style={styles.tabsRow}>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'chats' && styles.tabActive]}
+          style={[styles.tab, isChatsActive && styles.tabActive]}
           onPress={() => onTabChange('chats')}
           activeOpacity={0.8}
         >
           <MaterialCommunityIcons
             name="message-outline"
             size={18}
-            color={activeTab === 'chats' ? colors.accentText : colors.text}
+            color={isChatsActive ? colors.accentText : colors.text}
           />
-          <Text style={[styles.tabText, activeTab === 'chats' && styles.tabTextActive]}>Chats</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'connect' && styles.tabActive]}
-          onPress={() => onTabChange('connect')}
-          activeOpacity={0.8}
-        >
-          <MaterialCommunityIcons
-            name="access-point"
-            size={18}
-            color={activeTab === 'connect' ? colors.accentText : colors.text}
-          />
-          <Text style={[styles.tabText, activeTab === 'connect' && styles.tabTextActive]}>Connect</Text>
+          <Text style={[styles.tabText, isChatsActive && styles.tabTextActive]}>Chats</Text>
         </TouchableOpacity>
       </View>
       {timeLabel ? (
