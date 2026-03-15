@@ -24,6 +24,10 @@ import { clearBiometricPassword } from '../services/biometricAuth';
 type Status = 'loading' | 'missing' | 'locked' | 'unlocked';
 
 type WalletInstance = Wallet | HDNodeWallet | Keypair;
+type WalletCreateOptions = {
+  label?: string;
+  color?: string;
+};
 
 type WalletSession = {
   status: Status;
@@ -35,8 +39,8 @@ type WalletSession = {
   activeWalletId: string | null;
   unlock: (password: string) => Promise<void>;
   lock: () => void;
-  createWallet: (password: string) => Promise<{ mnemonic: string; address: string }>;
-  importWallet: (mnemonic: string, password: string) => Promise<{ address: string }>;
+  createWallet: (passwordOrOptions?: string | WalletCreateOptions) => Promise<{ mnemonic: string; address: string }>;
+  importWallet: (mnemonic: string, passwordOrOptions?: string | WalletCreateOptions) => Promise<{ address: string }>;
   confirmBackup: () => Promise<void>;
   forgetWallet: () => Promise<void>;
   removeWallet: (walletId: string) => Promise<void>;
@@ -193,6 +197,20 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
     await clearWallet();
   };
 
+  const resolveWalletCreateArgs = useCallback(
+    (passwordOrOptions?: string | WalletCreateOptions) => {
+      if (typeof passwordOrOptions === 'string') {
+        return { password: passwordOrOptions, options: {} as WalletCreateOptions };
+      }
+      const password = lastPasswordRef.current;
+      if (!password) {
+        throw new Error('Wallet is locked. Unlock with your app passcode first.');
+      }
+      return { password, options: passwordOrOptions ?? {} };
+    },
+    [],
+  );
+
   const forgetWallet = async () => {
     clearLockTimer();
     await clearWalletStorage();
@@ -206,7 +224,8 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
     setStatus('missing');
   };
 
-  const createWallet = async (password: string) => {
+  const createWallet = async (passwordOrOptions?: string | WalletCreateOptions) => {
+    const { password, options } = resolveWalletCreateArgs(passwordOrOptions);
     console.log('=== WalletSessionProvider.createWallet ===');
     console.log('Password received:', password);
     console.log('Password type:', typeof password);
@@ -220,6 +239,12 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
       setRecoveryPhrase(mnemonic);
       setActiveWalletIdState(record.id);
       lastPasswordRef.current = password;
+      if (options.label?.trim() || options.color) {
+        await updateWalletRecordMeta(record.id, {
+          label: options.label?.trim() || undefined,
+          color: options.color,
+        });
+      }
       await refreshWallets();
       setStatus('unlocked');
       scheduleLock();
@@ -245,13 +270,20 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
     setRecoveryPhrase(mnemonic);
     setActiveWalletIdState(record.id);
     lastPasswordRef.current = password;
+    if (options.label?.trim() || options.color) {
+      await updateWalletRecordMeta(record.id, {
+        label: options.label?.trim() || undefined,
+        color: options.color,
+      });
+    }
     await refreshWallets();
     setStatus('unlocked');
     scheduleLock();
     return { mnemonic, address: walletInstance.address };
   };
 
-  const importWallet = async (mnemonic: string, password: string) => {
+  const importWallet = async (mnemonic: string, passwordOrOptions?: string | WalletCreateOptions) => {
+    const { password, options } = resolveWalletCreateArgs(passwordOrOptions);
     if (getActiveChain().kind === 'solana') {
       const { record, keypair } = await importSolanaWalletRecord(mnemonic.trim(), password);
       setAddress(record.id);
@@ -260,6 +292,12 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
       setRecoveryPhrase(null);
       setActiveWalletIdState(record.id);
       lastPasswordRef.current = password;
+      if (options.label?.trim() || options.color) {
+        await updateWalletRecordMeta(record.id, {
+          label: options.label?.trim() || undefined,
+          color: options.color,
+        });
+      }
       await refreshWallets();
       setStatus('unlocked');
       scheduleLock();
@@ -283,6 +321,12 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
     setRecoveryPhrase(null);
     setActiveWalletIdState(record.id);
     lastPasswordRef.current = password;
+    if (options.label?.trim() || options.color) {
+      await updateWalletRecordMeta(record.id, {
+        label: options.label?.trim() || undefined,
+        color: options.color,
+      });
+    }
     await refreshWallets();
     setStatus('unlocked');
     scheduleLock();

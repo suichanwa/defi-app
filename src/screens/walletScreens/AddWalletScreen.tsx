@@ -9,6 +9,7 @@ import { createWalletStyles } from '@styles/WalletStyles';
 import { useWalletSession } from '@context/WalletSessionProvider';
 import { walletErrorMessage } from '@utils/walletErrors';
 import { useNavVisibility } from '@context/NavVisibilityProvider';
+import ColorPicker, { HueSlider, Panel1, Preview } from 'reanimated-color-picker';
 
 type AddMode = 'create' | 'import';
 type FlowStep = 'mode' | 'credentials' | 'recovery' | 'success';
@@ -23,7 +24,7 @@ type WalletStackParamList = {
   SendCryptoComplete: { symbol: string; amount: string; toAddress: string; signature: string };
 };
 
-const PASSCODE_REGEX = /^\d{6}$/;
+const DEFAULT_WALLET_COLOR = '#2563eb';
 
 export default function AddScreen() {
   const { colors } = useTheme();
@@ -36,8 +37,8 @@ export default function AddScreen() {
 
   const [mode, setMode] = useState<AddMode | null>(initialMode ?? null);
   const [step, setStep] = useState<FlowStep>(initialMode ? 'credentials' : 'mode');
-  const [walletPassword, setWalletPassword] = useState('');
-  const [walletPasswordConfirm, setWalletPasswordConfirm] = useState('');
+  const [walletName, setWalletName] = useState('Wallet');
+  const [walletColor, setWalletColor] = useState(DEFAULT_WALLET_COLOR);
   const [mnemonicInput, setMnemonicInput] = useState('');
   const [createdMnemonic, setCreatedMnemonic] = useState<string | null>(null);
   const [confirmIndices, setConfirmIndices] = useState<[number, number]>([1, 5]);
@@ -70,14 +71,8 @@ export default function AddScreen() {
   };
 
   const validateCredentials = () => {
-    if (!PASSCODE_REGEX.test(walletPassword)) {
-      return 'Passcode must be exactly 6 digits.';
-    }
-    if (!PASSCODE_REGEX.test(walletPasswordConfirm)) {
-      return 'Confirm passcode must be exactly 6 digits.';
-    }
-    if (walletPassword !== walletPasswordConfirm) {
-      return 'Passcodes do not match.';
+    if (mode === 'create' && walletName.trim().length === 0) {
+      return 'Enter a wallet name.';
     }
     if (mode === 'import') {
       const phrase = normalizeMnemonic(mnemonicInput);
@@ -121,11 +116,12 @@ export default function AddScreen() {
     setIsSubmitting(true);
     try {
       if (mode === 'create') {
-        const result = await createWallet(walletPassword);
+        const result = await createWallet({
+          label: walletName.trim() || 'Wallet',
+          color: walletColor,
+        });
         const normalized = normalizeMnemonic(result.mnemonic);
         startBackupConfirm(normalized);
-        setWalletPassword('');
-        setWalletPasswordConfirm('');
         setFlowMessage(
           existingWalletIds.has(result.address)
             ? 'Wallet already existed and is now active.'
@@ -136,7 +132,7 @@ export default function AddScreen() {
       }
 
       const phrase = normalizeMnemonic(mnemonicInput);
-      const { address } = await importWallet(phrase, walletPassword);
+      const { address } = await importWallet(phrase);
       await confirmBackup();
       setFlowMessage(
         existingWalletIds.has(address)
@@ -264,9 +260,34 @@ export default function AddScreen() {
       </Text>
       <Text style={[localStyles.subtitle, { color: colors.muted }]}>
         {mode === 'create'
-          ? 'Set a 6-digit passcode for this wallet.'
-          : 'Enter your phrase and set a 6-digit passcode for this wallet.'}
+          ? 'Pick a wallet name and card color.'
+          : 'Enter your 12 or 24 word phrase to import this wallet.'}
       </Text>
+      {mode === 'create' && (
+        <>
+          <TextInput
+            value={walletName}
+            onChangeText={setWalletName}
+            placeholder="Wallet name"
+            placeholderTextColor={colors.muted}
+            style={[styles.input, { color: colors.text }]}
+            autoCapitalize="words"
+            autoCorrect={false}
+          />
+          <Text style={[localStyles.sectionLabel, { color: colors.text }]}>Card color</Text>
+          <View style={[localStyles.pickerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <ColorPicker
+              value={walletColor}
+              onCompleteJS={(picked) => setWalletColor(picked.hex)}
+              style={localStyles.colorPicker}
+            >
+              <Preview hideText={false} colorFormat="hex" style={localStyles.colorPreview} />
+              <Panel1 style={localStyles.panel} />
+              <HueSlider style={localStyles.hueSlider} />
+            </ColorPicker>
+          </View>
+        </>
+      )}
       {mode === 'import' && (
         <TextInput
           value={mnemonicInput}
@@ -279,26 +300,6 @@ export default function AddScreen() {
           multiline
         />
       )}
-      <TextInput
-        value={walletPassword}
-        onChangeText={setWalletPassword}
-        placeholder="Passcode (6 digits)"
-        placeholderTextColor={colors.muted}
-        style={[styles.input, { color: colors.text }]}
-        keyboardType="number-pad"
-        maxLength={6}
-        secureTextEntry
-      />
-      <TextInput
-        value={walletPasswordConfirm}
-        onChangeText={setWalletPasswordConfirm}
-        placeholder="Confirm passcode"
-        placeholderTextColor={colors.muted}
-        style={[styles.input, { color: colors.text }]}
-        keyboardType="number-pad"
-        maxLength={6}
-        secureTextEntry
-      />
       <TouchableOpacity
         activeOpacity={0.9}
         style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}
@@ -468,6 +469,30 @@ const localStyles = StyleSheet.create({
   },
   buttonSpacing: {
     marginBottom: 12,
+  },
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+  pickerCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 24,
+  },
+  colorPicker: {
+    width: '100%',
+  },
+  colorPreview: {
+    marginBottom: 12,
+  },
+  panel: {
+    borderRadius: 12,
+    minHeight: 150,
+  },
+  hueSlider: {
+    marginTop: 12,
   },
   mnemonicInput: {
     minHeight: 110,
