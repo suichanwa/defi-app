@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, BackHandler, Keyboard, Platform, useWindowDimensions } from 'react-native';
+import { Alert, BackHandler, Keyboard, Platform, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import type { ChatMessage, ChatThread, ServerInfo } from '@app-types/securechat-types/secureChat';
 import type { SecureChatMessageRow, SecureChatScreenProps } from '@app-types/securechat-types/secureChatScreen';
 import type { ToastFn } from '@app-types/securechat-types/secureChatHandleMessage';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as date from 'date-and-time';
 import { showToast } from '@services/toast';
 import * as Clipboard from 'expo-clipboard';
@@ -31,6 +32,7 @@ import { createSecureChatUserActions } from '@services/securechat/userMessageAct
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import { useChatAvatar } from '../../hooks/useChatAvatar';
 import { useChatProfiles } from '../../hooks/useChatProfiles';
+import { useTheme } from '@theme/ThemeProvider';
 
 type PendingFile = {
   uri: string;
@@ -40,6 +42,7 @@ type PendingFile = {
 };
 
 export default function SecureChatScreen({ isActive = false, onChatViewChange }: SecureChatScreenProps) {
+  const { colors } = useTheme();
   const [chats, setChats] = useState<ChatThread[]>([
     {
       id: SecureChatConstants.DEFAULT_GLOBAL_CHAT_ID,
@@ -949,84 +952,124 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
   }, [chatView, onChatViewChange]);
 
   return (
-    <SecureChatLayout
-      isCompact={isCompact}
-      secureTab={secureTab}
-      chatView={chatView}
-      timeLabel={timeLabel}
-      onTabChange={handleTabChange}
-    >
-      <SecureChatContent
+    <View style={styles.screenRoot}>
+      <SecureChatLayout
+        isCompact={isCompact}
         secureTab={secureTab}
         chatView={chatView}
-        connect={{
-          connectAddress,
-          connectName,
-          connectionLog,
-          devicePublicKey,
-          serverInfo,
-          onConnectAddressChange: setConnectAddress,
-          onConnectNameChange: setConnectName,
-          onConnectPress: handleConnectPeer,
-          onStartServer: handleStartServer,
-          p2p: {
-            status: p2pStatus,
-            peerLabel: p2pPeerLabel,
-            localOffer: p2pLocalOffer,
-            localAnswer: p2pLocalAnswer,
-            localCandidates: p2pLocalCandidates,
-            remoteOffer: p2pRemoteOffer,
-            remoteAnswer: p2pRemoteAnswer,
-            remoteCandidates: p2pRemoteCandidates,
-            onRemoteOfferChange: setP2pRemoteOffer,
-            onRemoteAnswerChange: setP2pRemoteAnswer,
-            onRemoteCandidatesChange: setP2pRemoteCandidates,
-            onCreateOffer: handleCreateP2POffer,
-            onCreateAnswer: handleCreateP2PAnswer,
-            onAcceptAnswer: handleAcceptP2PAnswer,
-            onAddCandidates: handleAddP2PCandidates,
-            onReset: handleResetP2P,
-          },
-        }}
-        thread={{
-          chat: selectedChat,
-          messages: selectedMessages,
-          draft,
-          serverInfo,
-          participantCount,
-          currentUserId: effectiveUserId,
-          currentUserLabel: displayLabel,
-          onBack: () => setView('list'),
-          onDraftChange: setDraft,
-          onSend: handleSendMessage,
-          onPickImage: handlePickImage,
-          onPickFile: allowFileAttachment ? handlePickFile : undefined,
-          onClearAttachment: handleClearAttachment,
-          onClearFile: allowFileAttachment ? handleClearFile : undefined,
-          onLoadMore: handleLoadMoreMessages,
-          isLoadingMore: selectedHistoryState?.loading ?? false,
-          hasMoreMessages: selectedHistoryState?.hasMore ?? false,
-          attachmentUri: pendingImageUri,
-          fileAttachment: allowFileAttachment && pendingFile ? { uri: pendingFile.uri, name: pendingFile.name } : null,
-          typingLabel: selectedChatId ? typingByChatId[selectedChatId] : null,
-          resolveAvatar,
-          resolveAuthorName,
-          onCopyMessage: handleCopyMessage,
-          onReplyMessage: handleReplyMessage,
-          onEditMessage: handleEditMessage,
-          onDeleteMessage: handleDeleteMessage,
-          onStartP2P: handleStartP2P,
-          isMuted: selectedChat ? mutedChatIds.has(selectedChat.id) : false,
-          onToggleMute: handleToggleMute,
-          onOpenConnect: handleOpenConnect,
-        }}
-        list={{
-          chats: allChats,
-          selectedChatId,
-          onSelectChat: handleSelectChat,
-          onOpenSelected: handleSelectChat,
-        }}
-      />
-    </SecureChatLayout>
+        timeLabel={timeLabel}
+        onTabChange={handleTabChange}
+      >
+        <SecureChatContent
+          secureTab={secureTab}
+          chatView={chatView}
+          connect={{
+            connectAddress,
+            connectName,
+            connectionLog,
+            devicePublicKey,
+            serverInfo,
+            onConnectAddressChange: setConnectAddress,
+            onConnectNameChange: setConnectName,
+            onConnectPress: handleConnectPeer,
+            onStartServer: handleStartServer,
+            p2p: {
+              status: p2pStatus,
+              peerLabel: p2pPeerLabel,
+              localOffer: p2pLocalOffer,
+              localAnswer: p2pLocalAnswer,
+              localCandidates: p2pLocalCandidates,
+              remoteOffer: p2pRemoteOffer,
+              remoteAnswer: p2pRemoteAnswer,
+              remoteCandidates: p2pRemoteCandidates,
+              onRemoteOfferChange: setP2pRemoteOffer,
+              onRemoteAnswerChange: setP2pRemoteAnswer,
+              onRemoteCandidatesChange: setP2pRemoteCandidates,
+              onCreateOffer: handleCreateP2POffer,
+              onCreateAnswer: handleCreateP2PAnswer,
+              onAcceptAnswer: handleAcceptP2PAnswer,
+              onAddCandidates: handleAddP2PCandidates,
+              onReset: handleResetP2P,
+            },
+          }}
+          thread={{
+            chat: selectedChat,
+            messages: selectedMessages,
+            draft,
+            serverInfo,
+            participantCount,
+            currentUserId: effectiveUserId,
+            currentUserLabel: displayLabel,
+            onBack: () => setView('list'),
+            onDraftChange: setDraft,
+            onSend: handleSendMessage,
+            onPickImage: handlePickImage,
+            onPickFile: allowFileAttachment ? handlePickFile : undefined,
+            onClearAttachment: handleClearAttachment,
+            onClearFile: allowFileAttachment ? handleClearFile : undefined,
+            onLoadMore: handleLoadMoreMessages,
+            isLoadingMore: selectedHistoryState?.loading ?? false,
+            hasMoreMessages: selectedHistoryState?.hasMore ?? false,
+            attachmentUri: pendingImageUri,
+            fileAttachment: allowFileAttachment && pendingFile ? { uri: pendingFile.uri, name: pendingFile.name } : null,
+            typingLabel: selectedChatId ? typingByChatId[selectedChatId] : null,
+            resolveAvatar,
+            resolveAuthorName,
+            onCopyMessage: handleCopyMessage,
+            onReplyMessage: handleReplyMessage,
+            onEditMessage: handleEditMessage,
+            onDeleteMessage: handleDeleteMessage,
+            onStartP2P: handleStartP2P,
+            isMuted: selectedChat ? mutedChatIds.has(selectedChat.id) : false,
+            onToggleMute: handleToggleMute,
+          }}
+          list={{
+            chats: allChats,
+            selectedChatId,
+            onSelectChat: handleSelectChat,
+            onOpenSelected: handleSelectChat,
+          }}
+        />
+      </SecureChatLayout>
+
+      {secureTab === 'chats' ? (
+        <TouchableOpacity
+          style={[
+            styles.floatingConnectButton,
+            {
+              backgroundColor: colors.accent,
+              bottom: chatView === 'thread' ? 28 : 116,
+            },
+          ]}
+          onPress={handleOpenConnect}
+          activeOpacity={0.9}
+          accessibilityRole="button"
+          accessibilityLabel="Open connect screen"
+        >
+          <MaterialCommunityIcons name="plus" size={22} color={colors.accentText} />
+        </TouchableOpacity>
+      ) : null}
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screenRoot: {
+    flex: 1,
+  },
+  floatingConnectButton: {
+    position: 'absolute',
+    right: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 900,
+  },
+});

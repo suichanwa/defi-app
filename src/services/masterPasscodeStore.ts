@@ -81,8 +81,20 @@ async function verifyPasscode(passcode: string, hash: string): Promise<boolean> 
  * Check if master passcode has been set
  */
 export async function isMasterPasscodeSet(): Promise<boolean> {
-  const isSet = await getJson<boolean>(MASTER_PASSCODE_SET_KEY);
-  return Boolean(isSet);
+  const [isSet, existingHash] = await Promise.all([
+    getJson<boolean>(MASTER_PASSCODE_SET_KEY),
+    getMasterPasscodeHash(),
+  ]);
+
+  if (Boolean(isSet)) return true;
+
+  // Backward compatibility: hash exists but legacy "set" flag is missing.
+  if (existingHash) {
+    await setMasterPasscodeFlag();
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -137,5 +149,10 @@ export async function verifyOrSetMasterPasscode(passcode: string): Promise<boole
   }
   
   // Verify against existing
-  return verifyPasscode(passcode, existingHash);
+  const isValid = await verifyPasscode(passcode, existingHash);
+  if (isValid) {
+    // Keep migration-safe flag synced for older installs.
+    await setMasterPasscodeFlag();
+  }
+  return isValid;
 }

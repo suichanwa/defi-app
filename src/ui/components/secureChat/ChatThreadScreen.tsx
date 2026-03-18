@@ -48,7 +48,6 @@ type Props = {
   onStartP2P?: (userId: string, userName: string) => void;
   isMuted?: boolean;
   onToggleMute?: () => void;
-  onOpenConnect?: () => void;
 };
 
 const AVATAR_PALETTE = ['#2563eb', '#0ea5e9', '#14b8a6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7'];
@@ -90,7 +89,6 @@ export default function ChatThreadScreen({
   onStartP2P,
   isMuted,
   onToggleMute,
-  onOpenConnect,
 }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createChatStyles(colors), [colors]);
@@ -495,18 +493,6 @@ export default function ChatThreadScreen({
         </View>
       </View>
 
-      {onOpenConnect ? (
-        <TouchableOpacity
-          style={styles.floatingConnectButton}
-          onPress={onOpenConnect}
-          activeOpacity={0.9}
-          accessibilityRole="button"
-          accessibilityLabel="Open connect screen"
-        >
-          <MaterialCommunityIcons name="plus" size={22} color={colors.accentText} />
-        </TouchableOpacity>
-      ) : null}
-
       {/* Message Actions Modal */}
       {selectedMessage && (
         <View style={styles.actionOverlay}>
@@ -787,23 +773,6 @@ const createChatStyles = (colors: {
       justifyContent: 'center',
       alignItems: 'center',
       zIndex: 1000,
-    },
-    floatingConnectButton: {
-      position: 'absolute',
-      right: 20,
-      bottom: 94,
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.accent,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
-      elevation: 8,
-      zIndex: 900,
     },
     actionBackdrop: {
       position: 'absolute',

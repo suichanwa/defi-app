@@ -51,12 +51,12 @@ export default function WalletNFTsTab({ ownerAddress }: WalletNFTsTabProps) {
         const items = await fetchAlchemySolanaNfts(targetOwner, 'mainnet-beta');
         if (!cancelled) {
           setNfts(items);
-          setUseLocalFallback(items.length === 0);
+          setUseLocalFallback(shouldUseFallback && items.length === 0);
         }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Unable to load NFTs.');
-          setUseLocalFallback(true);
+          setUseLocalFallback(shouldUseFallback);
         }
       } finally {
         if (!cancelled) {

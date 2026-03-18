@@ -497,6 +497,13 @@ export default function WalletScreen() {
     console.log('hasMasterPasscode:', hasMasterPasscode);
     
     resetFlowMessages();
+
+    if (hasMasterPasscode) {
+      setFlow('unlock');
+      setFlowError('This device already has an app passcode. Unlock with that passcode to add wallets.');
+      setShowErrorDialog(true);
+      return;
+    }
     
     console.log('Running passcodePolicy...');
     const policy = passcodePolicy(walletPassword);
@@ -563,6 +570,12 @@ export default function WalletScreen() {
       if (error instanceof Error) {
         console.error('Error message:', error.message);
         console.error('Error stack:', error.stack);
+        if (error.message.toLowerCase().includes('invalid master passcode')) {
+          setFlow('unlock');
+          setFlowError('This device already has an app passcode. Unlock with that passcode to add wallets.');
+          setShowErrorDialog(true);
+          return;
+        }
       }
       setFlowError(walletErrorMessage(error, 'create'));
       setShowErrorDialog(true);
@@ -635,8 +648,26 @@ export default function WalletScreen() {
     setIsSubmitting(true);
     startSlowMessage('Yeah, this might take a moment...');
     try {
-      await unlock(unlockPassword);
-      setFlow('menu');
+      let createdDuringUnlock = false;
+      try {
+        await unlock(unlockPassword);
+        setFlow('menu');
+      } catch (error) {
+        const noWalletYet =
+          error instanceof Error && error.message.toLowerCase().includes('no wallet found');
+        if (!noWalletYet || !hasMasterPasscode) {
+          throw error;
+        }
+
+        const { mnemonic } = await createWallet(unlockPassword);
+        const normalized = normalizeMnemonic(mnemonic);
+        setBackupSkipped(false);
+        startBackupConfirm(normalized);
+        setFlowMessage('Wallet created. Back up your recovery phrase.');
+        setHasMasterPasscode(true);
+        createdDuringUnlock = true;
+      }
+
       if (biometricsAvailable) {
         const existing = await getBiometricPassword({ requireAuthentication: false });
         if (!existing) {
@@ -647,7 +678,9 @@ export default function WalletScreen() {
         }
       }
       setUnlockPassword('');
-      resetFlowMessages();
+      if (!createdDuringUnlock) {
+        resetFlowMessages();
+      }
     } catch (error) {
       setFlowError(walletErrorMessage(error, 'unlock'));
       setShowErrorDialog(true);
@@ -818,6 +851,11 @@ export default function WalletScreen() {
           }}
           onGoCreate={() => {
             resetFlowMessages();
+            if (hasMasterPasscode) {
+              setFlow('unlock');
+              setFlowMessage('Enter your existing app passcode to create a wallet.');
+              return;
+            }
             setFlow('create-passcode');
           }}
           onGoImport={() => {
