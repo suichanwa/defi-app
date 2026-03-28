@@ -14,6 +14,27 @@ try {
         npm install
     }
 
+    # Ensure Gradle child processes (cmd /c node ...) can always resolve Node on Windows.
+    $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+    if (-not $nodeCmd) {
+        Write-Host "Node.js is not available in PATH. Install Node or fix PATH first." -ForegroundColor Red
+        exit 1
+    }
+    $nodeExe = $nodeCmd.Source
+    $nodeDir = Split-Path -Parent $nodeExe
+    $requiredCmdPaths = @(
+        $nodeDir,
+        "$env:WINDIR\System32",
+        "$env:WINDIR"
+    )
+    foreach ($pathEntry in $requiredCmdPaths) {
+        if ($pathEntry -and -not ($env:Path -split ';' | Where-Object { $_ -eq $pathEntry })) {
+            $env:Path = "$pathEntry;$env:Path"
+        }
+    }
+    $env:NODE_BINARY = $nodeExe
+    $env:ComSpec = "$env:WINDIR\System32\cmd.exe"
+
     if (-not $env:ANDROID_HOME) {
         Write-Host "Warning: ANDROID_HOME is not set. Build may fail." -ForegroundColor Yellow
     }
@@ -29,10 +50,11 @@ try {
 
     Push-Location android
     try {
+        & .\gradlew.bat --stop | Out-Null
         if (Test-Path ".\gradlew.bat") {
-            & .\gradlew.bat assembleDebug
+            & .\gradlew.bat --no-daemon assembleDebug
         } else {
-            & .\gradlew assembleDebug
+            & .\gradlew --no-daemon assembleDebug
         }
         $buildSuccess = $LASTEXITCODE -eq 0
     } finally {
