@@ -1,8 +1,8 @@
 import type { Dispatch, SetStateAction } from 'react';
-import type { ChatMessage, ChatThread } from '@app-types/secureChat';
-import type { ToastShowParams } from 'toastify-react-native';
+import type { ChatMessage, ChatThread } from '@app-types/securechat-types/secureChat';
+import type { ShowToastParams } from '@services/toast';
 
-export type ToastFn = (options: ToastShowParams) => void;
+export type ToastFn = (options: ShowToastParams) => void;
 
 export type AlertFn = (title: string, message: string) => void;
 

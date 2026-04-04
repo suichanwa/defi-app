@@ -1032,13 +1032,13 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
         />
       </SecureChatLayout>
 
-      {secureTab === 'chats' ? (
+      {secureTab === 'chats' && chatView !== 'thread' ? (
         <TouchableOpacity
           style={[
             styles.floatingConnectButton,
             {
               backgroundColor: colors.accent,
-              bottom: chatView === 'thread' ? 28 : 116,
+              bottom: 116,
             },
           ]}
           onPress={handleOpenConnect}

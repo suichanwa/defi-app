@@ -10,7 +10,6 @@ export default function SecureChatContent({ secureTab, chatView, connect, thread
 
   useEffect(() => {
     if (chatView === 'thread') {
-      // Slide in from right
       Animated.timing(slideAnim, {
         toValue: 0,
         duration: 300,

@@ -67,19 +67,20 @@ export default function SecureChatLayout({
         { backgroundColor: colors.background },
       ]}
     >
-      <Animated.View
-        style={[
-          styles.navWrapper,
-          {
-            opacity: navOpacity,
-            transform: [{ translateY: navTranslateY }],
-          },
-        ]}
-        pointerEvents={showNav ? 'auto' : 'none'}
-      >
-        <ChatHeader isCompact={isCompact} />
-        <ChatTabs activeTab={secureTab} onTabChange={onTabChange} timeLabel={timeLabel} />
-      </Animated.View>
+      {showNav ? (
+        <Animated.View
+          style={[
+            styles.navWrapper,
+            {
+              opacity: navOpacity,
+              transform: [{ translateY: navTranslateY }],
+            },
+          ]}
+        >
+          <ChatHeader isCompact={isCompact} />
+          <ChatTabs activeTab={secureTab} onTabChange={onTabChange} timeLabel={timeLabel} />
+        </Animated.View>
+      ) : null}
       {children}
     </View>
   );
@@ -98,7 +99,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   containerNoNav: {
-    paddingTop: 4,
+    paddingTop: 0,
     paddingBottom: 6,
     paddingHorizontal: 10,
   },

@@ -4,7 +4,7 @@ import type { NotificationAnimation } from '@context/NotificationProvider';
 
 type ToastType = 'success' | 'error' | 'info' | 'default';
 
-type ShowToastParams = {
+export type ShowToastParams = {
   type?: ToastType;
   text1: string;
   text2?: string;
