@@ -13,6 +13,12 @@ type ProfileRow = {
   updated_at: string;
 };
 
+const isTransientNetworkError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  const lower = message.toLowerCase();
+  return lower.includes('network request failed') || lower.includes('fetch failed');
+};
+
 export async function fetchRemoteProfile(userId: string): Promise<ProfileSettings | null> {
   if (!isSupabaseConfigured || !supabase) return null;
 
@@ -24,6 +30,9 @@ export async function fetchRemoteProfile(userId: string): Promise<ProfileSetting
       .maybeSingle<ProfileRow>();
 
     if (error) {
+      if (isTransientNetworkError(error.message)) {
+        return null;
+      }
       console.warn('Error fetching remote profile:', error.message);
       return null;
     }
@@ -40,6 +49,9 @@ export async function fetchRemoteProfile(userId: string): Promise<ProfileSetting
       updatedAt: data.updated_at,
     };
   } catch (error) {
+    if (isTransientNetworkError(error)) {
+      return null;
+    }
     console.warn('Exception fetching remote profile:', error);
     return null;
   }

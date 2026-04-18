@@ -91,12 +91,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
     paddingHorizontal: 20,
-    paddingTop: 24,
+    paddingTop: 34,
     paddingBottom: 100,
   },
   containerCompact: {
     paddingHorizontal: 16,
-    paddingTop: 20,
+    paddingTop: 28,
   },
   containerNoNav: {
     paddingTop: 0,

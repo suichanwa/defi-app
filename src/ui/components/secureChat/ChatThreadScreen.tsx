@@ -52,6 +52,13 @@ type Props = {
 
 const AVATAR_PALETTE = ['#2563eb', '#0ea5e9', '#14b8a6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7'];
 
+const withAlpha = (hex: string, alphaHex: string) => {
+  if (!hex.startsWith('#')) return hex;
+  const value = hex.slice(1);
+  if (value.length === 6) return `#${value}${alphaHex}`;
+  return hex;
+};
+
 type SelectedProfile = {
   name: string;
   userId?: string;
@@ -236,22 +243,22 @@ export default function ChatThreadScreen({
         receivedMessageCaptionTextStyle: { fontSize: 13, color: colors.text },
         receivedMessageLinkDescriptionTextStyle: { fontSize: 12, color: colors.text },
         receivedMessageLinkTitleTextStyle: { fontSize: 14, fontWeight: '600' as const, color: colors.text },
-        sentMessageBodyTextStyle: { fontSize: 15, color: colors.accentText, fontWeight: '500' as const },
-        sentMessageCaptionTextStyle: { fontSize: 13, color: colors.accentText },
-        sentMessageLinkDescriptionTextStyle: { fontSize: 12, color: colors.accentText },
-        sentMessageLinkTitleTextStyle: { fontSize: 14, fontWeight: '600' as const, color: colors.accentText },
+        sentMessageBodyTextStyle: { fontSize: 15, color: colors.text, fontWeight: '500' as const },
+        sentMessageCaptionTextStyle: { fontSize: 13, color: colors.text },
+        sentMessageLinkDescriptionTextStyle: { fontSize: 12, color: colors.text },
+        sentMessageLinkTitleTextStyle: { fontSize: 14, fontWeight: '600' as const, color: colors.text },
         userAvatarTextStyle: { fontSize: 11, fontWeight: '700' as const, color: '#ffffff' },
         userNameTextStyle: { fontSize: 12, fontWeight: '700' as const, color: colors.text, letterSpacing: 0.4, textTransform: 'uppercase' as const },
       },
       colors: {
-        background: colors.card,
+        background: colors.background,
         error: '#ef4444',
-        inputBackground: colors.card,
+        inputBackground: colors.background,
         inputText: colors.text,
         primary: colors.accent,
-        secondary: colors.card,
+        secondary: colors.background,
         receivedMessageDocumentIcon: colors.text,
-        sentMessageDocumentIcon: colors.accentText,
+        sentMessageDocumentIcon: colors.text,
         userAvatarImageBackground: colors.accent,
         userAvatarNameColors: AVATAR_PALETTE,
       },
@@ -275,27 +282,11 @@ export default function ChatThreadScreen({
 
   const renderBubble = useCallback(
     ({ child, message, nextMessageInGroup }: { child: React.ReactNode; message: MessageType.Any; nextMessageInGroup: boolean }) => {
-      const isOwn = message.author.id === flyerUser.id;
-      if (message.type === 'image') {
-        return (
-          <View
-            style={[
-              styles.imageBubble,
-              isOwn ? styles.imageBubbleOutgoing : styles.imageBubbleIncoming,
-              nextMessageInGroup && styles.imageBubbleGrouped,
-            ]}
-          >
-            {child}
-          </View>
-        );
-      }
-
       return (
         <View
           style={[
-            styles.bubble,
-            isOwn ? styles.bubbleOutgoing : styles.bubbleIncoming,
-            nextMessageInGroup && (isOwn ? styles.bubbleOutgoingGrouped : styles.bubbleIncomingGrouped),
+            styles.messageItem,
+            nextMessageInGroup && styles.messageItemGrouped,
           ]}
         >
           {child}
@@ -315,7 +306,7 @@ export default function ChatThreadScreen({
       const initials = getInitials(authorLabel);
 
       return (
-        <View style={styles.messageBody}>
+        <View style={[styles.messageShell, isOwn ? styles.messageShellOutgoing : styles.messageShellIncoming]}>
           {!isOwn && showName ? (
             <View style={styles.metaRow}>
               <View style={[styles.avatarBadge, { backgroundColor: avatarColor }]}>
@@ -324,14 +315,16 @@ export default function ChatThreadScreen({
               <Text style={styles.authorLabel}>{authorLabel}</Text>
             </View>
           ) : null}
-          <Text style={[styles.messageText, isOwn ? styles.messageTextOutgoing : styles.messageTextIncoming]}>
-            {message.text}
-          </Text>
-          {timeLabel ? (
-            <Text style={[styles.timeText, isOwn ? styles.timeTextOutgoing : styles.timeTextIncoming]}>
-              {timeLabel}
+          <View style={[styles.messageSurface, isOwn ? styles.messageSurfaceOutgoing : styles.messageSurfaceIncoming]}>
+            <Text style={[styles.messageText, isOwn ? styles.messageTextOutgoing : styles.messageTextIncoming]}>
+              {message.text}
             </Text>
-          ) : null}
+            {timeLabel ? (
+              <Text style={[styles.timeText, isOwn ? styles.timeTextOutgoing : styles.timeTextIncoming]}>
+                {timeLabel}
+              </Text>
+            ) : null}
+          </View>
         </View>
       );
     },
@@ -349,7 +342,7 @@ export default function ChatThreadScreen({
       const initials = getInitials(authorLabel);
 
       return (
-        <View>
+        <View style={[styles.messageShell, isOwn ? styles.messageShellOutgoing : styles.messageShellIncoming]}>
           {!isOwn ? (
             <View style={styles.metaRow}>
               <View style={[styles.avatarBadge, { backgroundColor: avatarColor }]}>
@@ -368,9 +361,11 @@ export default function ChatThreadScreen({
             </View>
           </View>
           {caption ? (
-            <Text style={[styles.imageCaption, isOwn ? styles.imageCaptionOutgoing : styles.imageCaptionIncoming]}>
-              {caption}
-            </Text>
+            <View style={[styles.messageSurface, isOwn ? styles.messageSurfaceOutgoing : styles.messageSurfaceIncoming]}>
+              <Text style={[styles.imageCaption, isOwn ? styles.imageCaptionOutgoing : styles.imageCaptionIncoming]}>
+                {caption}
+              </Text>
+            </View>
           ) : null}
         </View>
       );
@@ -577,83 +572,61 @@ const createChatStyles = (colors: {
     container: {
       flex: 1,
       width: '100%',
-      maxWidth: 760,
-      alignSelf: 'center',
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.card,
-      padding: 6,
-      overflow: 'hidden',
+      alignSelf: 'stretch',
+      backgroundColor: colors.background,
+      padding: 0,
     },
     chatWrapper: {
       flex: 1,
-      marginTop: 2,
-      borderRadius: 12,
-      overflow: 'hidden',
-      backgroundColor: colors.card,
+      marginTop: 0,
+      backgroundColor: colors.background,
     },
     keyboardScrollable: {
-      backgroundColor: colors.card,
+      backgroundColor: colors.background,
     },
     keyboardAccessory: {
-      backgroundColor: colors.card,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
+      backgroundColor: colors.background,
     },
     keyboardAccessoryContent: {
-      backgroundColor: colors.card,
-    },
-    bubble: {
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 18,
-    },
-    bubbleOutgoing: {
-      backgroundColor: colors.accent,
-      borderBottomRightRadius: 8,
-      shadowColor: colors.accent,
-      shadowOpacity: 0.18,
-      shadowRadius: 6,
-      shadowOffset: { width: 0, height: 3 },
-      elevation: 2,
-    },
-    bubbleOutgoingGrouped: {
-      borderBottomRightRadius: 18,
-    },
-    bubbleIncoming: {
       backgroundColor: colors.background,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderBottomLeftRadius: 8,
     },
-    bubbleIncomingGrouped: {
-      borderBottomLeftRadius: 18,
+    messageItem: {
+      paddingHorizontal: 0,
+      paddingVertical: 2,
+      backgroundColor: 'transparent',
+      borderRadius: 0,
     },
-    imageBubble: {
-      borderRadius: 20,
-      overflow: 'hidden',
-    },
-    imageBubbleOutgoing: {
-      backgroundColor: colors.accent,
-      borderWidth: 0,
-      shadowColor: colors.accent,
-      shadowOpacity: 0.18,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 4 },
-      elevation: 3,
-    },
-    imageBubbleIncoming: {
-      backgroundColor: colors.background,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    imageBubbleGrouped: {
-      borderBottomLeftRadius: 20,
-      borderBottomRightRadius: 20,
+    messageItemGrouped: {
+      paddingTop: 1,
     },
     messageBody: {
-      gap: 6,
+      gap: 4,
+      backgroundColor: 'transparent',
+    },
+    messageShell: {
+      maxWidth: '86%',
+      gap: 4,
+    },
+    messageShellIncoming: {
+      alignSelf: 'flex-start',
+    },
+    messageShellOutgoing: {
+      alignSelf: 'flex-end',
+    },
+    messageSurface: {
+      backgroundColor: 'transparent',
+    },
+    messageSurfaceIncoming: {
+      alignSelf: 'flex-start',
+    },
+    messageSurfaceOutgoing: {
+      alignSelf: 'flex-end',
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 18,
+      backgroundColor: withAlpha(colors.accent, '18'),
+      borderWidth: 1,
+      borderColor: withAlpha(colors.accent, '3A'),
     },
     metaRow: {
       flexDirection: 'row',
@@ -691,7 +664,7 @@ const createChatStyles = (colors: {
       color: colors.text,
     },
     messageTextOutgoing: {
-      color: colors.accentText,
+      color: colors.text,
     },
     timeText: {
       fontSize: 11,
@@ -702,17 +675,15 @@ const createChatStyles = (colors: {
       color: colors.muted,
     },
     timeTextOutgoing: {
-      color: `${colors.accentText}CC`,
+      color: colors.muted,
       alignSelf: 'flex-end',
     },
     imageContainer: {
       borderRadius: 18,
       overflow: 'hidden',
-      backgroundColor: colors.border,
+      backgroundColor: 'transparent',
     },
     imageCaption: {
-      paddingHorizontal: 12,
-      paddingVertical: 8,
       fontSize: 14,
       lineHeight: 20,
     },
@@ -720,7 +691,7 @@ const createChatStyles = (colors: {
       color: colors.text,
     },
     imageCaptionOutgoing: {
-      color: colors.accentText,
+      color: colors.text,
     },
     imageOverlay: {
       position: 'absolute',
@@ -749,8 +720,8 @@ const createChatStyles = (colors: {
     inputBarWrapper: {
       paddingTop: 6,
       paddingBottom: 2,
-      paddingHorizontal: 4,
-      backgroundColor: colors.card,
+      paddingHorizontal: 0,
+      backgroundColor: colors.background,
     },
     loadMoreFooter: {
       flexDirection: 'row',
@@ -809,4 +780,3 @@ const createChatStyles = (colors: {
       color: colors.text,
     },
   });
-
