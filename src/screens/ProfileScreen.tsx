@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { BackHandler, Platform } from 'react-native';
-import Constants from 'expo-constants';
 import {
   AboutAppTab,
   AuthTab,
@@ -361,10 +360,8 @@ export default function ProfileScreen() {
       );
   }
 
-  const disableTransitions = Platform.OS === 'android' && Constants.appOwnership === 'expo';
-
   return (
-    <ProfileTabTransition viewKey={view} enabled={!disableTransitions}>
+    <ProfileTabTransition viewKey={view}>
       {content}
     </ProfileTabTransition>
   );

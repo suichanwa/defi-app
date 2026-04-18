@@ -353,14 +353,14 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
   }, [save, state.alias, state.avatarType, state.avatarUri]);
 
   useEffect(() => {
+    if (state.profileSource !== 'local') return;
+
     let mounted = true;
-    if (state.profileSource === 'local') {
-      loadProfile(() => mounted);
-    }
+    loadProfile(() => mounted);
     return () => {
       mounted = false;
     };
-  }, [save, state.profileSource]);
+  }, [loadProfile, state.profileSource]);
 
   const reset = async () => {
     updateStatus({ loading: true, message: null, error: null });

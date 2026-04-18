@@ -72,8 +72,10 @@ web-build/
 .cursor
 .continue
 .claude
-.omx
 .trae
 .vscode
 .windsurf
-.omx
+
+# OMX
+.omx/
+**/.omx/
