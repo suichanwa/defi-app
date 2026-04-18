@@ -1,51 +1,65 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { StyleSheet, View } from 'react-native';
+import Animated, { FadeInLeft, SlideInRight, SlideOutRight } from 'react-native-reanimated';
 import ChatListScreen from '@components/secureChat/ChatListScreen';
 import ChatThreadScreen from '@components/secureChat/ChatThreadScreen';
 import ConnectScreen from '@components/secureChat/ConnectScreen';
 import type { SecureChatContentProps } from '@app-types/securechat-types/secureChatContent';
 
+const THREAD_TRANSITION_DURATION_MS = 260;
+
 export default function SecureChatContent({ secureTab, chatView, connect, thread, list }: SecureChatContentProps) {
-  const slideAnim = useRef(new Animated.Value(100)).current;
+  const isThreadView = chatView === 'thread';
+  const previousChatViewRef = useRef(chatView);
+  const isReturningToList = !isThreadView && previousChatViewRef.current === 'thread';
+  const listEntering = useMemo(
+    () => (isReturningToList ? FadeInLeft.duration(THREAD_TRANSITION_DURATION_MS) : undefined),
+    [isReturningToList],
+  );
+  const threadEntering = useMemo(
+    () => SlideInRight.duration(THREAD_TRANSITION_DURATION_MS),
+    [],
+  );
+  const threadExiting = useMemo(
+    () => SlideOutRight.duration(THREAD_TRANSITION_DURATION_MS),
+    [],
+  );
 
   useEffect(() => {
-    if (chatView === 'thread') {
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      // Reset position when going back to list
-      slideAnim.setValue(100);
-    }
-  }, [chatView, slideAnim]);
+    previousChatViewRef.current = chatView;
+  }, [chatView]);
 
   if (secureTab === 'connect') {
     return <ConnectScreen {...connect} />;
   }
 
-  if (chatView === 'thread') {
-    return (
-      <Animated.View
-        style={[
-          styles.threadWrapper,
-          {
-            transform: [{ translateX: slideAnim }],
-          },
-        ]}
-      >
-        <ChatThreadScreen {...thread} />
-      </Animated.View>
-    );
-  }
+  return (
+    <View style={styles.contentRoot}>
+      {!isThreadView ? (
+        <Animated.View entering={listEntering} style={styles.viewLayer}>
+          <ChatListScreen {...list} />
+        </Animated.View>
+      ) : null}
 
-  return <ChatListScreen {...list} />;
+      {isThreadView ? (
+        <Animated.View entering={threadEntering} exiting={threadExiting} style={[styles.viewLayer, styles.threadWrapper]}>
+          <ChatThreadScreen {...thread} />
+        </Animated.View>
+      ) : null}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  threadWrapper: {
+  contentRoot: {
     flex: 1,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  viewLayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  threadWrapper: {
     marginBottom: 0,
   },
 });
