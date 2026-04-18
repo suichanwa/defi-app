@@ -476,9 +476,6 @@ export default function ChatThreadScreen({
                         <Text style={styles.loadMoreText}>Loading older messages...</Text>
                       </View>
                     ) : null,
-                  maintainVisibleContentPosition: {
-                    minIndexForVisible: 0,
-                  },
                 }}
               />
             )}

@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
     paddingTop: 28,
   },
   containerNoNav: {
-    paddingTop: 0,
+    paddingTop: 42,
     paddingBottom: 6,
     paddingHorizontal: 10,
   },
