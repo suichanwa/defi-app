@@ -66,3 +66,14 @@ npm-debug.*
 web-build/
 
 .env.local
+.cline
+.agents
+.agent
+.cursor
+.continue
+.claude
+.omx
+.trae
+.vscode
+.windsurf
+.omx

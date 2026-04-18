@@ -22,8 +22,11 @@ if (typeof global.process === 'undefined') {
   global.process = process;
 }
 if (!global.process.env) {
-  (global.process.env as any) = { NODE_ENV: 'production' };
+  (global.process.env as any) = {};
 }
+(global.process.env as any).NODE_ENV =
+  (global.process.env as any).NODE_ENV ??
+  (__DEV__ ? 'development' : 'production');
 (global.process as any).version = 'v16.0.0'; // Fake Node version for compatibility
 (global.process as any).browser = true;
 

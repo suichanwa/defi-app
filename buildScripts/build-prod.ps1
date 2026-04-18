@@ -40,8 +40,10 @@ try {
         exit 1
     }
 
-    # Clean previous builds
-    Write-Host "Cleaning previous builds..." -ForegroundColor Yellow
+    $env:NODE_ENV = "production"
+
+    # Clean previous APK artifacts without invoking the Gradle clean task.
+    Write-Host "Cleaning previous APK outputs..." -ForegroundColor Yellow
     if (Test-Path "android\app\build\outputs\apk") {
         Remove-Item -Recurse -Force "android\app\build\outputs\apk\*"
     }

@@ -82,14 +82,19 @@ export default function ExpressSwapScreen() {
     setIsSubmitting(false);
   }, []);
 
+  useEffect(() => {
+    setNavHidden(true);
+    return () => {
+      setNavHidden(false);
+    };
+  }, [setNavHidden]);
+
   useFocusEffect(
     useCallback(() => {
-      setNavHidden(true);
       return () => {
-        setNavHidden(false);
         resetSwapState();
       };
-    }, [resetSwapState, setNavHidden]),
+    }, [resetSwapState]),
   );
 
   const rate = useMemo(() => fromToken.usdPrice / toToken.usdPrice, [fromToken, toToken]);

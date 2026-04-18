@@ -78,7 +78,7 @@ const walletActions: WalletAction[] = [
 
 const Stack = createStackNavigator<WalletStackParamList>();
 
-function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<WalletStackParamList, 'WalletHome'> }) {
+export function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<WalletStackParamList, 'WalletHome'> }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const { chain, chainKey, setChainKey } = useChain();

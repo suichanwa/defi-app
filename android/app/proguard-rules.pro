@@ -11,4 +11,7 @@
 -keep class com.swmansion.reanimated.** { *; }
 -keep class com.facebook.react.turbomodule.** { *; }
 
+# WalletConnect pulls in JNA, which references desktop-only AWT types that are not used on Android.
+-dontwarn java.awt.Component
+
 # Add any project specific keep options here:

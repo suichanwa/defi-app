@@ -42,6 +42,7 @@ export default function WalletHeaderSection({
         <NetworkBadge onPress={onToggleNetwork} />
         {chain.kind === 'solana' && chain.cluster === 'devnet' && (
           <TouchableOpacity
+            testID="wallet-airdrop-button"
             activeOpacity={0.7}
             style={[
               localStyles.airdropButton, 

@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "main": "index.ts",
   "scripts": {
-    "dev": "expo start",
-    "start": "expo start",
+    "dev": "expo start --offline",
+    "start": "expo start --offline",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
@@ -14,7 +14,7 @@
     "build:dev:android:local": "eas build --platform android --profile development --local --clear-cache",
     "build:prod:android:local": "eas build --platform android --profile production --local --clear-cache",
     "build:local:clean-cache": "eas build --platform android --profile preview --local --clear-cache",
-    "build:apk": "cd android && gradlew.bat clean assembleRelease && cd ..",
+    "build:apk": "set \"NODE_ENV=production\" && cd android && gradlew.bat assembleRelease && cd ..",
     "build:dev": "cd android && gradlew.bat clean assembleDebug && cd ..",
     "rust:wallet:build:android": "cd rust-wallet-core && cargo ndk -t armeabi-v7a -t arm64-v8a -t x86_64 -o ../android/app/src/main/jniLibs build --release && cd ..",
     "rust:wallet:check": "cd rust-wallet-core && cargo check && cd ..",
@@ -114,6 +114,7 @@
   },
   "devDependencies": {
     "@iconify/react": "^6.0.2",
+    "@react-native-community/cli": "^20.0.2",
     "@types/aes-js": "^3.1.4",
     "@types/i18n-js": "^3.8.9",
     "@types/jest": "^30.0.0",
