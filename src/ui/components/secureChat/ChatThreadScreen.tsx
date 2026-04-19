@@ -428,11 +428,10 @@ export default function ChatThreadScreen({
         {/* Header */}
         <ChatThreadHeader
           chat={chat}
-          serverInfo={serverInfo}
           onBack={handleBackPress}
+          participantCount={participantCount}
           isMuted={isMuted}
           onToggleMute={onToggleMute}
-          typingLabel={typingLabel ?? ''}
         />
 
         {/* Flyer Chat Component */}
@@ -615,6 +614,17 @@ const createChatStyles = (colors: {
     },
     messageSurfaceIncoming: {
       alignSelf: 'flex-start',
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 18,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.08,
+      shadowRadius: 2,
+      elevation: 1,
     },
     messageSurfaceOutgoing: {
       alignSelf: 'flex-end',

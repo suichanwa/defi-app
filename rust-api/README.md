@@ -1,8 +1,15 @@
-# rust-wallet-core
+# rust-api
 
-Native Rust crypto core for wallet key encrypt/decrypt migration.
+Main Rust workspace for the app.
 
-This crate is compiled into `librust_wallet_core.so` and loaded by:
+This crate now hosts:
+
+- the HTTP API server in `src/main.rs`
+- the native wallet crypto library in `src/lib.rs`
+
+## Native wallet crypto
+
+The Rust library is compiled into `librust_wallet_core.so` and loaded by:
 
 - `android/app/src/main/java/com/yourcompany/defiaiapp/RustWalletCryptoModule.kt`
 

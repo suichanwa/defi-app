@@ -22,7 +22,6 @@ export default function BottomNavBar({ activeTab, onTabChange }: BottomNavBarPro
   const profileBgOpacity = useRef(new Animated.Value(activeTab === 'profile' ? 1 : 0)).current;
 
   useEffect(() => {
-    // Animate wallet tab
     Animated.parallel([
       Animated.spring(walletScale, {
         toValue: activeTab === 'wallet' ? 1.1 : 0.9,

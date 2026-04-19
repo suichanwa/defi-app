@@ -64,15 +64,16 @@ fn decrypt_wallet_key_impl(encrypted_json: &str, password: &str) -> Result<Strin
         return Err("Password must be a non-empty string".to_string());
     }
 
-    let payload: EncryptedPayload =
-        serde_json::from_str(encrypted_json).map_err(|e| format!("Invalid encrypted payload: {e}"))?;
+    let payload: EncryptedPayload = serde_json::from_str(encrypted_json)
+        .map_err(|e| format!("Invalid encrypted payload: {e}"))?;
     if payload.version != 1 || payload.algorithm != "aes-256-ctr" {
         return Err("Unsupported encryption version or algorithm".to_string());
     }
 
     let salt = hex::decode(payload.salt).map_err(|e| format!("Invalid salt: {e}"))?;
     let iv = hex::decode(payload.iv).map_err(|e| format!("Invalid iv: {e}"))?;
-    let mut ciphertext = hex::decode(payload.ciphertext).map_err(|e| format!("Invalid ciphertext: {e}"))?;
+    let mut ciphertext =
+        hex::decode(payload.ciphertext).map_err(|e| format!("Invalid ciphertext: {e}"))?;
 
     if salt.len() != SALT_LENGTH {
         return Err("Invalid salt length".to_string());
@@ -146,5 +147,25 @@ pub extern "system" fn Java_com_yourcompany_defiaiapp_RustWalletCryptoModule_nat
     match decrypt_wallet_key_impl(&encrypted_json, &password) {
         Ok(result) => rust_to_jstring(&mut env, &result),
         Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{decrypt_wallet_key_impl, encrypt_wallet_key_impl};
+
+    #[test]
+    fn encrypts_and_decrypts_wallet_key() {
+        let encrypted = encrypt_wallet_key_impl("secret-key", "password").expect("encrypt");
+        let decrypted = decrypt_wallet_key_impl(&encrypted, "password").expect("decrypt");
+
+        assert_eq!(decrypted, "secret-key");
+    }
+
+    #[test]
+    fn rejects_empty_private_key() {
+        let err = encrypt_wallet_key_impl("", "password").unwrap_err();
+
+        assert_eq!(err, "Private key must be a non-empty string");
     }
 }
