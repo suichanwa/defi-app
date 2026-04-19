@@ -1,5 +1,5 @@
 {
-  "last_turn_at": "2026-04-19T17:59:33.218Z",
-  "turn_count": 27,
-  "last_agent_output": "Fixed the Jest-name issue by giving `__tests__` its own TS project and telling VS Code to use worksp"
+  "last_turn_at": "2026-04-19T18:02:52.827Z",
+  "turn_count": 28,
+  "last_agent_output": "Removed dead SecureChat wrapper layer.\n\nChanged:\n- Deleted `src/components/secureChat/*` re-export f"
 }
