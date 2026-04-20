@@ -1,11 +1,10 @@
 import { useCallback } from 'react';
 import type { ChatMessage } from '@app-types/securechat-types/secureChat';
 import type { AvatarType } from '@app-types/profile';
-import { createOutgoingImageMessage, createOutgoingTextMessage, isUuid } from '@utils/secureChatUtils';
+import { createOutgoingImageMessage, createOutgoingTextMessage } from '@utils/secureChatUtils';
 import { encodeChatImageContent } from '@utils/secureChatImages';
 import { uploadChatImage } from '@services/chatImageStorage';
 import { supabase as supabaseClient, isSupabaseConfigured } from '@services/supabaseClient';
-import { sendDMMessage } from '@services/directMessages';
 import { MAX_MESSAGES_IN_MEMORY } from '@constants/secureChat.constants';
 
 type TransportArgs = {
@@ -18,8 +17,6 @@ type TransportArgs = {
   setChats: React.Dispatch<React.SetStateAction<any>>;
   onConnectionLog?: (message: string) => void;
   sendRoomBroadcast: (payload: ChatMessage) => Promise<void>;
-  refreshDmChannels: () => Promise<void>;
-  markDmFetched: (channelId: string, createdAt?: string | null) => void;
 };
 
 type SendTextArgs = {
@@ -45,8 +42,6 @@ export function useChatTransport({
   setChats,
   onConnectionLog,
   sendRoomBroadcast,
-  refreshDmChannels,
-  markDmFetched,
 }: TransportArgs) {
   const appendLocalMessage = useCallback(
     (chatId: string, message: ChatMessage) => {
@@ -143,69 +138,7 @@ export function useChatTransport({
   const sendText = useCallback(
     async ({ chatId, content, isDM }: SendTextArgs) => {
       if (isDM) {
-        if (isSupabaseConfigured && !isUuid(effectiveUserId)) {
-          return { sent: false, error: 'Sign in with a Supabase account to send synced DMs.' };
-        }
-        const outgoingAvatarUri = userAvatarType === 'custom' ? userAvatarUri : undefined;
-        const optimistic = createOutgoingTextMessage({
-          chatId,
-          authorId: effectiveUserId,
-          author: displayLabel,
-          content,
-          avatarUri: outgoingAvatarUri,
-        });
-        const optimisticId = `pending-${optimistic.id}`;
-        const optimisticMessage = { ...optimistic, id: optimisticId };
-        setMessagesByChat((prev) => {
-          const existing = prev[chatId] ?? [];
-          const seen = existing.some((m) => m.id === optimisticId);
-          if (seen) return prev;
-          
-          const updated = [...existing, optimisticMessage];
-          // Limit messages in memory to prevent crashes
-          const limited = updated.length > MAX_MESSAGES_IN_MEMORY
-            ? updated.slice(-MAX_MESSAGES_IN_MEMORY)
-            : updated;
-          
-          return { ...prev, [chatId]: limited };
-        });
-        const message = await sendDMMessage(chatId, {
-          chatId,
-          authorId: effectiveUserId,
-          author: displayLabel,
-          content,
-          avatarUri: outgoingAvatarUri,
-          outgoing: true,
-          type: 'text',
-        });
-
-        if (message) {
-          setMessagesByChat((prev) => {
-            const existing = prev[chatId] ?? [];
-            const withoutPending = existing.filter(
-              (m) =>
-                !(
-                  m.id?.startsWith('pending-') &&
-                  m.outgoing === true &&
-                  m.authorId === effectiveUserId &&
-                  m.content === content
-                ),
-            );
-            const seen = withoutPending.some((m) => m.id === message.id);
-            if (seen) return { ...prev, [chatId]: withoutPending };
-            
-            const updated = [...withoutPending, message];
-            // Limit messages in memory to prevent crashes
-            const limited = updated.length > MAX_MESSAGES_IN_MEMORY
-              ? updated.slice(-MAX_MESSAGES_IN_MEMORY)
-              : updated;
-            
-            return { ...prev, [chatId]: limited };
-          });
-          markDmFetched(chatId, message.createdAt ?? null);
-          await refreshDmChannels();
-        }
-        return { sent: true };
+        return { sent: false, error: 'Direct messages are handled by the XMTP transport layer.' };
       }
 
       if (!isSupabaseConfigured || !supabaseClient) {
@@ -230,11 +163,7 @@ export function useChatTransport({
       appendLocalMessage,
       authorId,
       displayLabel,
-      effectiveUserId,
-      markDmFetched,
-      refreshDmChannels,
       sendRoomBroadcast,
-      setMessagesByChat,
       userAvatarType,
       userAvatarUri,
     ],
@@ -242,6 +171,10 @@ export function useChatTransport({
 
   const sendImage = useCallback(
     async ({ chatId, imageUri, isDM, content }: SendImageArgs) => {
+      if (isDM) {
+        return { sent: false, error: 'Image attachments over XMTP are not enabled in this build.' };
+      }
+
       if (!isSupabaseConfigured || !supabaseClient) {
         return { sent: false, error: 'Supabase not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY to send images.' };
       }
@@ -264,13 +197,6 @@ export function useChatTransport({
 
       appendLocalMessage(chatId, imagePayload);
 
-      if (isDM) {
-        await sendDMMessage(chatId, imagePayload);
-        markDmFetched(chatId, imagePayload.createdAt ?? null);
-        await refreshDmChannels();
-        return { sent: true };
-      }
-
       await persistRoomImage(chatId, imagePayload, upload.path);
       await sendRoomBroadcast({ ...imagePayload, outgoing: false });
       return { sent: true };
@@ -280,8 +206,6 @@ export function useChatTransport({
       authorId,
       displayLabel,
       effectiveUserId,
-      markDmFetched,
-      refreshDmChannels,
       sendRoomBroadcast,
       userAvatarType,
       userAvatarUri,

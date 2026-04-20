@@ -14,14 +14,14 @@ import * as SecureChatConstants from '@constants/secureChat.constants';
 import { useSecureChatIdentity } from '@hooks/useSecureChatIdentity';
 import { useSecureChatImageAttachment } from '@hooks/useSecureChatImageAttachment';
 import { useSecureChatUIState } from '@hooks/secureChat/useSecureChatUIState';
-import { useDirectMessages } from '@hooks/secureChat/useDirectMessages';
+import { useXmtpDirectMessages } from '@hooks/secureChat/useXmtpDirectMessages';
 import { useRealtimeRoom, type TypingPayload } from '@hooks/secureChat/useRealtimeRoom';
 import { useChatTransport } from '@hooks/secureChat/useChatTransport';
 import { useTickingClock } from '@hooks/useTickingClock';
 import { useRoomHistory } from '@hooks/useRoomHistory';
 import { useP2PDirectMessages } from '@hooks/secureChat/useP2PDirectMessages';
 import { resolveChatImageMessages } from '@utils/secureChatImages';
-import { isUuid, mapRowToMessage } from '@utils/secureChatUtils';
+import { mapRowToMessage } from '@utils/secureChatUtils';
 import {
   createIncomingRoomMessageHandler,
   createIsOwnMessage,
@@ -33,6 +33,8 @@ import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import { useChatAvatar } from '../../hooks/useChatAvatar';
 import { useChatProfiles } from '../../hooks/useChatProfiles';
 import { useTheme } from '@theme/ThemeProvider';
+import { useXmtpClient } from '@context/XmtpProvider';
+import { isEvmAddress } from '@services/xmtp/signer';
 
 type PendingFile = {
   uri: string;
@@ -43,6 +45,7 @@ type PendingFile = {
 
 export default function SecureChatScreen({ isActive = false, onChatViewChange }: SecureChatScreenProps) {
   const { colors } = useTheme();
+  const { client: xmtpClient } = useXmtpClient();
   const [chats, setChats] = useState<ChatThread[]>([
     {
       id: SecureChatConstants.DEFAULT_GLOBAL_CHAT_ID,
@@ -89,7 +92,10 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
   } = useSecureChatUIState();
   const { pickImage, clearImage } = useSecureChatImageAttachment(setAttachment);
 
-  const devicePublicKey = useMemo(() => `user:${displayLabel}`, [displayLabel]);
+  const devicePublicKey = useMemo(
+    () => (xmtpClient?.inboxId ? `xmtp:${xmtpClient.inboxId}` : `user:${displayLabel}`),
+    [displayLabel, xmtpClient?.inboxId],
+  );
   const [p2pRemoteOffer, setP2pRemoteOffer] = useState('');
   const [p2pRemoteAnswer, setP2pRemoteAnswer] = useState('');
   const [p2pRemoteCandidates, setP2pRemoteCandidates] = useState('');
@@ -259,23 +265,37 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
 
   const {
     dmChannels,
-    refreshChannels: refreshDmChannels,
     startDM,
     loadThread,
-    markDmFetched,
-  } = useDirectMessages({
-    effectiveUserId,
+    sendText: sendXmtpDmText,
+    xmtpStatus,
+    xmtpError,
+  } = useXmtpDirectMessages({
     displayLabel,
     isActive,
-    selectedChatId,
-    secureTab,
-    chatView,
     notifyIncoming,
     setMessagesByChat,
     onError: (message) => {
       setConnectionLog((prev) => [`DM sync error: ${message}`, ...prev]);
     },
   });
+
+  useEffect(() => {
+    if (!xmtpError) return;
+    setConnectionLog((prev) => [`XMTP error: ${xmtpError}`, ...prev]);
+  }, [xmtpError]);
+
+  useEffect(() => {
+    if (xmtpStatus !== 'ready' || !xmtpClient?.inboxId) return;
+    const line = `XMTP ready: inbox ${xmtpClient.inboxId}`;
+    setConnectionLog((prev) => (prev.includes(line) ? prev : [line, ...prev]));
+  }, [xmtpClient?.inboxId, xmtpStatus]);
+
+  useEffect(() => {
+    if (xmtpStatus !== 'unsupported') return;
+    const line = 'XMTP unavailable: unlock an Ethereum wallet to enable direct messages.';
+    setConnectionLog((prev) => (prev.includes(line) ? prev : [line, ...prev]));
+  }, [xmtpStatus]);
 
   const getChatById = useCallback(
     (chatId: string) =>
@@ -524,8 +544,6 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     sendRoomBroadcast: async (payload) => {
       await sendBroadcast(payload);
     },
-    refreshDmChannels,
-    markDmFetched,
   });
 
   const inferMimeFromName = useCallback((name: string) => {
@@ -555,9 +573,12 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
         appendMessageToChat(chatId, message);
         return { sent: true };
       }
-      return transportSendText({ chatId, content, isDM });
+      if (isDM || chatId.startsWith('dm:')) {
+        return sendXmtpDmText({ chatId, content });
+      }
+      return transportSendText({ chatId, content, isDM: false });
     },
-    [appendMessageToChat, p2pSendText, transportSendText],
+    [appendMessageToChat, p2pSendText, sendXmtpDmText, transportSendText],
   );
 
   const sendImage = useCallback(
@@ -585,7 +606,10 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
         appendMessageToChat(chatId, message);
         return { sent: true };
       }
-      return transportSendImage({ chatId, imageUri, isDM, content });
+      if (isDM || chatId.startsWith('dm:')) {
+        return { sent: false, error: 'Image attachments over XMTP are not enabled in this build.' };
+      }
+      return transportSendImage({ chatId, imageUri, isDM: false, content });
     },
     [appendMessageToChat, inferMimeFromName, p2pSendFile, transportSendImage],
   );
@@ -619,19 +643,17 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
   // Handle starting a DM from profile view
   const handleStartDM = useCallback(async (otherUserId: string, otherUserName: string) => {
     try {
-      const requiresSupabase =
-        !isSupabaseConfigured || !isUuid(effectiveUserId) || !isUuid(otherUserId);
-      if (requiresSupabase) {
+      if (!isEvmAddress(otherUserId)) {
         setTab('connect');
         setView('list');
         setConnectionLog((prev) => [
-          'Local-only accounts cannot sync DMs. Use P2P DM from + Connect (offer/answer + ICE).',
+          'XMTP DMs require the peer Ethereum wallet address (0x...).',
           ...prev,
         ]);
         scopedShowToast({
           type: 'default',
-          text1: 'P2P DM required',
-          text2: 'Tap + to open Connect and exchange offer/answer for this DM.',
+          text1: 'Wallet address required',
+          text2: 'Open Connect and enter a peer Ethereum address to start XMTP DM.',
           position: 'top',
           visibilityTime: 3500,
         });
@@ -646,7 +668,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
       const message = error instanceof Error ? error.message : 'Failed to start DM.';
       Alert.alert('Direct message error', message);
     }
-  }, [selectChat, setTab, startDM]);
+  }, [selectChat, scopedShowToast, setTab, setView, startDM]);
 
   const handleStartP2P = useCallback((otherUserId: string, otherUserName: string) => {
     setTab('connect');
@@ -799,51 +821,27 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     ],
   );
 
-  const handleConnectPeer = () => {
-    if (!connectAddress.trim()) {
-      setConnectionLog((prev) => ['Enter a peer address to connect.', ...prev]);
-      return;
-    }
-
+  const handleConnectPeer = useCallback(async () => {
     const address = connectAddress.trim();
     const name = connectName.trim() || `Peer @ ${address}`;
-    const chatId = address.toLowerCase().replace(/[^a-z0-9-_]/gi, '-') || `peer-${Date.now()}`;
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    setChats((prev) => [
-      {
-        id: chatId,
-        name,
-        participants: ['You', name],
-        peerAddress: address,
-        isOnline: true,
-        lastMessage: { text: 'Secure handshake started.', ts: timestamp, from: 'System' },
-      },
-      ...prev,
-    ]);
-
-    setMessagesByChat((prev) => ({
-      ...prev,
-      [chatId]: [
-        ...(prev[chatId] ?? []),
-        {
-          id: `${chatId}-sys`,
-          chatId,
-          author: 'System',
-          content: `Secure channel negotiated with ${address}.`,
-          timestamp,
-          type: 'system',
-        },
-      ],
-    }));
-
-    setConnectionLog((prev) => [`Connected to ${address}.`, ...prev]);
-    selectChat(chatId);
-    setRoomId(chatId);
-    setTab('chats');
-    setConnectAddress('');
-    setConnectName('');
-  };
+    if (!address) {
+      setConnectionLog((prev) => ['Enter a peer Ethereum address (0x...) to start XMTP DM.', ...prev]);
+      return;
+    }
+    try {
+      const chatId = await startDM(address, name);
+      setConnectionLog((prev) => [`XMTP DM ready with ${address}.`, ...prev]);
+      selectChat(chatId);
+      setRoomId(chatId);
+      setTab('chats');
+      setConnectAddress('');
+      setConnectName('');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to start XMTP DM.';
+      setConnectionLog((prev) => [`XMTP connect error: ${message}`, ...prev]);
+      Alert.alert('XMTP connection error', message);
+    }
+  }, [connectAddress, connectName, selectChat, setConnectAddress, setConnectName, setTab, startDM]);
 
   const handleStartServer = () => {
     if (serverInfo?.status === 'running') return;

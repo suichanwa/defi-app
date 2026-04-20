@@ -8,7 +8,19 @@ export type ChangelogEntry = {
 };
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
-    {
+  {
+    id: '0.20-2026-04-20',
+    version: '0.20',
+    date: '2026-04-20',
+    title: 'Compact chat header and cleanup',
+    summary: 'New chat header layout, cleaner message bubbles, and Rust wallet core consolidation.',
+    changes: [
+      'Added a compact chat header with title, participant count, and settings menu.',
+      'Restored cleaner incoming chat bubble styling for better readability.',
+      'Moved the Rust wallet core into the rust-api package.',
+    ],
+  },
+  {
     id: '0.19-2026-1-9',
     version: '0.19.2',
     date: '2026-1-9',

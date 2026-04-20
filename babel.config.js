@@ -6,6 +6,7 @@ module.exports = function (api) {
       'nativewind/babel',
     ],
     plugins: [
+      '@babel/plugin-proposal-export-namespace-from',
       [
         'module:react-native-dotenv',
         {

@@ -1,5 +1,7 @@
 import React, { useMemo } from 'react';
 import { ActivityIndicator, Animated, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { createWalletStyles } from '@styles/WalletStyles';
 import FlowMessage from './FlowMessage';
 import { useTheme } from '@theme/ThemeProvider';
@@ -41,9 +43,21 @@ export default function SendScreen({
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const { animatedStyle } = useWalletCardAnimation([sendStep]);
+  const navigation = useNavigation();
 
   return (
     <Animated.View style={[styles.setupCard, animatedStyle]}>
+      <View style={localStyles.headerRow}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          activeOpacity={0.7}
+          style={[localStyles.backButton, { borderColor: colors.border }]}
+          onPress={() => navigation.goBack()}
+        >
+          <MaterialCommunityIcons name="chevron-left" size={22} color={colors.text} />
+        </TouchableOpacity>
+      </View>
       <Text style={styles.setupTitle}>Send {chainName}</Text>
       <Text style={styles.setupSubtitle}>Transfer native coin to another address.</Text>
       {sendStep === 'form' && (
@@ -138,3 +152,21 @@ export default function SendScreen({
     </Animated.View>
   );
 }
+
+const localStyles = {
+  headerRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'flex-start' as const,
+    marginBottom: 12,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+  },
+};

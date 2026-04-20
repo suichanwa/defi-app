@@ -232,6 +232,34 @@ export default function ConnectScreen({
       </View>
 
       <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>XMTP Direct Message</Text>
+          <MaterialCommunityIcons name="message-lock-outline" size={22} color={colors.text} />
+        </View>
+        <Text style={styles.cardSubtitle}>Start an XMTP DM using a peer Ethereum wallet address.</Text>
+        <TextInput
+          placeholder="Peer wallet address (0x...)"
+          placeholderTextColor={colors.muted}
+          style={styles.input}
+          value={connectAddress}
+          onChangeText={onConnectAddressChange}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <TextInput
+          placeholder="Display name (optional)"
+          placeholderTextColor={colors.muted}
+          style={styles.input}
+          value={connectName}
+          onChangeText={onConnectNameChange}
+        />
+        <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={onConnectPress} activeOpacity={0.9}>
+          <MaterialCommunityIcons name="send" size={18} color={colors.accentText} />
+          <Text style={styles.primaryButtonText}>Open XMTP DM</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.card}>
         <Text style={styles.cardTitle}>Connection activity</Text>
         <Text style={styles.cardSubtitle}>Recent events from transport / clipboard helpers</Text>
         <ScrollView style={styles.logList} showsVerticalScrollIndicator={false}>

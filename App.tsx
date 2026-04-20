@@ -19,6 +19,7 @@ import { NotificationProvider } from './src/context/NotificationProvider';
 import { NavVisibilityProvider, useNavVisibility } from './src/context/NavVisibilityProvider';
 import { QRReceiveProvider } from './src/context/QRReceiveProvider';
 import { ChainProvider } from './src/context/ChainProvider';
+import { XmtpProvider } from './src/context/XmtpProvider';
 import 'react-native-get-random-values';
 
 Sentry.init({
@@ -208,18 +209,20 @@ export default Sentry.wrap(function App() {
     <ThemeProvider>
       <ChainProvider>
         <WalletSessionProvider isWalletActive={activeTab === 'wallet'}>
-          <GestureHandlerRootView style={{ flex: 1 }}>
-            <SafeAreaProvider>
-              <NotificationProvider>
-                <NavVisibilityProvider>
-                  <QRReceiveProvider>
-                    <AppContent activeTab={activeTab} onTabChange={setActiveTab} />
-                  </QRReceiveProvider>
-                </NavVisibilityProvider>
-                <Toast />
-              </NotificationProvider>
-            </SafeAreaProvider>
-          </GestureHandlerRootView>
+          <XmtpProvider>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+              <SafeAreaProvider>
+                <NotificationProvider>
+                  <NavVisibilityProvider>
+                    <QRReceiveProvider>
+                      <AppContent activeTab={activeTab} onTabChange={setActiveTab} />
+                    </QRReceiveProvider>
+                  </NavVisibilityProvider>
+                  <Toast />
+                </NotificationProvider>
+              </SafeAreaProvider>
+            </GestureHandlerRootView>
+          </XmtpProvider>
         </WalletSessionProvider>
       </ChainProvider>
     </ThemeProvider>

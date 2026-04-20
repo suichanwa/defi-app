@@ -115,8 +115,22 @@ export default function SendScreen() {
   return (
     <View style={localStyles.container}>
       <ScrollView contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}>
-        <Text style={styles.headerTitle}>Send</Text>
-        <Text style={styles.headerSubtitle}>Pick a coin to send from your wallet.</Text>
+        <View style={localStyles.headerRow}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            activeOpacity={0.7}
+            style={[localStyles.backButton, { borderColor: colors.border }]}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="chevron-back" size={18} color={colors.text} />
+          </TouchableOpacity>
+          <View style={localStyles.headerTextBlock}>
+            <Text style={styles.headerTitle}>Send</Text>
+            <Text style={styles.headerSubtitle}>Pick a coin to send from your wallet.</Text>
+          </View>
+          <View style={localStyles.headerSpacer} />
+        </View>
 
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={20} color={colors.muted} />
@@ -220,6 +234,28 @@ const buildDefaultTokens = (chain: ChainConfig): TokenBalance[] => [
 const localStyles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    gap: 12,
+  },
+  headerTextBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerSpacer: {
+    width: 36,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sectionRow: {
     flexDirection: 'row',
