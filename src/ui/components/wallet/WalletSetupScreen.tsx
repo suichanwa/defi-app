@@ -46,6 +46,8 @@ type Props = {
   onFinishSetup: () => void;
   onSkipBackup: () => void;
   initialImportOpen?: boolean;
+  walletNetworkLabel?: string;
+  onToggleWalletNetwork?: () => void;
 };
 
 type PasscodeFieldId = 'primary' | 'confirm' | 'unlock';
@@ -115,6 +117,8 @@ export default function WalletSetupScreen({
   onFinishSetup,
   onSkipBackup,
   initialImportOpen,
+  walletNetworkLabel,
+  onToggleWalletNetwork,
 }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
@@ -367,6 +371,8 @@ export default function WalletSetupScreen({
           onStartFresh={onStartFresh}
           isStartFreshDisabled={isSubmitting}
           showStartFresh={showStartFresh}
+          walletNetworkLabel={walletNetworkLabel}
+          onToggleWalletNetwork={onToggleWalletNetwork}
         />
       </ScreenTransition>
     );
@@ -387,6 +393,15 @@ export default function WalletSetupScreen({
             </TouchableOpacity>
           </View>
           <Text style={styles.setupSubtitle}>Create a new wallet or log in to an existing one.</Text>
+          {walletNetworkLabel && onToggleWalletNetwork ? (
+            <TouchableOpacity
+              style={[styles.networkBadge, { alignSelf: 'flex-start', marginBottom: 14 }]}
+              onPress={onToggleWalletNetwork}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.networkBadgeText}>{walletNetworkLabel}</Text>
+            </TouchableOpacity>
+          ) : null}
           <TouchableOpacity
             style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}
             onPress={handleGoCreate}

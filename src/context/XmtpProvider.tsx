@@ -70,8 +70,28 @@ export function XmtpProvider({ children }: { children: React.ReactNode }) {
 
     if (!canUseWallet) {
       await disconnectCurrentClient();
+      if (walletStatus !== 'unlocked') {
+        setError(null);
+        setStatus('idle');
+        return;
+      }
+      if (!address) {
+        setStatus('unsupported');
+        setError('Wallet is unlocked but no active address is loaded.');
+        return;
+      }
+      if (!isEvmAddress(address)) {
+        setStatus('unsupported');
+        setError('Active unlocked wallet is not Ethereum. Switch to an Ethereum wallet for XMTP.');
+        return;
+      }
+      if (!isEvmMessageSigner(wallet)) {
+        setStatus('unsupported');
+        setError('Active Ethereum wallet cannot sign XMTP messages in this session.');
+        return;
+      }
       setError(null);
-      setStatus(walletStatus === 'unlocked' ? 'unsupported' : 'idle');
+      setStatus('unsupported');
       return;
     }
 

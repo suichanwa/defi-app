@@ -3,6 +3,7 @@ import { getJson, setJson } from '../services/storage';
 import { CHAINS, getActiveChain, getActiveChainKey, setActiveChainKey, type ChainConfig, type ChainKey } from '../config/chain';
 import { resetProvider } from '../services/provider';
 import { resetSolanaConnection } from '../services/solanaProvider';
+import { setActiveWalletType } from '../services/activeWalletType';
 
 type ChainContextValue = {
   chain: ChainConfig;
@@ -25,9 +26,12 @@ export function ChainProvider({ children }: { children: React.ReactNode }) {
       const stored = await getJson<ChainKey | null>(CHAIN_STORAGE_KEY);
       if (stored && CHAINS[stored]) {
         setActiveChainKey(stored);
+        await setActiveWalletType(CHAINS[stored].kind);
         if (mounted) {
           setChainKeyState(stored);
         }
+      } else {
+        await setActiveWalletType(getActiveChain().kind);
       }
       if (mounted) {
         setReady(true);
@@ -42,6 +46,7 @@ export function ChainProvider({ children }: { children: React.ReactNode }) {
   const setChainKey = useCallback(async (nextKey: ChainKey) => {
     if (!CHAINS[nextKey]) return;
     setActiveChainKey(nextKey);
+    await setActiveWalletType(CHAINS[nextKey].kind);
     resetProvider();
     resetSolanaConnection();
     setChainKeyState(nextKey);

@@ -19,6 +19,8 @@ type WalletUnlockCardProps = {
   onStartFresh: () => void;
   isStartFreshDisabled?: boolean;
   showStartFresh?: boolean;
+  walletNetworkLabel?: string;
+  onToggleWalletNetwork?: () => void;
 };
 
 export default function WalletUnlockCard({
@@ -34,6 +36,8 @@ export default function WalletUnlockCard({
   onStartFresh,
   isStartFreshDisabled = false,
   showStartFresh = true,
+  walletNetworkLabel,
+  onToggleWalletNetwork,
 }: WalletUnlockCardProps) {
   const { colors } = useTheme();
 
@@ -69,6 +73,15 @@ export default function WalletUnlockCard({
       </View>
 
       <View style={localStyles.passcodeSection}>
+        {walletNetworkLabel && onToggleWalletNetwork ? (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={onToggleWalletNetwork}
+            style={[styles.networkBadge, localStyles.networkBadge]}
+          >
+            <Text style={styles.networkBadgeText}>{walletNetworkLabel}</Text>
+          </TouchableOpacity>
+        ) : null}
         <PasscodeField
           label="Enter Passcode"
           value={unlockPassword}
@@ -136,6 +149,10 @@ const localStyles = StyleSheet.create({
   },
   passcodeSection: {
     marginBottom: 24,
+  },
+  networkBadge: {
+    alignSelf: 'center',
+    marginBottom: 14,
   },
   errorContainer: {
     flexDirection: 'row',

@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { createStackNavigator, StackNavigationProp } from '@react-navigation/stack';
 import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '../theme/ThemeProvider';
 import { useChain } from '../context/ChainProvider';
+import { getSolanaClusterLabel } from '../config/chain';
 import { useWalletSession } from '../context/WalletSessionProvider';
 import type { WalletRecordMeta } from '../types/wallet';
 import WalletSetupScreen from '@components/wallet/WalletSetupScreen';
@@ -251,6 +252,10 @@ export function WalletHomeScreen({ navigation }: { navigation: StackNavigationPr
       return;
     }
     if (chainKey === 'solanaMainnet') {
+      await setChainKey('ethereumMainnet');
+      return;
+    }
+    if (chainKey === 'ethereumMainnet') {
       await setChainKey('solanaDevnet');
     }
   };
@@ -360,6 +365,7 @@ export function WalletHomeScreen({ navigation }: { navigation: StackNavigationPr
 export default function WalletScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
+  const { chain, chainKey, setChainKey } = useChain();
   const {
     status,
     address,
@@ -390,6 +396,23 @@ export default function WalletScreen() {
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [biometricsAvailable, setBiometricsAvailable] = useState(false);
   const [hasMasterPasscode, setHasMasterPasscode] = useState(false);
+
+  const setupNetworkLabel = useMemo(
+    () => (chain.kind === 'solana' ? getSolanaClusterLabel(chain.cluster) : 'Ethereum'),
+    [chain],
+  );
+
+  const handleToggleSetupNetwork = useCallback(async () => {
+    if (chainKey === 'solanaDevnet') {
+      await setChainKey('solanaMainnet');
+      return;
+    }
+    if (chainKey === 'solanaMainnet') {
+      await setChainKey('ethereumMainnet');
+      return;
+    }
+    await setChainKey('solanaDevnet');
+  }, [chainKey, setChainKey]);
 
   const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const biometricInFlightRef = useRef(false);
@@ -863,6 +886,8 @@ export default function WalletScreen() {
           }}
           onFinishSetup={handleFinishSetup}
           onSkipBackup={handleSkipBackup}
+          walletNetworkLabel={setupNetworkLabel}
+          onToggleWalletNetwork={handleToggleSetupNetwork}
         />
       </ScrollView>
     );

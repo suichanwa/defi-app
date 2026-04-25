@@ -13,7 +13,7 @@ export default function NetworkBadge({ onPress }: NetworkBadgeProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const { chain } = useChain();
-  const label = chain.kind === 'solana' ? getSolanaClusterLabel(chain.cluster) : 'Mainnet';
+  const label = chain.kind === 'solana' ? getSolanaClusterLabel(chain.cluster) : 'Ethereum';
 
   if (onPress) {
     return (

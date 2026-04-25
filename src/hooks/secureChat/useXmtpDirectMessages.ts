@@ -154,6 +154,12 @@ export function useXmtpDirectMessages({
   const startDM = useCallback(
     async (peerAddress: string, peerName: string) => {
       if (!client) {
+        if (xmtpError) {
+          throw new Error(xmtpError);
+        }
+        if (xmtpStatus === 'unsupported') {
+          throw new Error('XMTP is unavailable for the active wallet. Switch to Ethereum and unlock it.');
+        }
         throw new Error('XMTP client is not ready yet. Unlock your Ethereum wallet first.');
       }
       if (!isXmtpNativeModuleAvailable() || !XmtpPublicIdentity) {
@@ -173,7 +179,7 @@ export function useXmtpDirectMessages({
       await loadThread(chatId);
       return chatId;
     },
-    [client, loadThread, refreshChannels],
+    [client, loadThread, refreshChannels, xmtpError, xmtpStatus],
   );
 
   const sendText = useCallback(
