@@ -111,14 +111,18 @@ export default function ChatThreadScreen({
     });
   }, [messages]);
 
-  // Convert messages to Flyer format (pre-sorted)
+  const isDirectChat = useMemo(() => {
+    if (!chat) return false;
+    return chat.isDM === true || chat.id.startsWith('dm:') || chat.id.startsWith('p2p:');
+  }, [chat]);
+
+  // Convert messages to Flyer format (pre-sorted).
+  // Keep true timestamps when available and only synthesize for missing createdAt.
   const sortedMessages = useMemo(() => {
     if (sortedChatMessages.length === 0) return [];
-    const baseTime = sortedChatMessages[0].createdAt
-      ? new Date(sortedChatMessages[0].createdAt).getTime()
-      : Date.now();
+    const fallbackBaseTime = Date.now();
     return sortedChatMessages.map((msg, index) =>
-      convertToFlyerMessage(msg, currentUserId, baseTime - index * 30000)
+      convertToFlyerMessage(msg, currentUserId, msg.createdAt ? undefined : fallbackBaseTime - index * 30000)
     );
   }, [sortedChatMessages, currentUserId]);
 
@@ -282,11 +286,14 @@ export default function ChatThreadScreen({
 
   const renderBubble = useCallback(
     ({ child, message, nextMessageInGroup }: { child: React.ReactNode; message: MessageType.Any; nextMessageInGroup: boolean }) => {
+      const isOwn = message.author.id === flyerUser.id;
       return (
         <View
           style={[
             styles.messageItem,
+            isOwn ? styles.messageItemOutgoing : styles.messageItemIncoming,
             nextMessageInGroup && styles.messageItemGrouped,
+            !nextMessageInGroup && styles.messageItemUngrouped,
           ]}
         >
           {child}
@@ -304,10 +311,11 @@ export default function ChatThreadScreen({
       const authorLabel = message.author.firstName ?? message.author.id ?? '';
       const avatarColor = getAvatarColor(authorLabel);
       const initials = getInitials(authorLabel);
+      const shouldShowAuthor = !isOwn && showName && !isDirectChat;
 
       return (
         <View style={[styles.messageShell, isOwn ? styles.messageShellOutgoing : styles.messageShellIncoming]}>
-          {!isOwn && showName ? (
+          {shouldShowAuthor ? (
             <View style={styles.metaRow}>
               <View style={[styles.avatarBadge, { backgroundColor: avatarColor }]}>
                 <Text style={styles.avatarBadgeText}>{initials}</Text>
@@ -328,7 +336,7 @@ export default function ChatThreadScreen({
         </View>
       );
     },
-    [flyerUser.id, getAvatarColor, getInitials, getTimeLabel, styles]
+    [flyerUser.id, getAvatarColor, getInitials, getTimeLabel, isDirectChat, styles]
   );
 
   const renderImageMessage = useCallback(
@@ -340,10 +348,11 @@ export default function ChatThreadScreen({
       const authorLabel = message.author.firstName ?? message.author.id ?? '';
       const avatarColor = getAvatarColor(authorLabel);
       const initials = getInitials(authorLabel);
+      const shouldShowAuthor = !isOwn && !isDirectChat;
 
       return (
         <View style={[styles.messageShell, isOwn ? styles.messageShellOutgoing : styles.messageShellIncoming]}>
-          {!isOwn ? (
+          {shouldShowAuthor ? (
             <View style={styles.metaRow}>
               <View style={[styles.avatarBadge, { backgroundColor: avatarColor }]}>
                 <Text style={styles.avatarBadgeText}>{initials}</Text>
@@ -370,7 +379,7 @@ export default function ChatThreadScreen({
         </View>
       );
     },
-    [flyerUser.id, getAvatarColor, getInitials, getTimeLabel, styles]
+    [flyerUser.id, getAvatarColor, getInitials, getTimeLabel, isDirectChat, styles]
   );
 
   const renderInputBar = useCallback(
@@ -458,12 +467,13 @@ export default function ChatThreadScreen({
                 disableImageGallery={false}
                 enableAnimation={true}
                 showUserAvatars={false}
-                showUserNames={true}
+                showUserNames={!isDirectChat}
                 flatListProps={{
                   ...panHandlers,
                   contentContainerStyle: {
-                    paddingTop: 6,
+                    paddingTop: 8,
                     paddingBottom: 0,
+                    paddingHorizontal: 8,
                   },
                   onEndReached: handleLoadOlder,
                   onEndReachedThreshold: 0.25,
@@ -479,6 +489,12 @@ export default function ChatThreadScreen({
               />
             )}
           >
+            {typingLabel ? (
+              <View style={styles.typingRow}>
+                <MaterialCommunityIcons name="pencil" size={13} color={colors.muted} />
+                <Text style={styles.typingText}>{typingLabel}</Text>
+              </View>
+            ) : null}
             {renderInputBar()}
           </KeyboardAccessoryView>
         </View>
@@ -587,13 +603,22 @@ const createChatStyles = (colors: {
       backgroundColor: colors.background,
     },
     messageItem: {
-      paddingHorizontal: 0,
+      paddingHorizontal: 4,
       paddingVertical: 2,
       backgroundColor: 'transparent',
       borderRadius: 0,
     },
+    messageItemIncoming: {
+      alignItems: 'flex-start',
+    },
+    messageItemOutgoing: {
+      alignItems: 'flex-end',
+    },
     messageItemGrouped: {
       paddingTop: 1,
+    },
+    messageItemUngrouped: {
+      paddingTop: 6,
     },
     messageBody: {
       gap: 4,
@@ -617,6 +642,7 @@ const createChatStyles = (colors: {
       paddingHorizontal: 14,
       paddingVertical: 10,
       borderRadius: 18,
+      borderTopLeftRadius: 8,
       backgroundColor: colors.card,
       borderWidth: 1,
       borderColor: colors.border,
@@ -631,6 +657,7 @@ const createChatStyles = (colors: {
       paddingHorizontal: 14,
       paddingVertical: 10,
       borderRadius: 18,
+      borderTopRightRadius: 8,
       backgroundColor: withAlpha(colors.accent, '18'),
       borderWidth: 1,
       borderColor: withAlpha(colors.accent, '3A'),
@@ -729,6 +756,25 @@ const createChatStyles = (colors: {
       paddingBottom: 2,
       paddingHorizontal: 0,
       backgroundColor: colors.background,
+    },
+    typingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      alignSelf: 'flex-start',
+      marginLeft: 12,
+      marginBottom: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.card,
+    },
+    typingText: {
+      fontSize: 12,
+      color: colors.muted,
+      fontWeight: '500',
     },
     loadMoreFooter: {
       flexDirection: 'row',

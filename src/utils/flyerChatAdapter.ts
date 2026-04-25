@@ -23,7 +23,7 @@ export function convertToFlyerMessage(
                 (currentUserId && msg.authorId === currentUserId);
 
   const author = {
-    id: msg.authorId || msg.author,
+    id: isOwn && currentUserId ? currentUserId : (msg.authorId || msg.author),
     firstName: msg.author,
   };
 

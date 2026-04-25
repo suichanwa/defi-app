@@ -310,6 +310,18 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     return getChatById(selectedChatId);
   }, [getChatById, selectedChatId]);
 
+  const threadCurrentUserId = useMemo(() => {
+    if (selectedChat?.id.startsWith('dm:xmtp:')) {
+      return xmtpClient?.inboxId ?? effectiveUserId;
+    }
+    if (selectedChat?.id.startsWith('p2p:')) {
+      return authorId ?? effectiveUserId;
+    }
+    return effectiveUserId;
+  }, [authorId, effectiveUserId, selectedChat?.id, xmtpClient?.inboxId]);
+
+  const typingSenderId = useMemo(() => authorId ?? effectiveUserId, [authorId, effectiveUserId]);
+
   useEffect(() => {
     if (!p2pChatId || p2pStatus !== 'connected') return;
     const peerName = p2pPeerLabel ?? 'P2P Peer';
@@ -486,7 +498,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
 
   const { participantCount, sendBroadcast, sendTyping } = useRealtimeRoom({
     roomId,
-    presenceKey: authorId ?? displayLabel,
+    presenceKey: typingSenderId,
     presencePayload,
     onIncomingMessage: handleIncomingRoomMessage,
     onTyping: (payload: TypingPayload) => {
@@ -501,15 +513,16 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
       };
       const payloadChatId = readString('chatId');
       if (!payloadChatId) return;
+      const payloadSenderId = readString('senderId');
       const payloadAuthorId = readString('authorId');
       const payloadAuthor = readString('author');
       const payloadIsTyping = readBoolean('isTyping') === true;
 
-      if (payloadAuthorId && payloadAuthorId === effectiveUserId) return;
-      if (!payloadAuthorId && payloadAuthor === displayLabel) return;
+      const senderIdentity = payloadSenderId ?? payloadAuthorId;
+      if (senderIdentity && senderIdentity === typingSenderId) return;
 
       if (payloadIsTyping) {
-        const label = payloadAuthor ?? 'Someone';
+        const label = payloadAuthor ?? getChatById(payloadChatId)?.name ?? 'Someone';
         setTypingByChatId((prev) => ({ ...prev, [payloadChatId]: `${label} is typing...` }));
         if (typingTimersRef.current[payloadChatId]) {
           clearTimeout(typingTimersRef.current[payloadChatId] as ReturnType<typeof setTimeout>);
@@ -713,6 +726,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
         typingSentRef.current.isTyping = false;
         sendTyping({
           chatId: selectedChat.id,
+          senderId: typingSenderId,
           authorId,
           author: displayLabel,
           isTyping: false,
@@ -730,12 +744,13 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
       typingSentRef.current.lastSentAt = now;
       sendTyping({
         chatId: selectedChat.id,
+        senderId: typingSenderId,
         authorId,
         author: displayLabel,
         isTyping: true,
       }).catch(() => undefined);
     }
-  }, [authorId, displayLabel, draft, selectedChat, sendTyping]);
+  }, [authorId, displayLabel, draft, selectedChat, sendTyping, typingSenderId]);
 
   useEffect(() => {
     return () => {
@@ -998,7 +1013,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
             draft,
             serverInfo,
             participantCount,
-            currentUserId: effectiveUserId,
+            currentUserId: threadCurrentUserId,
             currentUserLabel: displayLabel,
             onBack: () => setView('list'),
             onDraftChange: setDraft,

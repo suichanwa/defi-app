@@ -16,6 +16,7 @@ type RealtimeArgs = {
 
 export type TypingPayload = {
   chatId: string;
+  senderId?: string;
   authorId?: string;
   author?: string;
   isTyping: boolean;
