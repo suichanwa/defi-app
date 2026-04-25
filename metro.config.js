@@ -31,6 +31,27 @@ config.resolver.unstable_enablePackageExports = false;
 // Allow importing from @noble/hashes subpaths
 config.resolver.sourceExts = [...config.resolver.sourceExts, 'cjs'];
 
+// Ignore transient Gradle build output inside node_modules. These directories
+// can be deleted/recreated while Metro is crawling, which causes ENOENT watch
+// crashes on Windows fallback watcher.
+const transientAndroidBuildDirs = [
+  /[/\\]node_modules[/\\].*[/\\]android[/\\].*[/\\]build[/\\].*/,
+];
+
+if (!config.resolver.blockList) {
+  config.resolver.blockList = transientAndroidBuildDirs;
+} else if (Array.isArray(config.resolver.blockList)) {
+  config.resolver.blockList = [
+    ...config.resolver.blockList,
+    ...transientAndroidBuildDirs,
+  ];
+} else {
+  config.resolver.blockList = [
+    config.resolver.blockList,
+    ...transientAndroidBuildDirs,
+  ];
+}
+
 // Custom resolver to handle @noble/hashes and @noble/ciphers subpath imports
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   // Handle @noble/hashes subpath imports - always use root version

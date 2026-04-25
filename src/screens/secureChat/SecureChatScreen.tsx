@@ -34,7 +34,6 @@ import { useChatAvatar } from '../../hooks/useChatAvatar';
 import { useChatProfiles } from '../../hooks/useChatProfiles';
 import { useTheme } from '@theme/ThemeProvider';
 import { useXmtpClient } from '@context/XmtpProvider';
-import { isEvmAddress } from '@services/xmtp/signer';
 
 type PendingFile = {
   uri: string;
@@ -293,7 +292,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
 
   useEffect(() => {
     if (xmtpStatus !== 'unsupported') return;
-    const line = 'XMTP unavailable: unlock an Ethereum wallet to enable direct messages.';
+    const line = 'XMTP unavailable: unlock an Ethereum wallet to enable direct messages (Solana addresses can route via linked XMTP wallet).';
     setConnectionLog((prev) => (prev.includes(line) ? prev : [line, ...prev]));
   }, [xmtpStatus]);
 
@@ -643,23 +642,24 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
   // Handle starting a DM from profile view
   const handleStartDM = useCallback(async (otherUserId: string, otherUserName: string) => {
     try {
-      if (!isEvmAddress(otherUserId)) {
+      const candidate = otherUserId.trim();
+      if (!candidate) {
         setTab('connect');
         setView('list');
         setConnectionLog((prev) => [
-          'XMTP DMs require the peer Ethereum wallet address (0x...).',
+          'Enter a peer wallet address (Ethereum 0x... or Solana base58).',
           ...prev,
         ]);
         scopedShowToast({
           type: 'default',
           text1: 'Wallet address required',
-          text2: 'Open Connect and enter a peer Ethereum address to start XMTP DM.',
+          text2: 'Open Connect and enter a peer wallet address to start XMTP DM.',
           position: 'top',
           visibilityTime: 3500,
         });
         return;
       }
-      const channelId = await startDM(otherUserId, otherUserName);
+      const channelId = await startDM(candidate, otherUserName);
       selectChat(channelId);
       setRoomId(channelId);
       setTab('chats');
@@ -825,7 +825,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     const address = connectAddress.trim();
     const name = connectName.trim() || `Peer @ ${address}`;
     if (!address) {
-      setConnectionLog((prev) => ['Enter a peer Ethereum address (0x...) to start XMTP DM.', ...prev]);
+      setConnectionLog((prev) => ['Enter a peer wallet address (Ethereum 0x... or Solana base58) to start XMTP DM.', ...prev]);
       return;
     }
     try {

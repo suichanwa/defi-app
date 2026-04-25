@@ -5,6 +5,7 @@ import { getOrCreateXmtpDbKey } from '@services/xmtp/dbKeyStore';
 import { createXmtpEoaSigner, isEvmAddress, isEvmMessageSigner } from '@services/xmtp/signer';
 import { getXmtpEnvironment } from '@services/xmtp/config';
 import { XMTP_APP_VERSION } from '@services/xmtp/constants';
+import { publishWalletLinkToProfile, readLocalWalletLinkCandidates } from '@services/xmtp/profileWalletLink';
 
 type XmtpStatus = 'idle' | 'unsupported' | 'initializing' | 'ready' | 'error';
 
@@ -35,6 +36,7 @@ export function XmtpProvider({ children }: { children: React.ReactNode }) {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const activeInitRef = useRef(0);
   const clientRef = useRef<Client | null>(null);
+  const lastPublishedLinkRef = useRef('');
 
   useEffect(() => {
     clientRef.current = client;
@@ -113,6 +115,32 @@ export function XmtpProvider({ children }: { children: React.ReactNode }) {
       void disconnectCurrentClient();
     };
   }, [disconnectCurrentClient]);
+
+  useEffect(() => {
+    if (status !== 'ready' || !walletAddress || !client?.inboxId) return;
+
+    let cancelled = false;
+    const publishWalletLink = async () => {
+      const localCandidates = await readLocalWalletLinkCandidates();
+      const linkKey = `${walletAddress}|${localCandidates.solanaWalletAddress ?? ''}|${client.inboxId}`;
+      if (lastPublishedLinkRef.current === linkKey) return;
+
+      const result = await publishWalletLinkToProfile({
+        evmWalletAddress: walletAddress,
+        solanaWalletAddress: localCandidates.solanaWalletAddress,
+        xmtpInboxId: client.inboxId,
+      });
+
+      if (!cancelled && result.ok) {
+        lastPublishedLinkRef.current = linkKey;
+      }
+    };
+
+    void publishWalletLink();
+    return () => {
+      cancelled = true;
+    };
+  }, [client?.inboxId, status, walletAddress]);
 
   const value = useMemo<XmtpContextValue>(
     () => ({

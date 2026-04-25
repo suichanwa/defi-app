@@ -9,7 +9,7 @@ import {
   xmtpChatIdToConversationId,
   xmtpConversationIdToChatId,
 } from '@services/xmtp/mappers';
-import { isEvmAddress } from '@services/xmtp/signer';
+import { resolvePeerXmtpAddress } from '@services/xmtp/addressResolver';
 
 type UseXmtpDirectMessagesArgs = {
   displayLabel: string;
@@ -142,17 +142,14 @@ export function useXmtpDirectMessages({
       if (!client) {
         throw new Error('XMTP client is not ready yet. Unlock your Ethereum wallet first.');
       }
-      const normalizedAddress = peerAddress.trim().toLowerCase();
-      if (!isEvmAddress(normalizedAddress)) {
-        throw new Error('XMTP DMs require a valid Ethereum wallet address (0x...).');
-      }
+      const resolved = await resolvePeerXmtpAddress(peerAddress);
+      const normalizedAddress = resolved.xmtpEvmAddress;
 
       const identity = new PublicIdentity(normalizedAddress, 'ETHEREUM');
       const dm = await client.conversations.findOrCreateDmWithIdentity(identity);
       const chatId = xmtpConversationIdToChatId(dm.id as string);
-      if (peerName.trim()) {
-        preferredNameByChatIdRef.current[chatId] = peerName.trim();
-      }
+      const preferredName = peerName.trim() || resolved.alias || '';
+      if (preferredName) preferredNameByChatIdRef.current[chatId] = preferredName;
       conversationCacheRef.current.set(chatId, dm);
 
       await refreshChannels();

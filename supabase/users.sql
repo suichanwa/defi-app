@@ -7,6 +7,9 @@ create table if not exists public.user_profiles (
   avatar_seed text,
   theme_preference text default 'system',
   language text default 'en',
+  evm_wallet_address text,
+  solana_wallet_address text,
+  xmtp_inbox_id text,
   updated_at timestamptz not null default now()
 );
 
