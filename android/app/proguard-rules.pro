@@ -14,4 +14,11 @@
 # WalletConnect pulls in JNA, which references desktop-only AWT types that are not used on Android.
 -dontwarn java.awt.Component
 
+# XMTP SDK relies on Kotlin/Uniffi classes and native bindings that can break if obfuscated.
+-keep class expo.modules.xmtpreactnativesdk.** { *; }
+-keep class org.xmtp.** { *; }
+-keep class uniffi.xmtpv3.** { *; }
+-dontwarn org.xmtp.**
+-dontwarn uniffi.xmtpv3.**
+
 # Add any project specific keep options here:
