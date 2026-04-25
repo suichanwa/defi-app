@@ -210,19 +210,16 @@ export async function createInitialWalletKey(password: string): Promise<Encrypte
   
   const { Wallet } = await import('ethers');
   const wallet = Wallet.createRandom();
-  const encryptedJson = await wallet.encrypt(password);
+  const encrypted = await encryptWalletKey(wallet.privateKey, password);
   
-  const now = new Date().toISOString();
   const record: EncryptedWalletKey = {
+    ...encrypted,
     id: wallet.address,
-    encryptedJson,
-    createdAt: now,
-    updatedAt: now,
     backupCompleted: false,
     walletType: 'ethereum',
   };
   
-  await saveEncryptedWalletKey(record);
+  await saveEncryptedWalletKey(record, 'ethereum');
   return record;
 }
 

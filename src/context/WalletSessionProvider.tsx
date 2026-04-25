@@ -17,6 +17,8 @@ import {
   unlockSolanaWallet,
   removeWalletRecord,
   updateWalletRecordMeta,
+  encryptWalletKey,
+  decryptWalletKey,
 } from '../services/walletKeyStore';
 import { getActiveChain } from '../config/chain';
 import { clearBiometricPassword } from '../services/biometricAuth';
@@ -109,11 +111,21 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
         return;
       }
 
-      const walletInstance = await Wallet.fromEncryptedJson(record.encryptedJson, password);
+      let walletInstance: Wallet | HDNodeWallet;
+      try {
+        // New path: decrypt app-stored key payload (Rust/native or JS fallback) then create wallet instance.
+        const decryptedPrivateKey = await decryptWalletKey(record.encryptedJson, password);
+        const normalizedPrivateKey = decryptedPrivateKey.startsWith('0x')
+          ? decryptedPrivateKey
+          : `0x${decryptedPrivateKey}`;
+        walletInstance = new Wallet(normalizedPrivateKey);
+      } catch {
+        // Backward compatibility: previously stored Ethereum wallets use ethers encrypted JSON.
+        walletInstance = await Wallet.fromEncryptedJson(record.encryptedJson, password);
+      }
       setWallet(walletInstance);
       setAddress(walletInstance.address);
       setBackupCompletedState(Boolean(record.backupCompleted));
-      // HDNodeWallet has mnemonic, regular Wallet doesn't
       const hdWallet = walletInstance as HDNodeWallet;
       setRecoveryPhrase(record.backupCompleted ? null : hdWallet.mnemonic?.phrase ?? null);
     },
@@ -252,10 +264,10 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
     }
 
     const walletInstance = Wallet.createRandom();
-    const encryptedJson = await walletInstance.encrypt(password);
+    const encrypted = await encryptWalletKey(walletInstance.privateKey, password);
     const record: EncryptedWalletKey = {
+      ...encrypted,
       id: walletInstance.address,
-      encryptedJson,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       backupCompleted: false,
@@ -305,10 +317,10 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
     }
 
     const walletInstance = HDNodeWallet.fromPhrase(mnemonic.trim());
-    const encryptedJson = await walletInstance.encrypt(password);
+    const encrypted = await encryptWalletKey(walletInstance.privateKey, password);
     const record: EncryptedWalletKey = {
+      ...encrypted,
       id: walletInstance.address,
-      encryptedJson,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       backupCompleted: false,
