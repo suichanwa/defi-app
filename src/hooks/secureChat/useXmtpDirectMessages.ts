@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChatMessage, ChatThread } from '@app-types/securechat-types/secureChat';
-import { ConversationVersion, Dm, PublicIdentity, type ConsentState, type DecodedMessageUnion } from '@xmtp/react-native-sdk';
+import type { Dm, ConsentState, DecodedMessageUnion } from '@xmtp/react-native-sdk';
 import { useXmtpClient } from '@context/XmtpProvider';
 import { MAX_MESSAGES_IN_MEMORY } from '@constants/secureChat.constants';
 import {
@@ -10,6 +10,7 @@ import {
   xmtpConversationIdToChatId,
 } from '@services/xmtp/mappers';
 import { resolvePeerXmtpAddress } from '@services/xmtp/addressResolver';
+import { isXmtpNativeModuleAvailable, XmtpConversationVersion, XmtpPublicIdentity } from '@services/xmtp/sdk';
 
 type UseXmtpDirectMessagesArgs = {
   displayLabel: string;
@@ -32,7 +33,10 @@ const parseSentNs = (value?: number): number => {
 };
 
 const isDmConversation = (value: unknown): value is Dm =>
-  value instanceof Dm || (!!value && typeof value === 'object' && (value as Dm).version === ConversationVersion.DM);
+  !!value &&
+  typeof value === 'object' &&
+  XmtpConversationVersion !== null &&
+  (value as Dm).version === XmtpConversationVersion.DM;
 
 export function useXmtpDirectMessages({
   displayLabel,
@@ -46,6 +50,11 @@ export function useXmtpDirectMessages({
   const conversationCacheRef = useRef<Map<string, Dm>>(new Map());
   const preferredNameByChatIdRef = useRef<Record<string, string>>({});
   const streamStartNsRef = useRef(0);
+  const onErrorRef = useRef(onError);
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
 
   const resolveDmConversation = useCallback(
     async (chatId: string): Promise<Dm | null> => {
@@ -67,6 +76,10 @@ export function useXmtpDirectMessages({
   );
 
   const refreshChannels = useCallback(async () => {
+    if (!isXmtpNativeModuleAvailable()) {
+      setDmChannels([]);
+      return;
+    }
     if (!client) {
       setDmChannels([]);
       return;
@@ -96,9 +109,9 @@ export function useXmtpDirectMessages({
       setDmChannels(mapped);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to refresh XMTP conversations.';
-      onError?.(message);
+      onErrorRef.current?.(message);
     }
-  }, [client, displayLabel, onError]);
+  }, [client, displayLabel]);
 
   const setThreadMessages = useCallback(
     (chatId: string, incoming: ChatMessage[]) => {
@@ -116,6 +129,7 @@ export function useXmtpDirectMessages({
 
   const loadThread = useCallback(
     async (chatId: string) => {
+      if (!isXmtpNativeModuleAvailable()) return;
       const dm = await resolveDmConversation(chatId);
       if (!client || !dm) return;
 
@@ -131,10 +145,10 @@ export function useXmtpDirectMessages({
         setThreadMessages(chatId, mapped);
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to load XMTP thread.';
-        onError?.(message);
+        onErrorRef.current?.(message);
       }
     },
-    [client, displayLabel, onError, resolveDmConversation, setThreadMessages],
+    [client, displayLabel, resolveDmConversation, setThreadMessages],
   );
 
   const startDM = useCallback(
@@ -142,10 +156,13 @@ export function useXmtpDirectMessages({
       if (!client) {
         throw new Error('XMTP client is not ready yet. Unlock your Ethereum wallet first.');
       }
+      if (!isXmtpNativeModuleAvailable() || !XmtpPublicIdentity) {
+        throw new Error('XMTP native module is unavailable in this build.');
+      }
       const resolved = await resolvePeerXmtpAddress(peerAddress);
       const normalizedAddress = resolved.xmtpEvmAddress;
 
-      const identity = new PublicIdentity(normalizedAddress, 'ETHEREUM');
+      const identity = new XmtpPublicIdentity(normalizedAddress, 'ETHEREUM');
       const dm = await client.conversations.findOrCreateDmWithIdentity(identity);
       const chatId = xmtpConversationIdToChatId(dm.id as string);
       const preferredName = peerName.trim() || resolved.alias || '';
@@ -265,14 +282,14 @@ export function useXmtpDirectMessages({
       .streamAllMessages(handleMessage, 'dms', DM_CONSENT_STATES)
       .catch((error) => {
         if (cancelled) return;
-        onError?.(error instanceof Error ? error.message : 'XMTP stream failed.');
+        onErrorRef.current?.(error instanceof Error ? error.message : 'XMTP stream failed.');
       });
 
     return () => {
       cancelled = true;
       client.conversations.cancelStreamAllMessages();
     };
-  }, [client, displayLabel, isActive, notifyIncoming, onError, setMessagesByChat]);
+  }, [client, displayLabel, isActive, notifyIncoming, setMessagesByChat]);
 
   useEffect(() => {
     if (!client) {

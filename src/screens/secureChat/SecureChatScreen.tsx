@@ -262,6 +262,10 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
 
   const selectedHistoryState = historyStateByChat[selectedChatId];
 
+  const handleXmtpSyncError = useCallback((message: string) => {
+    setConnectionLog((prev) => [`DM sync error: ${message}`, ...prev]);
+  }, []);
+
   const {
     dmChannels,
     startDM,
@@ -274,9 +278,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     isActive,
     notifyIncoming,
     setMessagesByChat,
-    onError: (message) => {
-      setConnectionLog((prev) => [`DM sync error: ${message}`, ...prev]);
-    },
+    onError: handleXmtpSyncError,
   });
 
   useEffect(() => {

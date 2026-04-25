@@ -1,11 +1,12 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Client } from '@xmtp/react-native-sdk';
+import type { Client } from '@xmtp/react-native-sdk';
 import { useWalletSession } from './WalletSessionProvider';
 import { getOrCreateXmtpDbKey } from '@services/xmtp/dbKeyStore';
 import { createXmtpEoaSigner, isEvmAddress, isEvmMessageSigner } from '@services/xmtp/signer';
 import { getXmtpEnvironment } from '@services/xmtp/config';
 import { XMTP_APP_VERSION } from '@services/xmtp/constants';
 import { publishWalletLinkToProfile, readLocalWalletLinkCandidates } from '@services/xmtp/profileWalletLink';
+import { getXmtpSdkErrorMessage, isXmtpNativeModuleAvailable, XmtpClient } from '@services/xmtp/sdk';
 
 type XmtpStatus = 'idle' | 'unsupported' | 'initializing' | 'ready' | 'error';
 
@@ -20,9 +21,9 @@ type XmtpContextValue = {
 const XmtpContext = createContext<XmtpContextValue | null>(null);
 
 async function dropXmtpClient(client: Client | null): Promise<void> {
-  if (!client) return;
+  if (!client || !XmtpClient) return;
   try {
-    await Client.dropClient(client.installationId);
+    await XmtpClient.dropClient(client.installationId);
   } catch {
     // Keep drop best-effort to avoid blocking app state transitions.
   }
@@ -51,6 +52,16 @@ export function XmtpProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const initClient = useCallback(async () => {
+    if (!isXmtpNativeModuleAvailable() || !XmtpClient) {
+      await disconnectCurrentClient();
+      setStatus('unsupported');
+      setError(
+        getXmtpSdkErrorMessage() ??
+          'XMTP native module is unavailable. Use a development build / release build, not Expo Go.',
+      );
+      return;
+    }
+
     const canUseWallet =
       walletStatus === 'unlocked' &&
       Boolean(address) &&
@@ -84,7 +95,7 @@ export function XmtpProvider({ children }: { children: React.ReactNode }) {
         dbEncryptionKey,
         appVersion: XMTP_APP_VERSION,
       };
-      const nextClient = await Client.create(signer, options);
+      const nextClient = await XmtpClient.create(signer, options);
 
       if (activeInitRef.current !== initId) {
         await dropXmtpClient(nextClient);

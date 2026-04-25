@@ -7,6 +7,7 @@ import { useTheme } from '@theme/ThemeProvider';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useNavVisibility } from '@context/NavVisibilityProvider';
 import { useWalletSession } from '@context/WalletSessionProvider';
+import { useCopyToClipboard } from '@hooks/useCopyToClipboard';
 
 type WalletStackParamList = {
   WalletSettings: { walletId: string };
@@ -20,6 +21,7 @@ export default function WalletSettingsScreen() {
   const navigation = useNavigation<StackNavigationProp<WalletStackParamList, 'WalletSettings'>>();
   const route = useRoute<WalletSettingsRouteProp>();
   const { wallets, removeWallet } = useWalletSession();
+  const { copyText } = useCopyToClipboard();
   const { setNavHidden } = useNavVisibility();
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -34,9 +36,12 @@ export default function WalletSettingsScreen() {
   const wallet = wallets.find((record) => record.id === walletId);
   const label = wallet?.label ?? 'Wallet';
 
-  const formatAddress = (value: string) => {
-    if (value.length <= 10) return value;
-    return `${value.slice(0, 4)}...${value.slice(-4)}`;
+  const handleCopyAddress = () => {
+    if (!walletId) return;
+    copyText(walletId, {
+      successMessage: 'Wallet address copied',
+      errorMessage: 'Unable to copy address',
+    });
   };
 
   const handleDelete = () => {
@@ -82,7 +87,21 @@ export default function WalletSettingsScreen() {
         <View style={[localStyles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[localStyles.infoLabel, { color: colors.muted }]}>Wallet</Text>
           <Text style={[localStyles.infoTitle, { color: colors.text }]}>{label}</Text>
-          {walletId && <Text style={[localStyles.infoAddress, { color: colors.muted }]}>{formatAddress(walletId)}</Text>}
+          {walletId ? (
+            <View style={localStyles.addressBlock}>
+              <Text style={[localStyles.addressLabel, { color: colors.muted }]}>Address</Text>
+              <Text style={[localStyles.infoAddress, { color: colors.text }]}>{walletId}</Text>
+              <TouchableOpacity
+                accessibilityRole="button"
+                activeOpacity={0.8}
+                style={[localStyles.copyButton, { borderColor: colors.border, backgroundColor: colors.background }]}
+                onPress={handleCopyAddress}
+              >
+                <MaterialCommunityIcons name="content-copy" size={16} color={colors.text} />
+                <Text style={[localStyles.copyButtonText, { color: colors.text }]}>Copy address</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
         </View>
 
         <View style={[localStyles.deleteCard, { borderColor: colors.border }]}>
@@ -151,9 +170,34 @@ const localStyles = StyleSheet.create({
     marginTop: 6,
   },
   infoAddress: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
     marginTop: 4,
+    lineHeight: 18,
+  },
+  addressBlock: {
+    marginTop: 12,
+  },
+  addressLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  copyButton: {
+    marginTop: 12,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  copyButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   deleteCard: {
     borderRadius: 16,
