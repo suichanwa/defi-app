@@ -14,6 +14,12 @@
 # WalletConnect pulls in JNA, which references desktop-only AWT types that are not used on Android.
 -dontwarn java.awt.Component
 
+# JNA internals are accessed from native code/reflection. Keep classes and members stable.
+-keep class com.sun.jna.** { *; }
+-keepclassmembers class com.sun.jna.Pointer { long peer; }
+-keepclassmembers class * extends com.sun.jna.Structure { *; }
+-dontwarn com.sun.jna.**
+
 # XMTP SDK relies on Kotlin/Uniffi classes and native bindings that can break if obfuscated.
 -keep class expo.modules.xmtpreactnativesdk.** { *; }
 -keep class org.xmtp.** { *; }
