@@ -12,8 +12,6 @@ type ViewProfileCardProps = {
   isOnline?: boolean;
   onClose: () => void;
   onCopyId?: () => void;
-  onP2P?: () => void;
-  canP2P?: boolean;
 };
 
 export default function ViewProfileCard({
@@ -23,25 +21,12 @@ export default function ViewProfileCard({
   isOnline = false,
   onClose,
   onCopyId,
-  onP2P,
-  canP2P = false,
 }: ViewProfileCardProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(1)).current;
   const isAnimating = useRef(false);
-
-  const handleP2PPress = () => {
-    if (!canP2P || !onP2P || isAnimating.current) return;
-    isAnimating.current = true;
-    Animated.parallel([
-      Animated.timing(scale, { toValue: 0.96, duration: 120, useNativeDriver: true }),
-      Animated.timing(opacity, { toValue: 0.85, duration: 120, useNativeDriver: true }),
-    ]).start(() => {
-      onP2P();
-    });
-  };
 
   return (
     <Animated.View style={[styles.card, { transform: [{ scale }], opacity }]}>
@@ -70,19 +55,6 @@ export default function ViewProfileCard({
       )}
 
       <View style={styles.actionsRow}>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.actionSecondary, !canP2P && styles.actionDisabled]}
-          activeOpacity={0.8}
-          onPress={handleP2PPress}
-          disabled={!canP2P}
-        >
-          <MaterialCommunityIcons
-            name="signal"
-            size={20}
-            color={canP2P ? colors.text : colors.muted}
-          />
-          <Text style={[styles.actionText, styles.actionTextSecondary, !canP2P && styles.actionTextDisabled]}>P2P DM</Text>
-        </TouchableOpacity>
         <TouchableOpacity style={[styles.actionButton, styles.actionSecondary]} activeOpacity={0.8}>
           <MaterialCommunityIcons name="account-plus-outline" size={20} color={colors.text} />
           <Text style={[styles.actionText, styles.actionTextSecondary]}>Add Friend</Text>
@@ -200,17 +172,10 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     actionSecondary: {
       backgroundColor: colors.border,
     },
-    actionDisabled: {
-      backgroundColor: colors.border,
-      opacity: 0.6,
-    },
     actionText: {
       fontSize: 13,
       fontWeight: '600',
       color: colors.accentText,
-    },
-    actionTextDisabled: {
-      color: colors.muted,
     },
     actionTextSecondary: {
       color: colors.text,

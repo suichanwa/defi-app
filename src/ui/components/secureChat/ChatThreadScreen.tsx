@@ -45,7 +45,6 @@ type Props = {
   onReplyMessage?: (message: ChatMessage) => void;
   onEditMessage?: (message: ChatMessage) => void;
   onDeleteMessage?: (message: ChatMessage) => void;
-  onStartP2P?: (userId: string, userName: string) => void;
   isMuted?: boolean;
   onToggleMute?: () => void;
 };
@@ -93,7 +92,6 @@ export default function ChatThreadScreen({
   onReplyMessage,
   onEditMessage,
   onDeleteMessage,
-  onStartP2P,
   isMuted,
   onToggleMute,
 }: Props) {
@@ -113,7 +111,7 @@ export default function ChatThreadScreen({
 
   const isDirectChat = useMemo(() => {
     if (!chat) return false;
-    return chat.isDM === true || chat.id.startsWith('dm:') || chat.id.startsWith('p2p:');
+    return chat.isDM === true || chat.id.startsWith('dm:');
   }, [chat]);
 
   // Convert messages to Flyer format (pre-sorted).
@@ -540,7 +538,6 @@ export default function ChatThreadScreen({
         avatarSource={selectedProfile?.avatarSource ?? { avatarType: 'identicon', seed: 'default' }}
         isOnline={selectedProfile?.isOnline ?? false}
         onClose={() => setSelectedProfile(null)}
-        onStartP2P={onStartP2P}
       />
     </View>
   );

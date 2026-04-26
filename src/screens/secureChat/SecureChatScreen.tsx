@@ -7,7 +7,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as date from 'date-and-time';
 import { showToast } from '@services/toast';
 import * as Clipboard from 'expo-clipboard';
-import * as DocumentPicker from 'expo-document-picker';
 import SecureChatContent from './components/SecureChatContent';
 import SecureChatLayout from './components/SecureChatLayout';
 import * as SecureChatConstants from '@constants/secureChat.constants';
@@ -19,7 +18,6 @@ import { useRealtimeRoom, type TypingPayload } from '@hooks/secureChat/useRealti
 import { useChatTransport } from '@hooks/secureChat/useChatTransport';
 import { useTickingClock } from '@hooks/useTickingClock';
 import { useRoomHistory } from '@hooks/useRoomHistory';
-import { useP2PDirectMessages } from '@hooks/secureChat/useP2PDirectMessages';
 import { resolveChatImageMessages } from '@utils/secureChatImages';
 import { mapRowToMessage } from '@utils/secureChatUtils';
 import {
@@ -95,9 +93,6 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     () => (xmtpClient?.inboxId ? `xmtp:${xmtpClient.inboxId}` : `user:${displayLabel}`),
     [displayLabel, xmtpClient?.inboxId],
   );
-  const [p2pRemoteOffer, setP2pRemoteOffer] = useState('');
-  const [p2pRemoteAnswer, setP2pRemoteAnswer] = useState('');
-  const [p2pRemoteCandidates, setP2pRemoteCandidates] = useState('');
 
   const handlePickImage = useCallback(async () => {
     setPendingFile(null);
@@ -107,24 +102,6 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
   const handleClearAttachment = useCallback(() => {
     clearImage();
   }, [clearImage]);
-
-  const handlePickFile = useCallback(async () => {
-    const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true });
-    if (result.canceled) return;
-    const asset = result.assets[0];
-    if (!asset?.uri) return;
-    setAttachment(null);
-    setPendingFile({
-      uri: asset.uri,
-      name: asset.name ?? `file-${Date.now()}`,
-      size: asset.size ?? 0,
-      mime: asset.mimeType ?? 'application/octet-stream',
-    });
-  }, [setAttachment]);
-
-  const handleClearFile = useCallback(() => {
-    setPendingFile(null);
-  }, []);
 
   const notifyIncomingRef = useRef<(chatId: string, message: ChatMessage) => void>(() => undefined);
   const notifyIncoming = useCallback(
@@ -196,13 +173,13 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
             : chat,
         );
         if (next.some((chat) => chat.id === chatId)) return next;
-        const fallbackName = message.author || 'P2P Peer';
+        const fallbackName = message.author || 'Direct Message';
         return [
           {
             id: chatId,
             name: fallbackName,
             participants: [displayLabel, fallbackName],
-            peerAddress: 'p2p',
+            peerAddress: 'direct',
             isOnline: true,
             isDM: true,
             lastMessage: {
@@ -223,32 +200,6 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     },
     [displayLabel, setChats, setMessagesByChat],
   );
-
-  const {
-    status: p2pStatus,
-    chatId: p2pChatId,
-    peerLabel: p2pPeerLabel,
-    localOffer: p2pLocalOffer,
-    localAnswer: p2pLocalAnswer,
-    localCandidates: p2pLocalCandidates,
-    createOffer: p2pCreateOffer,
-    createAnswer: p2pCreateAnswer,
-    acceptAnswer: p2pAcceptAnswer,
-    addRemoteCandidates: p2pAddRemoteCandidates,
-    reset: p2pReset,
-    sendText: p2pSendText,
-    sendFile: p2pSendFile,
-  } = useP2PDirectMessages({
-    displayLabel,
-    authorId: authorId ?? effectiveUserId,
-    onMessage: (message, chatId) => {
-      appendMessageToChat(chatId, message);
-      notifyIncoming(chatId, message);
-    },
-    onLog: (line) => {
-      setConnectionLog((prev) => [line, ...prev]);
-    },
-  });
 
   const loadInitialRef = useRef(loadInitial);
   useEffect(() => {
@@ -314,44 +265,10 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     if (selectedChat?.id.startsWith('dm:xmtp:')) {
       return xmtpClient?.inboxId ?? effectiveUserId;
     }
-    if (selectedChat?.id.startsWith('p2p:')) {
-      return authorId ?? effectiveUserId;
-    }
     return effectiveUserId;
-  }, [authorId, effectiveUserId, selectedChat?.id, xmtpClient?.inboxId]);
+  }, [effectiveUserId, selectedChat?.id, xmtpClient?.inboxId]);
 
   const typingSenderId = useMemo(() => authorId ?? effectiveUserId, [authorId, effectiveUserId]);
-
-  useEffect(() => {
-    if (!p2pChatId || p2pStatus !== 'connected') return;
-    const peerName = p2pPeerLabel ?? 'P2P Peer';
-    setChats((prev) => {
-      const existing = prev.find((chat) => chat.id === p2pChatId);
-      if (existing) {
-        return prev.map((chat) => (chat.id === p2pChatId ? { ...chat, name: peerName } : chat));
-      }
-      return [
-        {
-          id: p2pChatId,
-          name: peerName,
-          participants: [displayLabel, peerName],
-          peerAddress: 'p2p',
-          isOnline: true,
-          isDM: true,
-          lastMessage: {
-            text: 'P2P session connected',
-            ts: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            from: 'System',
-          },
-        },
-        ...prev,
-      ];
-    });
-    if (selectedChatId !== p2pChatId) {
-      selectChat(p2pChatId);
-      setTab('chats');
-    }
-  }, [displayLabel, p2pChatId, p2pPeerLabel, p2pStatus, selectChat, selectedChatId, setTab]);
 
   const scopedShowToast = useCallback<ToastFn>(
     (params) => showToast({ ...params, scope: 'chat', animation: 'slide' }),
@@ -560,39 +477,14 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     },
   });
 
-  const inferMimeFromName = useCallback((name: string) => {
-    const ext = name.split('.').pop()?.toLowerCase();
-    switch (ext) {
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      case 'png':
-        return 'image/png';
-      case 'webp':
-        return 'image/webp';
-      case 'gif':
-        return 'image/gif';
-      case 'pdf':
-        return 'application/pdf';
-      default:
-        return 'application/octet-stream';
-    }
-  }, []);
-
   const sendText = useCallback(
     async ({ chatId, content, isDM }: { chatId: string; content: string; isDM: boolean }) => {
-      if (chatId.startsWith('p2p:')) {
-        const message = p2pSendText(content);
-        if (!message) return { sent: false, error: 'P2P channel not connected.' };
-        appendMessageToChat(chatId, message);
-        return { sent: true };
-      }
       if (isDM || chatId.startsWith('dm:')) {
         return sendXmtpDmText({ chatId, content });
       }
       return transportSendText({ chatId, content, isDM: false });
     },
-    [appendMessageToChat, p2pSendText, sendXmtpDmText, transportSendText],
+    [sendXmtpDmText, transportSendText],
   );
 
   const sendImage = useCallback(
@@ -607,44 +499,28 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
       isDM: boolean;
       content?: string;
     }) => {
-      if (chatId.startsWith('p2p:')) {
-        const name = imageUri.split('/').pop() ?? `image-${Date.now()}.jpg`;
-        const file = {
-          uri: imageUri,
-          name,
-          size: 0,
-          mime: inferMimeFromName(name),
-        };
-        const message = await p2pSendFile({ ...file, isImage: true, caption: content });
-        if (!message) return { sent: false, error: 'P2P channel not connected.' };
-        appendMessageToChat(chatId, message);
-        return { sent: true };
-      }
       if (isDM || chatId.startsWith('dm:')) {
         return { sent: false, error: 'Image attachments over XMTP are not enabled in this build.' };
       }
       return transportSendImage({ chatId, imageUri, isDM: false, content });
     },
-    [appendMessageToChat, inferMimeFromName, p2pSendFile, transportSendImage],
+    [transportSendImage],
   );
 
   const sendFile = useCallback(
-    async ({ chatId, file, isDM }: { chatId: string; file: PendingFile; isDM: boolean }) => {
-      if (!chatId.startsWith('p2p:')) {
-        return { sent: false, error: 'File sending only works in P2P chats.' };
+    async ({ chatId, isDM }: { chatId: string; file: PendingFile; isDM: boolean }) => {
+      const isDirectMessage = isDM || chatId.startsWith('dm:');
+      if (isDirectMessage) {
+        return { sent: false, error: 'File attachments are not enabled for direct messages in this build.' };
       }
-      const message = await p2pSendFile({ ...file, isImage: false });
-      if (!message) return { sent: false, error: 'P2P channel not connected.' };
-      appendMessageToChat(chatId, message);
-      return { sent: true };
+      return { sent: false, error: 'File attachments are currently disabled.' };
     },
-    [appendMessageToChat, p2pSendFile],
+    [],
   );
 
   const handleLoadMoreMessages = useCallback(() => {
     if (!selectedChat) return;
     if (selectedChat.id.startsWith('dm:')) return;
-    if (selectedChat.id.startsWith('p2p:')) return;
     loadOlder(selectedChat.id);
   }, [loadOlder, selectedChat]);
 
@@ -685,28 +561,9 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     }
   }, [selectChat, scopedShowToast, setTab, setView, startDM]);
 
-  const handleStartP2P = useCallback((otherUserId: string, otherUserName: string) => {
-    setTab('connect');
-    setView('list');
-    setConnectionLog((prev) => [
-      `Start a P2P DM with ${otherUserName}. Exchange offer/answer + ICE.`,
-      ...prev,
-    ]);
-    scopedShowToast({
-      type: 'default',
-      text1: 'P2P DM',
-      text2: 'Use + Connect to exchange offer/answer.',
-      position: 'top',
-      visibilityTime: 3000,
-    });
-  }, [setTab, setView]);
-
   // Update handleSelectChat to load DM messages
   const handleSelectChat = useCallback(async (chatId: string) => {
     selectChat(chatId);
-    if (chatId.startsWith('p2p:')) {
-      return;
-    }
     setRoomId(chatId);
     if (chatId.startsWith('dm:')) {
       await loadThread(chatId);
@@ -716,11 +573,8 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     }
   }, [ensureChatInitialized, loadInitial, loadThread, selectChat]);
 
-  const allowFileAttachment = Boolean(selectedChat?.id.startsWith('p2p:'));
-
   useEffect(() => {
     if (!selectedChat) return;
-    if (selectedChat.id.startsWith('p2p:')) return;
     if (!draft.trim()) {
       if (typingSentRef.current.isTyping && typingSentRef.current.chatId === selectedChat.id) {
         typingSentRef.current.isTyping = false;
@@ -892,53 +746,6 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     }, 650);
   };
 
-  const handleCreateP2POffer = useCallback(async () => {
-    try {
-      await p2pCreateOffer();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create offer.';
-      setConnectionLog((prev) => [`P2P offer error: ${message}`, ...prev]);
-    }
-  }, [p2pCreateOffer]);
-
-  const handleCreateP2PAnswer = useCallback(async () => {
-    if (!p2pRemoteOffer.trim()) return;
-    try {
-      await p2pCreateAnswer(p2pRemoteOffer);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to create answer.';
-      setConnectionLog((prev) => [`P2P answer error: ${message}`, ...prev]);
-    }
-  }, [p2pCreateAnswer, p2pRemoteOffer]);
-
-  const handleAcceptP2PAnswer = useCallback(async () => {
-    if (!p2pRemoteAnswer.trim()) return;
-    try {
-      await p2pAcceptAnswer(p2pRemoteAnswer);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to accept answer.';
-      setConnectionLog((prev) => [`P2P answer error: ${message}`, ...prev]);
-    }
-  }, [p2pAcceptAnswer, p2pRemoteAnswer]);
-
-  const handleAddP2PCandidates = useCallback(async () => {
-    if (!p2pRemoteCandidates.trim()) return;
-    try {
-      await p2pAddRemoteCandidates(p2pRemoteCandidates);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to add ICE candidates.';
-      setConnectionLog((prev) => [`P2P ICE error: ${message}`, ...prev]);
-    }
-  }, [p2pAddRemoteCandidates, p2pRemoteCandidates]);
-
-  const handleResetP2P = useCallback(() => {
-    p2pReset();
-    setP2pRemoteOffer('');
-    setP2pRemoteAnswer('');
-    setP2pRemoteCandidates('');
-    setConnectionLog((prev) => ['P2P session reset.', ...prev]);
-  }, [p2pReset]);
-
   const handleTabChange = (tab: 'chats' | 'connect') => {
     setTab(tab);
   };
@@ -988,24 +795,6 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
             onConnectNameChange: setConnectName,
             onConnectPress: handleConnectPeer,
             onStartServer: handleStartServer,
-            p2p: {
-              status: p2pStatus,
-              peerLabel: p2pPeerLabel,
-              localOffer: p2pLocalOffer,
-              localAnswer: p2pLocalAnswer,
-              localCandidates: p2pLocalCandidates,
-              remoteOffer: p2pRemoteOffer,
-              remoteAnswer: p2pRemoteAnswer,
-              remoteCandidates: p2pRemoteCandidates,
-              onRemoteOfferChange: setP2pRemoteOffer,
-              onRemoteAnswerChange: setP2pRemoteAnswer,
-              onRemoteCandidatesChange: setP2pRemoteCandidates,
-              onCreateOffer: handleCreateP2POffer,
-              onCreateAnswer: handleCreateP2PAnswer,
-              onAcceptAnswer: handleAcceptP2PAnswer,
-              onAddCandidates: handleAddP2PCandidates,
-              onReset: handleResetP2P,
-            },
           }}
           thread={{
             chat: selectedChat,
@@ -1019,14 +808,14 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
             onDraftChange: setDraft,
             onSend: handleSendMessage,
             onPickImage: handlePickImage,
-            onPickFile: allowFileAttachment ? handlePickFile : undefined,
+            onPickFile: undefined,
             onClearAttachment: handleClearAttachment,
-            onClearFile: allowFileAttachment ? handleClearFile : undefined,
+            onClearFile: undefined,
             onLoadMore: handleLoadMoreMessages,
             isLoadingMore: selectedHistoryState?.loading ?? false,
             hasMoreMessages: selectedHistoryState?.hasMore ?? false,
             attachmentUri: pendingImageUri,
-            fileAttachment: allowFileAttachment && pendingFile ? { uri: pendingFile.uri, name: pendingFile.name } : null,
+            fileAttachment: null,
             typingLabel: selectedChatId ? typingByChatId[selectedChatId] : null,
             resolveAvatar,
             resolveAuthorName,
@@ -1034,7 +823,6 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
             onReplyMessage: handleReplyMessage,
             onEditMessage: handleEditMessage,
             onDeleteMessage: handleDeleteMessage,
-            onStartP2P: handleStartP2P,
             isMuted: selectedChat ? mutedChatIds.has(selectedChat.id) : false,
             onToggleMute: handleToggleMute,
           }}

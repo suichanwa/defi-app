@@ -23,7 +23,7 @@ export default function ChatThreadHeader({
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [settingsVisible, setSettingsVisible] = useState(false);
-  const isGlobalChat = !chat.isDM && !chat.id.startsWith('p2p:');
+  const isGlobalChat = !chat.isDM;
   const subtitle = isGlobalChat ? `${participantCount} participants` : '';
 
   return (

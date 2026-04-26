@@ -245,7 +245,7 @@ export const createSendMessageHandler = ({
 
   if (hasFile && pendingFile) {
     if (!sendFile) {
-      showAlert('File upload error', 'File sending is only available for P2P chats.');
+      showAlert('File upload error', 'File attachments are currently unavailable.');
       return;
     }
     const fileUri = pendingFile.uri;

@@ -10,24 +10,6 @@ export type SecureChatConnectProps = {
   onConnectNameChange: (value: string) => void;
   onConnectPress: () => void;
   onStartServer: () => void;
-  p2p: {
-    status: string;
-    peerLabel?: string | null;
-    localOffer: string;
-    localAnswer: string;
-    localCandidates: string;
-    remoteOffer: string;
-    remoteAnswer: string;
-    remoteCandidates: string;
-    onRemoteOfferChange: (value: string) => void;
-    onRemoteAnswerChange: (value: string) => void;
-    onRemoteCandidatesChange: (value: string) => void;
-    onCreateOffer: () => void;
-    onCreateAnswer: () => void;
-    onAcceptAnswer: () => void;
-    onAddCandidates: () => void;
-    onReset: () => void;
-  };
 };
 
 export type SecureChatThreadProps = {
@@ -57,7 +39,6 @@ export type SecureChatThreadProps = {
   onReplyMessage?: (message: ChatMessage) => void;
   onEditMessage?: (message: ChatMessage) => void;
   onDeleteMessage?: (message: ChatMessage) => void;
-  onStartP2P?: (userId: string, userName: string) => void;
   isMuted?: boolean;
   onToggleMute?: () => void;
 };
