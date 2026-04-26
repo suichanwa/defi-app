@@ -5,7 +5,7 @@ import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '../theme/ThemeProvider';
 import { useChain } from '../context/ChainProvider';
-import { getSolanaClusterLabel } from '../config/chain';
+import { CHAINS, getSolanaClusterLabel, type ChainKey } from '../config/chain';
 import { useWalletSession } from '../context/WalletSessionProvider';
 import type { WalletRecordMeta } from '../types/wallet';
 import WalletSetupScreen from '@components/wallet/WalletSetupScreen';
@@ -246,17 +246,44 @@ export function WalletHomeScreen({ navigation }: { navigation: StackNavigationPr
 
   const airdropCooldownMsRemaining = Math.max(0, (airdropCooldownUntil ?? 0) - nowMs);
 
-  const handleToggleNetwork = async () => {
+  const confirmChainChange = useCallback(
+    (nextKey: ChainKey) => {
+      if (nextKey === chainKey) return;
+
+      const nextChain = CHAINS[nextKey];
+      const nextChainName = nextChain?.name ?? nextKey;
+
+      Alert.alert(
+        'Reload app required',
+        `You have to reload the app before switching to ${nextChainName}.`,
+        [
+          {
+            text: 'Stay on current chain',
+            style: 'cancel',
+          },
+          {
+            text: `Move to ${nextChainName}`,
+            onPress: () => {
+              setChainKey(nextKey);
+            },
+          },
+        ],
+      );
+    },
+    [chainKey, setChainKey],
+  );
+
+  const handleToggleNetwork = () => {
     if (chainKey === 'solanaDevnet') {
-      await setChainKey('solanaMainnet');
+      confirmChainChange('solanaMainnet');
       return;
     }
     if (chainKey === 'solanaMainnet') {
-      await setChainKey('ethereumMainnet');
+      confirmChainChange('ethereumMainnet');
       return;
     }
     if (chainKey === 'ethereumMainnet') {
-      await setChainKey('solanaDevnet');
+      confirmChainChange('solanaDevnet');
     }
   };
 
@@ -402,17 +429,17 @@ export default function WalletScreen() {
     [chain],
   );
 
-  const handleToggleSetupNetwork = useCallback(async () => {
+  const handleToggleSetupNetwork = useCallback(() => {
     if (chainKey === 'solanaDevnet') {
-      await setChainKey('solanaMainnet');
+      confirmChainChange('solanaMainnet');
       return;
     }
     if (chainKey === 'solanaMainnet') {
-      await setChainKey('ethereumMainnet');
+      confirmChainChange('ethereumMainnet');
       return;
     }
-    await setChainKey('solanaDevnet');
-  }, [chainKey, setChainKey]);
+    confirmChainChange('solanaDevnet');
+  }, [chainKey, confirmChainChange]);
 
   const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const biometricInFlightRef = useRef(false);
