@@ -1,5 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, BackHandler, Keyboard, Platform, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import {
+  Alert,
+  AppState,
+  BackHandler,
+  Keyboard,
+  Platform,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import type { ChatMessage, ChatThread, ServerInfo } from '@app-types/securechat-types/secureChat';
 import type { SecureChatMessageRow, SecureChatScreenProps } from '@app-types/securechat-types/secureChatScreen';
 import type { ToastFn } from '@app-types/securechat-types/secureChatHandleMessage';
@@ -32,6 +42,7 @@ import { useChatAvatar } from '../../hooks/useChatAvatar';
 import { useChatProfiles } from '../../hooks/useChatProfiles';
 import { useTheme } from '@theme/ThemeProvider';
 import { useXmtpClient } from '@context/XmtpProvider';
+import { notifyAndroidSecureChatMessage } from '@services/androidNotifications';
 
 type PendingFile = {
   uri: string;
@@ -108,6 +119,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     (chatId: string, message: ChatMessage) => notifyIncomingRef.current(chatId, message),
     [],
   );
+  const appStateRef = useRef(AppState.currentState);
   const sendingImageUriRef = useRef<string | null>(null);
   const sendingFileUriRef = useRef<string | null>(null);
   const typingTimersRef = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({});
@@ -257,6 +269,28 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     [chats, dmChannels],
   );
 
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      appStateRef.current = nextState;
+    });
+    return () => subscription.remove();
+  }, []);
+
+  const notifyNative = useCallback(async (payload: { chatId: string; chatName: string; message: ChatMessage }) => {
+    if (appStateRef.current === 'active') return;
+    await notifyAndroidSecureChatMessage({
+      chatId: payload.chatId,
+      chatName: payload.chatName,
+      author: payload.message.author,
+      message: payload.message.type === 'image'
+        ? 'Photo'
+        : payload.message.type === 'file'
+          ? payload.message.fileName ?? 'File'
+          : payload.message.content,
+      messageType: payload.message.type,
+    });
+  }, []);
+
   const selectedChat = useMemo(() => {
     return getChatById(selectedChatId);
   }, [getChatById, selectedChatId]);
@@ -286,8 +320,9 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
         selectedChatId,
         getChatById,
         showToast: scopedShowToast,
+        notifyNative,
       }),
-    [chatView, displayLabel, effectiveUserId, getChatById, mutedChatIds, scopedShowToast, secureTab, selectedChatId],
+    [chatView, displayLabel, effectiveUserId, getChatById, mutedChatIds, notifyNative, scopedShowToast, secureTab, selectedChatId],
   );
 
   useEffect(() => {

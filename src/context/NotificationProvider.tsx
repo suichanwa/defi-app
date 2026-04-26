@@ -1,5 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 import { setNotificationHandler } from '@services/notificationService';
+import { prepareAndroidNotifications } from '@services/androidNotifications';
 
 export type NotificationType = 'success' | 'error' | 'info';
 export type NotificationAnimation = 'slide' | 'fade' | 'scale';
@@ -57,6 +59,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     setNotificationHandler(notify);
     return () => setNotificationHandler(null);
   }, [notify]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    void prepareAndroidNotifications();
+  }, []);
 
   const value = useMemo(
     () => ({

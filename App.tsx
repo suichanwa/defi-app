@@ -20,6 +20,8 @@ import { NavVisibilityProvider, useNavVisibility } from './src/context/NavVisibi
 import { QRReceiveProvider } from './src/context/QRReceiveProvider';
 import { ChainProvider } from './src/context/ChainProvider';
 import { XmtpProvider } from './src/context/XmtpProvider';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { MD3DarkTheme, MD3LightTheme, PaperProvider } from 'react-native-paper';
 import 'react-native-get-random-values';
 
 Sentry.init({
@@ -127,9 +129,33 @@ function AppContent({ activeTab, onTabChange }: { activeTab: TabName; onTabChang
     transform: [{ translateX: 12 * (1 - secureTransition.value) }],
   }));
 
-  const isWeb = Platform.OS === 'web';
   const walletPointerEvents = activeTab === 'secureChat' ? 'none' : 'auto';
   const chatPointerEvents = activeTab === 'secureChat' ? 'auto' : 'none';
+  const paperTheme = useMemo(
+    () => ({
+      ...(resolved === 'dark' ? MD3DarkTheme : MD3LightTheme),
+      dark: resolved === 'dark',
+      roundness: 14,
+      colors: {
+        ...(resolved === 'dark' ? MD3DarkTheme.colors : MD3LightTheme.colors),
+        primary: colors.accent,
+        onPrimary: colors.accentText,
+        primaryContainer: colors.accent,
+        onPrimaryContainer: colors.accentText,
+        secondary: colors.accent,
+        background: colors.background,
+        onBackground: colors.text,
+        surface: colors.card,
+        onSurface: colors.text,
+        surfaceVariant: colors.border,
+        onSurfaceVariant: colors.muted,
+        outline: colors.border,
+        outlineVariant: colors.border,
+        error: '#ef4444',
+      },
+    }),
+    [colors, resolved],
+  );
 
   const renderWalletLayer = () => {
     const tabToRender = activeTab === 'secureChat' ? lastNonChatTab : activeTab;
@@ -143,62 +169,69 @@ function AppContent({ activeTab, onTabChange }: { activeTab: TabName; onTabChang
   };
 
   return (
-    <View style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      <View
-        style={{
-          paddingTop: insets.top,
-          paddingBottom: insets.bottom,
-          paddingLeft: insets.left,
-          paddingRight: insets.right,
-          flex: 1,
-        }}
-      >
-        <StatusBar style={resolved === 'dark' ? 'light' : 'dark'} />
-        <Animated.View
-          style={[
-            styles.screenLayer,
-            { backgroundColor: colors.background, pointerEvents: walletPointerEvents },
-            walletAnimatedStyle,
-          ]}
-        >
-          {renderWalletLayer()}
-        </Animated.View>
-
-        <Animated.View
-          style={[
-            styles.screenLayer,
-            styles.chatLayer,
-            { backgroundColor: colors.background, pointerEvents: chatPointerEvents },
-            secureChatAnimatedStyle,
-          ]}
-        >
-          <SecureChatScreen
-            isActive={activeTab === 'secureChat'}
-            onChatViewChange={(view) => setIsChatThreadOpen(view === 'thread')}
-          />
-        </Animated.View>
-
-        {showNavbar && (
-          <Animated.View
-            style={[navbarAnimatedStyle, { pointerEvents: activeTab === 'secureChat' && isChatThreadOpen ? 'none' : 'auto' }]}
+    <PaperProvider theme={paperTheme}>
+      <BottomSheetModalProvider>
+        <View style={[styles.safeArea, { backgroundColor: colors.background }]}>
+          <View
+            style={{
+              paddingTop: insets.top,
+              paddingBottom: insets.bottom,
+              paddingLeft: insets.left,
+              paddingRight: insets.right,
+              flex: 1,
+            }}
           >
-            <BottomNavBar activeTab={activeTab} onTabChange={onTabChange} />
-          </Animated.View>
-        )}
+            <StatusBar style={resolved === 'dark' ? 'light' : 'dark'} />
+            <Animated.View
+              style={[
+                styles.screenLayer,
+                { backgroundColor: colors.background, pointerEvents: walletPointerEvents },
+                walletAnimatedStyle,
+              ]}
+            >
+              {renderWalletLayer()}
+            </Animated.View>
 
-        {activeTab === 'wallet' && <NotificationHost scope="wallet" animation="slide" />}
-        {activeTab === 'secureChat' && <NotificationHost scope="chat" animation="slide" />}
+            <Animated.View
+              style={[
+                styles.screenLayer,
+                styles.chatLayer,
+                { backgroundColor: colors.background, pointerEvents: chatPointerEvents },
+                secureChatAnimatedStyle,
+              ]}
+            >
+              <SecureChatScreen
+                isActive={activeTab === 'secureChat'}
+                onChatViewChange={(view) => setIsChatThreadOpen(view === 'thread')}
+              />
+            </Animated.View>
 
-        <ToastManager
-          config={toastConfig}
-          position="top"
-          topOffset={insets.top + 12}
-          duration={3500}
-          showProgressBar
-          useModal={false}
-        />
-      </View>
-    </View>
+            {showNavbar && (
+              <Animated.View
+                style={[
+                  navbarAnimatedStyle,
+                  { pointerEvents: activeTab === 'secureChat' && isChatThreadOpen ? 'none' : 'auto' },
+                ]}
+              >
+                <BottomNavBar activeTab={activeTab} onTabChange={onTabChange} />
+              </Animated.View>
+            )}
+
+            {activeTab === 'wallet' && <NotificationHost scope="wallet" animation="slide" />}
+            {activeTab === 'secureChat' && <NotificationHost scope="chat" animation="slide" />}
+
+            <ToastManager
+              config={toastConfig}
+              position="top"
+              topOffset={insets.top + 12}
+              duration={3500}
+              showProgressBar
+              useModal={false}
+            />
+          </View>
+        </View>
+      </BottomSheetModalProvider>
+    </PaperProvider>
   );
 }
 

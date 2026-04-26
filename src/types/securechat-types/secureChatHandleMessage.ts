@@ -18,7 +18,11 @@ export type ResolveAuthorRef = {
 
 export type GetChatById = (chatId: string) => ChatThread | null;
 
-export type NotifyNativeFn = (chatId: string, message: ChatMessage) => void | Promise<void>;
+export type NotifyNativeFn = (payload: {
+  chatId: string;
+  chatName: string;
+  message: ChatMessage;
+}) => void | Promise<void>;
 
 export type PendingFile = {
   uri: string;

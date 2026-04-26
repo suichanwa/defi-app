@@ -51,7 +51,7 @@ export const createNotifyIncomingMessage = ({
     visibilityTime: 3500,
   });
   if (notifyNative) {
-    void notifyNative(chatId, message);
+    void notifyNative({ chatId, chatName, message });
   }
 };
 
