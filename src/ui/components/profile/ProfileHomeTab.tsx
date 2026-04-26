@@ -10,7 +10,7 @@ type ProfileHomeTabProps = {
   profileSource: 'local' | 'supabase';
   onOpenPersonalization: () => void;
   onOpenAuth: () => void;
-  onOpenSecurity: () => void;
+  onOpenPrivacy: () => void;
   onOpenRewards: () => void;
   onOpenTransactionHistory: () => void;
   onOpenLocalization: () => void;
@@ -28,7 +28,7 @@ export default function ProfileHomeTab({
   profileSource,
   onOpenPersonalization,
   onOpenAuth,
-  onOpenSecurity,
+  onOpenPrivacy,
   onOpenRewards,
   onOpenTransactionHistory,
   onOpenLocalization,
@@ -91,14 +91,14 @@ export default function ProfileHomeTab({
         </View>
       </TouchableOpacity>
 
-      <TouchableOpacity style={cardStyle} onPress={onOpenSecurity} activeOpacity={0.85}>
+      <TouchableOpacity style={cardStyle} onPress={onOpenPrivacy} activeOpacity={0.85}>
         <View style={styles.cardRow}>
           <View style={styles.cardIcon}>
             <MaterialCommunityIcons name="shield-lock-outline" size={22} color={colors.accent} />
           </View>
           <View style={styles.cardBody}>
-            <Text style={styles.cardTitle}>Security</Text>
-            <Text style={styles.cardSubtitle}>Change wallet password and verify keys.</Text>
+            <Text style={styles.cardTitle}>Privacy</Text>
+            <Text style={styles.cardSubtitle}>Change wallet password and chat settings.</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.muted} />
         </View>

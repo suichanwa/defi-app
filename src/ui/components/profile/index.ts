@@ -6,7 +6,7 @@ export { default as ExperimentalTab } from './ExperimentalTab';
 export { default as LocalizationTab } from './LocalizationTab';
 export { default as PersonalizationTab } from './PersonalizationTab';
 export { default as ProfileHomeTab } from './ProfileHomeTab';
+export { default as PrivacyTab } from './PrivacyTab';
 export { default as RewardsTab } from './RewardsTab';
-export { default as SecurityTab } from './SecurityTab';
 export { default as ProfileTabTransition } from './ProfileTabTransition';
 export { default as TransactionHistoryTab } from './TransactionHistoryTab';

@@ -16,6 +16,7 @@ type PrivateChatSettingsMenuProps = {
   chatName: string;
   isMuted?: boolean;
   onToggleMute?: () => void;
+  onViewProfile?: () => void;
   onClose: () => void;
 };
 
@@ -24,6 +25,7 @@ export default function PrivateChatSettingsMenu({
   chatName,
   isMuted,
   onToggleMute,
+  onViewProfile,
   onClose,
 }: PrivateChatSettingsMenuProps) {
   const { colors } = useTheme();
@@ -61,6 +63,11 @@ export default function PrivateChatSettingsMenu({
     }
     setLocalMuted((prev) => !prev);
   }, [onToggleMute]);
+
+  const handleViewProfile = useCallback(() => {
+    onClose();
+    onViewProfile?.();
+  }, [onClose, onViewProfile]);
 
   const handleBackdropPress = useCallback((props: BottomSheetBackdropProps) => (
     <BottomSheetBackdrop
@@ -110,6 +117,28 @@ export default function PrivateChatSettingsMenu({
             accessibilityLabel="Close chat settings"
           />
         </View>
+
+        {onViewProfile ? (
+          <Surface style={styles.profileCard} elevation={0}>
+            <Pressable
+              style={({ pressed }) => [styles.profileRow, pressed && styles.profileRowPressed]}
+              onPress={handleViewProfile}
+              accessibilityRole="button"
+              accessibilityLabel="View profile"
+            >
+              <View style={styles.profileIcon}>
+                <MaterialCommunityIcons name="account-circle-outline" size={18} color={colors.accentText} />
+              </View>
+
+              <View style={styles.profileTextBlock}>
+                <Text style={styles.profileTitle}>View profile</Text>
+                <Text style={styles.profileSubtitle}>Open name and avatar on full screen.</Text>
+              </View>
+
+              <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
+            </Pressable>
+          </Surface>
+        ) : null}
 
         <Surface style={styles.actionCard} elevation={0}>
           <Pressable
@@ -221,6 +250,46 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors'], bottomInset
     },
     closeButton: {
       margin: 0,
+    },
+    profileCard: {
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.background,
+      overflow: 'hidden',
+    },
+    profileRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 14,
+    },
+    profileRowPressed: {
+      opacity: 0.88,
+    },
+    profileIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.accent,
+    },
+    profileTextBlock: {
+      flex: 1,
+      minWidth: 0,
+    },
+    profileTitle: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    profileSubtitle: {
+      marginTop: 4,
+      fontSize: 12,
+      lineHeight: 17,
+      color: colors.muted,
     },
     actionCard: {
       borderRadius: 18,

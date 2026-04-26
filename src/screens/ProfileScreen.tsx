@@ -10,8 +10,8 @@ import {
   PersonalizationTab,
   ProfileHomeTab,
   ProfileTabTransition,
+  PrivacyTab,
   RewardsTab,
-  SecurityTab,
   TransactionHistoryTab,
 } from '@components/profile';
 import { StatusDialog } from '@components/common';
@@ -30,7 +30,7 @@ import { APP_VARIANT, appFeatures } from '@config/appFeatures';
 type ProfileView =
   | 'home'
   | 'personalization'
-  | 'security'
+  | 'privacy'
   | 'rewards'
   | 'transactionHistory'
   | 'auth'
@@ -55,7 +55,7 @@ export default function ProfileScreen() {
   const profile = useProfilePreferences({ theme, session: auth.state.session });
   const rewards = useRewards({ session: auth.state.session });
   const transactionHistory = useTransactionHistory({ address });
-  const security = useWalletSecurity({
+  const privacy = useWalletSecurity({
     alias: profile.state.alias,
     avatarType: profile.state.avatarType,
     themePreference: profile.state.themePreference,
@@ -63,7 +63,7 @@ export default function ProfileScreen() {
     onWalletKeyCreated: profile.actions.setAvatarSeed,
   });
 
-  const identiconSeed = security.walletKey?.id ?? profile.state.avatarSeed;
+  const identiconSeed = privacy.walletKey?.id ?? profile.state.avatarSeed;
   const identicon = useMemo(() => buildIdenticon(identiconSeed || 'seed'), [identiconSeed]);
   useEffect(() => {
     if (Platform.OS !== 'android') return;
@@ -99,7 +99,7 @@ export default function ProfileScreen() {
   const handleRefreshData = async () => {
     await runDevAction(
       async () => {
-        await Promise.all([profile.actions.reload(), rewards.actions.refresh(), security.actions.reload()]);
+        await Promise.all([profile.actions.reload(), rewards.actions.refresh(), privacy.actions.reload()]);
       },
       'Profile data reloaded.',
     );
@@ -109,7 +109,7 @@ export default function ProfileScreen() {
     await runDevAction(
       async () => {
         await forgetWallet();
-        await security.actions.clearWallet();
+        await privacy.actions.clearWallet();
       },
       'Local wallet key removed.',
     );
@@ -132,7 +132,7 @@ export default function ProfileScreen() {
       async () => {
         await auth.actions.signOut();
         await Promise.all([forgetWallet(), profile.actions.reset(), rewards.actions.clearCache()]);
-        await security.actions.clearWallet();
+        await privacy.actions.clearWallet();
       },
       'Signed out and cleared local data. Remote deletion requires backend support.',
     );
@@ -193,27 +193,27 @@ export default function ProfileScreen() {
         />
       );
       break;
-    case 'security':
+    case 'privacy':
       content = (
-        <SecurityTab
+        <PrivacyTab
           scrollStyle={profile.styles.scrollStyle}
           cardStyle={profile.styles.cardStyle}
           onBack={() => setView('home')}
-          walletKey={security.walletKey}
-          setupPassword={security.setupFields.fields.setupPassword}
-          setupConfirm={security.setupFields.fields.setupConfirm}
-          currentPassword={security.changeFields.fields.currentPassword}
-          newPassword={security.changeFields.fields.newPassword}
-          confirmPassword={security.changeFields.fields.confirmPassword}
-          securityMessage={security.status.message}
-          securityError={security.status.error}
-          onChangeSetupPassword={(value) => security.setupFields.setField('setupPassword', value)}
-          onChangeSetupConfirm={(value) => security.setupFields.setField('setupConfirm', value)}
-          onChangeCurrentPassword={(value) => security.changeFields.setField('currentPassword', value)}
-          onChangeNewPassword={(value) => security.changeFields.setField('newPassword', value)}
-          onChangeConfirmPassword={(value) => security.changeFields.setField('confirmPassword', value)}
-          onCreateWalletKey={security.actions.createWalletKey}
-          onChangePassword={security.actions.changePassword}
+          walletKey={privacy.walletKey}
+          setupPassword={privacy.setupFields.fields.setupPassword}
+          setupConfirm={privacy.setupFields.fields.setupConfirm}
+          currentPassword={privacy.changeFields.fields.currentPassword}
+          newPassword={privacy.changeFields.fields.newPassword}
+          confirmPassword={privacy.changeFields.fields.confirmPassword}
+          privacyMessage={privacy.status.message}
+          privacyError={privacy.status.error}
+          onChangeSetupPassword={(value) => privacy.setupFields.setField('setupPassword', value)}
+          onChangeSetupConfirm={(value) => privacy.setupFields.setField('setupConfirm', value)}
+          onChangeCurrentPassword={(value) => privacy.changeFields.setField('currentPassword', value)}
+          onChangeNewPassword={(value) => privacy.changeFields.setField('newPassword', value)}
+          onChangeConfirmPassword={(value) => privacy.changeFields.setField('confirmPassword', value)}
+          onCreateWalletKey={privacy.actions.createWalletKey}
+          onChangePassword={privacy.actions.changePassword}
         />
       );
       break;
@@ -311,7 +311,7 @@ export default function ProfileScreen() {
           profileSource={profile.state.profileSource}
           onOpenPersonalization={() => setView('personalization')}
           onOpenAuth={() => setView('auth')}
-          onOpenSecurity={() => setView('security')}
+          onOpenPrivacy={() => setView('privacy')}
           onOpenRewards={() => setView('rewards')}
           onOpenTransactionHistory={() => setView('transactionHistory')}
           onOpenLocalization={() => setView('localization')}
@@ -349,7 +349,7 @@ export default function ProfileScreen() {
           profileSource={profile.state.profileSource}
           onOpenPersonalization={() => setView('personalization')}
           onOpenAuth={() => setView('auth')}
-          onOpenSecurity={() => setView('security')}
+          onOpenPrivacy={() => setView('privacy')}
           onOpenRewards={() => setView('rewards')}
           onOpenTransactionHistory={() => setView('transactionHistory')}
           onOpenLocalization={() => setView('localization')}

@@ -14,7 +14,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { ChatAvatarSource, ChatMessage, ChatThread, ServerInfo } from '@app-types/securechat-types/secureChat';
 import { useTheme } from '@theme/ThemeProvider';
 import ChatThreadHeader from '@components/secureChat/ChatThreadHeader';
-import ViewProfileModal from '@components/secureChat/ViewProfileModal';
+import ViewProfileScreen from '@components/secureChat/ViewProfileScreen';
 import ChatInputBar from '@components/secureChat/ChatInputBar';
 import { convertToFlyerMessage, type FlyerMessageWithMeta } from '@utils/flyerChatAdapter';
 
@@ -60,9 +60,7 @@ const withAlpha = (hex: string, alphaHex: string) => {
 
 type SelectedProfile = {
   name: string;
-  userId?: string;
   avatarSource: ChatAvatarSource;
-  isOnline: boolean;
 } | null;
 
 export default function ChatThreadScreen({
@@ -101,6 +99,11 @@ export default function ChatThreadScreen({
   const [selectedProfile, setSelectedProfile] = useState<SelectedProfile>(null);
   const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(null);
 
+  useEffect(() => {
+    setSelectedProfile(null);
+    setSelectedMessage(null);
+  }, [chat?.id]);
+
   const sortedChatMessages = useMemo(() => {
     return [...messages].sort((a, b) => {
       const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -131,6 +134,27 @@ export default function ChatThreadScreen({
     }),
     [currentUserId, currentUserLabel]
   );
+
+  const selectedPeerProfile = useMemo(() => {
+    const peerMessage = [...messages]
+      .reverse()
+      .find((message) => {
+        if (message.outgoing === true) return false;
+        if (currentUserId && message.authorId && message.authorId === currentUserId) return false;
+        if (currentUserLabel && message.author === currentUserLabel) return false;
+        return true;
+      });
+
+    const name = chat?.name?.trim() || (peerMessage ? resolveAuthorName(peerMessage) : 'Profile');
+    const avatarSource = peerMessage
+      ? resolveAvatar(peerMessage)
+      : {
+          avatarType: 'identicon' as const,
+          seed: chat?.id || chat?.peerAddress || chat?.name || 'profile',
+        };
+
+    return { name, avatarSource };
+  }, [chat?.id, chat?.name, chat?.peerAddress, currentUserId, currentUserLabel, messages, resolveAvatar, resolveAuthorName]);
 
   const getAvatarColor = useCallback((seed: string) => {
     let hash = 0;
@@ -233,6 +257,10 @@ export default function ChatThreadScreen({
       setSelectedMessage(null);
     }
   }, [selectedMessage, onDeleteMessage]);
+
+  const handleViewProfile = useCallback(() => {
+    setSelectedProfile(selectedPeerProfile);
+  }, [selectedPeerProfile]);
 
   // Flyer theme matching design
   const flyerTheme = useMemo(
@@ -429,6 +457,16 @@ export default function ChatThreadScreen({
     setTimeout(onBack, 20);
   }, [onBack]);
 
+  if (selectedProfile) {
+    return (
+      <ViewProfileScreen
+        name={selectedProfile.name}
+        avatarSource={selectedProfile.avatarSource}
+        onBack={() => setSelectedProfile(null)}
+      />
+    );
+  }
+
   return (
     <View style={styles.outerContainer}>
       <View style={styles.container}>
@@ -439,6 +477,7 @@ export default function ChatThreadScreen({
           participantCount={participantCount}
           isMuted={isMuted}
           onToggleMute={onToggleMute}
+          onViewProfile={isDirectChat ? handleViewProfile : undefined}
         />
 
         {/* Flyer Chat Component */}
@@ -531,14 +570,6 @@ export default function ChatThreadScreen({
         </View>
       )}
 
-      <ViewProfileModal
-        visible={selectedProfile !== null}
-        name={selectedProfile?.name ?? ''}
-        userId={selectedProfile?.userId}
-        avatarSource={selectedProfile?.avatarSource ?? { avatarType: 'identicon', seed: 'default' }}
-        isOnline={selectedProfile?.isOnline ?? false}
-        onClose={() => setSelectedProfile(null)}
-      />
     </View>
   );
 }

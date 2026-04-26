@@ -10,9 +10,10 @@ type PrivateChatHeaderProps = {
   chat: ChatThread;
   isMuted?: boolean;
   onToggleMute?: () => void;
+  onViewProfile?: () => void;
 };
 
-export default function PrivateChatHeader({ chat, isMuted, onToggleMute }: PrivateChatHeaderProps) {
+export default function PrivateChatHeader({ chat, isMuted, onToggleMute, onViewProfile }: PrivateChatHeaderProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const isPrivate = chat.isDM ?? chat.id.startsWith('dm:');
@@ -51,6 +52,7 @@ export default function PrivateChatHeader({ chat, isMuted, onToggleMute }: Priva
         chatName={chat.name}
         isMuted={isMuted}
         onToggleMute={onToggleMute}
+        onViewProfile={onViewProfile}
         onClose={() => setSettingsVisible(false)}
       />
     </>

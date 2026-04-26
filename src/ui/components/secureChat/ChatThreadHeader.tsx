@@ -11,6 +11,7 @@ type Props = {
   participantCount?: number;
   isMuted?: boolean;
   onToggleMute?: () => void;
+  onViewProfile?: () => void;
 };
 
 export default function ChatThreadHeader({
@@ -19,6 +20,7 @@ export default function ChatThreadHeader({
   participantCount = 0,
   isMuted,
   onToggleMute,
+  onViewProfile,
 }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -52,13 +54,14 @@ export default function ChatThreadHeader({
 
       <View style={styles.divider} />
 
-      <PrivateChatSettingsMenu
-        visible={settingsVisible}
-        chatName={chat.name}
-        isMuted={isMuted}
-        onToggleMute={onToggleMute}
-        onClose={() => setSettingsVisible(false)}
-      />
+        <PrivateChatSettingsMenu
+          visible={settingsVisible}
+          chatName={chat.name}
+          isMuted={isMuted}
+          onToggleMute={onToggleMute}
+          onViewProfile={onViewProfile}
+          onClose={() => setSettingsVisible(false)}
+        />
     </View>
   );
 }
