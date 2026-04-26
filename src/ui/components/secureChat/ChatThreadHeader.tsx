@@ -2,8 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@theme/ThemeProvider';
+import ChatAvatar from '@components/secureChat/ChatAvatar';
 import PrivateChatSettingsMenu from '@components/secureChat/PrivateChatSettingsMenu';
-import type { ChatThread } from '@app-types/securechat-types/secureChat';
+import type { ChatAvatarSource, ChatThread } from '@app-types/securechat-types/secureChat';
 
 type Props = {
   chat: ChatThread;
@@ -12,6 +13,8 @@ type Props = {
   isMuted?: boolean;
   onToggleMute?: () => void;
   onViewProfile?: () => void;
+  avatarSource?: ChatAvatarSource;
+  onAvatarPress?: () => void;
 };
 
 export default function ChatThreadHeader({
@@ -21,6 +24,8 @@ export default function ChatThreadHeader({
   isMuted,
   onToggleMute,
   onViewProfile,
+  avatarSource,
+  onAvatarPress,
 }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -34,6 +39,18 @@ export default function ChatThreadHeader({
         <TouchableOpacity onPress={onBack} style={styles.backButton} accessibilityLabel="Back to chats">
           <MaterialCommunityIcons name="arrow-left" size={18} color={colors.text} />
         </TouchableOpacity>
+
+        {avatarSource && onAvatarPress ? (
+          <TouchableOpacity
+            onPress={onAvatarPress}
+            style={styles.avatarButton}
+            accessibilityRole="button"
+            accessibilityLabel={`Open ${chat.name} profile`}
+            hitSlop={8}
+          >
+            <ChatAvatar source={avatarSource} variant="incoming" size={34} />
+          </TouchableOpacity>
+        ) : null}
 
         <View style={styles.titleBlock}>
           <Text style={styles.title} numberOfLines={1}>
@@ -84,6 +101,12 @@ const createStyles = (colors: {
       padding: 8,
       borderRadius: 16,
       backgroundColor: colors.border,
+    },
+    avatarButton: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     titleBlock: {
       flex: 1,

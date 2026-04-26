@@ -505,6 +505,8 @@ export default function ChatThreadScreen({
           isMuted={isMuted}
           onToggleMute={onToggleMute}
           onViewProfile={isDirectChat ? handleViewProfile : undefined}
+          avatarSource={isDirectChat ? selectedPeerProfile.avatarSource : undefined}
+          onAvatarPress={isDirectChat ? handleViewProfile : undefined}
         />
 
         {/* Flyer Chat Component */}

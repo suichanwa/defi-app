@@ -1,11 +1,6 @@
 # rust-api
 
-Main Rust workspace for the app.
-
-This crate now hosts:
-
-- the HTTP API server in `src/main.rs`
-- the native wallet crypto library in `src/lib.rs`
+Native Rust workspace for the app wallet crypto.
 
 ## Native wallet crypto
 
@@ -38,8 +33,3 @@ This outputs `.so` files into:
 - `android/app/src/main/jniLibs/armeabi-v7a/`
 - `android/app/src/main/jniLibs/arm64-v8a/`
 - `android/app/src/main/jniLibs/x86_64/`
-
-## Runtime behavior
-
-- If the Rust library loads successfully, wallet crypto calls can use Rust.
-- If not, app logic falls back to existing TypeScript implementation.
