@@ -5,6 +5,7 @@ export type LanguageCode = 'en' | 'ru' | 'ro';
 
 export type ProfileSettings = {
   alias: string;
+  bio?: string;
   avatarType: AvatarType;
   avatarUri?: string;
   avatarSeed?: string;

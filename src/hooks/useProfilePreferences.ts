@@ -27,6 +27,7 @@ const ALIAS_REGEX = /^[a-zA-Z0-9 _-]+$/;
 
 type ProfilePreferencesState = {
   alias: string;
+  bio: string;
   avatarType: AvatarType;
   avatarSeed: string;
   avatarUri?: string;
@@ -55,6 +56,7 @@ type ProfilePreferencesArgs = {
 
 const initialState: ProfilePreferencesState = {
   alias: '',
+  bio: '',
   avatarType: 'identicon',
   avatarSeed: '',
   avatarUri: undefined,
@@ -112,6 +114,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevProfileRef = useRef({
     alias: initialState.alias,
+    bio: initialState.bio,
     avatarType: initialState.avatarType,
     avatarUri: initialState.avatarUri,
   });
@@ -156,6 +159,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
 
         setState({
           alias: merged.alias ?? '',
+          bio: merged.bio ?? '',
           avatarType: merged.avatarType ?? 'identicon',
           avatarSeed: nextSeed,
           avatarUri: merged.avatarUri,
@@ -194,6 +198,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
   }, [loadProfile]);
 
   const setAlias = (value: string) => setState((prev) => ({ ...prev, alias: value }));
+  const setBio = (value: string) => setState((prev) => ({ ...prev, bio: value }));
   const setAvatarType = (value: AvatarType) =>
     setState((prev) => ({ ...prev, avatarType: value, ...(value !== 'custom' ? { avatarUri: undefined } : {}) }));
   const setAvatarSeed = (value: string) => setState((prev) => ({ ...prev, avatarSeed: value }));
@@ -271,6 +276,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
       }
       const settings = {
         alias: trimmed,
+        bio: state.bio.trim(),
         avatarType: state.avatarType,
         avatarSeed: state.avatarType === 'identicon' ? state.avatarSeed : undefined,
         avatarUri: state.avatarType === 'custom' ? remoteAvatarUrl : undefined,
@@ -315,6 +321,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
     if (!didInitRef.current) {
       prevProfileRef.current = {
         alias: state.alias,
+        bio: state.bio,
         avatarType: state.avatarType,
         avatarUri: state.avatarUri,
       };
@@ -323,12 +330,14 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
 
     const prev = prevProfileRef.current;
     const aliasChanged = prev.alias !== state.alias;
+    const bioChanged = prev.bio !== state.bio;
     const avatarTypeChanged = prev.avatarType !== state.avatarType;
     const avatarUriChanged = prev.avatarUri !== state.avatarUri;
-    if (!aliasChanged && !avatarTypeChanged && !avatarUriChanged) return;
+    if (!aliasChanged && !bioChanged && !avatarTypeChanged && !avatarUriChanged) return;
 
     prevProfileRef.current = {
       alias: state.alias,
+      bio: state.bio,
       avatarType: state.avatarType,
       avatarUri: state.avatarUri,
     };
@@ -365,7 +374,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
         clearTimeout(autoSaveTimerRef.current);
       }
     };
-  }, [save, state.alias, state.avatarType, state.avatarUri]);
+  }, [save, state.alias, state.bio, state.avatarType, state.avatarUri]);
 
   useEffect(() => {
     if (state.profileSource !== 'local') return;
@@ -382,6 +391,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
     try {
       await saveProfileSettings({
         alias: '',
+        bio: '',
         avatarType: 'identicon',
         avatarSeed: '',
         avatarUri: undefined,
@@ -401,6 +411,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
     status,
     actions: {
       setAlias,
+      setBio,
       setAvatarType,
       setAvatarSeed,
       setAvatarUri,

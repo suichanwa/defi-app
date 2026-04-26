@@ -5,6 +5,7 @@ type ProfileRow = {
   id: string;
   email: string | null;
   alias: string | null;
+  bio: string | null;
   avatar_type: string | null;
   avatar_url: string | null;
   avatar_seed: string | null;
@@ -25,7 +26,7 @@ export async function fetchRemoteProfile(userId: string): Promise<ProfileSetting
   try {
     const { data, error } = await supabase
       .from('user_profiles')
-      .select('alias, avatar_type, avatar_url, avatar_seed, theme_preference, language, updated_at')
+      .select('alias, bio, avatar_type, avatar_url, avatar_seed, theme_preference, language, updated_at')
       .eq('id', userId)
       .maybeSingle<ProfileRow>();
 
@@ -41,6 +42,7 @@ export async function fetchRemoteProfile(userId: string): Promise<ProfileSetting
 
     return {
       alias: data.alias ?? '',
+      bio: data.bio ?? '',
       avatarType: (data.avatar_type as ProfileSettings['avatarType']) ?? 'identicon',
       avatarUri: data.avatar_url ?? undefined,
       avatarSeed: data.avatar_seed ?? undefined,
@@ -66,6 +68,7 @@ export async function upsertRemoteProfile(userId: string, settings: ProfileSetti
   const payload = {
     id: userId,
     alias: settings.alias || null,
+    bio: settings.bio?.trim() || null,
     avatar_type: settings.avatarType || 'identicon',
     avatar_url: settings.avatarUri ?? null,
     avatar_seed: settings.avatarSeed ?? null,

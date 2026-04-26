@@ -1,5 +1,5 @@
 {
-  "last_turn_at": "2026-04-26T22:09:24.274Z",
-  "turn_count": 67,
-  "last_agent_output": "Done. The profile action now opens a dedicated full-screen view instead of a modal. `ChatThreadScree"
+  "last_turn_at": "2026-04-26T22:15:31.163Z",
+  "turn_count": 70,
+  "last_agent_output": "Done. I added `bio` to the personalization flow and made it Supabase-only in the UI.\n\nWhat changed:\n"
 }

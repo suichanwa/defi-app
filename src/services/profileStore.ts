@@ -5,6 +5,7 @@ const PROFILE_KEY = 'profile.settings.v1';
 
 const defaultSettings = (): ProfileSettings => ({
   alias: '',
+  bio: '',
   avatarType: 'identicon',
   themePreference: 'system',
   language: 'en',
@@ -27,7 +28,9 @@ export async function loadProfileSettings(): Promise<ProfileSettings> {
 export async function saveProfileSettings(
   next: Omit<ProfileSettings, 'updatedAt'> & { updatedAt?: string },
 ): Promise<ProfileSettings> {
+  const current = await loadProfileSettings();
   const saved: ProfileSettings = {
+    ...current,
     ...next,
     updatedAt: next.updatedAt ?? new Date().toISOString(),
   };

@@ -55,7 +55,7 @@ export default function ProfileHomeTab({
         >
           <View style={{ flexShrink: 1, paddingRight: 12 }}>
             <Text style={styles.headerTitle}>Profile</Text>
-            <Text style={styles.cardSubtitle}>Manage how your account feels and stays secure.</Text>
+            <Text style={styles.cardSubtitle}>Manage how your account feels and stays private.</Text>
           </View>
           <View style={[styles.pill, { alignSelf: 'flex-start', marginTop: 8 }]}>
             <Text style={styles.pillText}>{buildLabel}</Text>

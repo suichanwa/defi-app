@@ -15,8 +15,11 @@ type PersonalizationTabProps = {
   scrollStyle: StyleProp<ViewStyle>;
   cardStyle: StyleProp<ViewStyle>;
   onBack: () => void;
+  profileSource: 'local' | 'supabase';
   alias: string;
   onChangeAlias: (value: string) => void;
+  bio: string;
+  onChangeBio: (value: string) => void;
   avatarType: AvatarType;
   onChangeAvatarType: (value: AvatarType) => void;
   avatarUri?: string;
@@ -35,8 +38,11 @@ export default function PersonalizationTab({
   scrollStyle,
   cardStyle,
   onBack,
+  profileSource,
   alias,
   onChangeAlias,
+  bio,
+  onChangeBio,
   avatarType,
   onChangeAvatarType,
   avatarUri,
@@ -78,6 +84,23 @@ export default function PersonalizationTab({
         />
         <Text style={styles.hint}>Optional. 3-24 characters using letters, numbers, spaces, _ and -.</Text>
       </View>
+
+      {profileSource === 'supabase' ? (
+        <View style={cardStyle}>
+          <Text style={styles.cardTitle}>Bio</Text>
+          <TextInput
+            value={bio}
+            onChangeText={onChangeBio}
+            placeholder="Tell people a little about yourself"
+            placeholderTextColor="#94a3b8"
+            style={[styles.input, styles.bioInput]}
+            multiline
+            textAlignVertical="top"
+            maxLength={160}
+          />
+          <Text style={styles.hint}>Visible on Supabase-backed profiles only. Up to 160 characters.</Text>
+        </View>
+      ) : null}
 
       <View style={cardStyle}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>

@@ -9,6 +9,19 @@ export type ChangelogEntry = {
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    id: '0.22-2026-04-27',
+    version: '0.22',
+    date: '2026-04-27',
+    title: 'XMTP wallet messaging and chat UI rework',
+    summary: 'Added XMTP direct messaging through Ethereum wallets and refreshed the secure chat experience.',
+    changes: [
+      'Added XMTP direct message integration through Ethereum wallet connections.',
+      'Reworked secure chat settings, profile viewing, and thread navigation.',
+      'Updated chat UI with a cleaner bottom sheet settings flow and full-screen profile view.',
+      'Added native Android notifications for incoming secure chat and connection messages.',
+    ],
+  },
+  {
     id: '0.20-2026-04-20',
     version: '0.20',
     date: '2026-04-20',

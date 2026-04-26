@@ -97,6 +97,10 @@ export const createProfileStyles = (colors: ProfilePalette) =>
       color: colors.text,
       backgroundColor: colors.background,
     },
+    bioInput: {
+      minHeight: 96,
+      paddingTop: 12,
+    },
     hint: {
       marginTop: 8,
       fontSize: 12,

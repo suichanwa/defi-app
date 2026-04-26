@@ -147,8 +147,11 @@ export default function ProfileScreen() {
           scrollStyle={profile.styles.scrollStyle}
           cardStyle={profile.styles.cardStyle}
           onBack={() => setView('home')}
+          profileSource={profile.state.profileSource}
           alias={profile.state.alias}
           onChangeAlias={profile.actions.setAlias}
+          bio={profile.state.bio}
+          onChangeBio={profile.actions.setBio}
           avatarType={profile.state.avatarType}
           onChangeAvatarType={profile.actions.setAvatarType}
           avatarUri={profile.state.avatarUri}
