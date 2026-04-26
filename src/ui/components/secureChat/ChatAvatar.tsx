@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Platform, StyleSheet, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
 import { useTheme } from '@theme/ThemeProvider';
@@ -15,6 +15,7 @@ type ChatAvatarProps = {
 
 export default function ChatAvatar({ source, variant, style, size = 32, onPress }: ChatAvatarProps) {
   const { colors } = useTheme();
+  const [imageFailed, setImageFailed] = useState(false);
 
   // Check if custom URI is usable (not a local file on web)
   const isCustomUriUsable = useMemo(() => {
@@ -29,13 +30,19 @@ export default function ChatAvatar({ source, variant, style, size = 32, onPress 
     return true;
   }, [source]);
 
+  const imageUri = isCustomUriUsable && source.uri ? source.uri : undefined;
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [imageUri, source.avatarType]);
+
   const identiconData = useMemo(() => {
     // Use identicon if custom URI is not usable
-    if ((source.avatarType === 'identicon' || !isCustomUriUsable) && source.seed) {
+    if ((source.avatarType === 'identicon' || !isCustomUriUsable || imageFailed) && source.seed) {
       return buildIdenticon(source.seed);
     }
     return null;
-  }, [source, isCustomUriUsable]);
+  }, [source, isCustomUriUsable, imageFailed]);
 
   const containerStyle = [
     styles.container,
@@ -78,10 +85,11 @@ export default function ChatAvatar({ source, variant, style, size = 32, onPress 
 
   const content = (
     <View style={containerStyle}>
-      {isCustomUriUsable && source.uri ? (
+      {imageUri && !imageFailed ? (
         <Image
-          source={{ uri: source.uri }}
+          source={{ uri: imageUri }}
           style={{ width: imageSize, height: imageSize, borderRadius: imageSize / 2 }}
+          onError={() => setImageFailed(true)}
         />
       ) : identiconData ? (
         renderIdenticon()

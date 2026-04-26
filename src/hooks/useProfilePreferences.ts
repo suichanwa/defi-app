@@ -107,6 +107,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
   const [state, setState] = useState<ProfilePreferencesState>(initialState);
   const [status, setStatus] = useState<ProfilePreferencesStatus>(initialStatus);
   const applyThemePreference = theme.setPreference;
+  const saveInFlightRef = useRef(false);
   const didInitRef = useRef(false);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevProfileRef = useRef({
@@ -227,24 +228,36 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
   };
 
   const save = useCallback(async () => {
+    if (saveInFlightRef.current) {
+      return;
+    }
+    saveInFlightRef.current = true;
     setStatus({ loading: true, message: null, error: null });
     const trimmed = state.alias.trim();
     const aliasError = validateAlias(trimmed);
     if (aliasError) {
       setStatus({ loading: false, message: null, error: aliasError });
+      saveInFlightRef.current = false;
       return;
     }
     if (state.avatarType === 'custom' && !state.avatarUri) {
       setStatus({ loading: false, message: null, error: 'Pick a photo to use a custom avatar.' });
+      saveInFlightRef.current = false;
       return;
     }
     try {
       const currentSession = session ?? (await getAuthSession());
       const profileId = await resolveProfileId(currentSession);
       let remoteAvatarUrl = state.avatarUri;
-      if (state.avatarType === 'custom' && state.avatarUri && profileId) {
+      const shouldUploadAvatar =
+        state.avatarType === 'custom' &&
+        Boolean(state.avatarUri) &&
+        Boolean(profileId) &&
+        !state.avatarUri?.startsWith('http');
+
+      if (shouldUploadAvatar) {
         try {
-          remoteAvatarUrl = await uploadAvatar(profileId, state.avatarUri);
+          remoteAvatarUrl = await uploadAvatar(profileId!, state.avatarUri!);
           setState((prev) => ({ ...prev, avatarUri: remoteAvatarUrl }));
         } catch (uploadError) {
           setStatus({
@@ -252,6 +265,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
             message: null,
             error: normalizeProfileError(uploadError, 'Unable to upload avatar.'),
           });
+          saveInFlightRef.current = false;
           return;
         }
       }
@@ -269,16 +283,15 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
       await saveProfileSettings(settings);
       setStatus({ loading: false, message: 'Profile saved locally.', error: null });
 
-      // If signed in with Supabase, also save remotely (non-blocking)
-      // Exclude experimental settings from remote sync - keep them local-only
-      const userId = session?.user?.id;
-      if (userId && isSupabaseConfigured) {
+      // Save remotely when a remote profile id is available (signed-in or anon profile id).
+      // Exclude experimental settings from remote sync - keep them local-only.
+      if (profileId && isSupabaseConfigured) {
         // Run in background, don't block UI
         const { experimental: _, ...settingsWithoutExperimental } = settings;
-        upsertRemoteProfile(userId, settingsWithoutExperimental)
+        upsertRemoteProfile(profileId, settingsWithoutExperimental)
           .then(() => {
             setState((prev) => ({ ...prev, profileSource: 'supabase' }));
-            setStatus({ loading: false, message: 'Profile saved.', error: null });
+            setStatus({ loading: false, message: 'Profile saved and synced.', error: null });
           })
           .catch((remoteError) => {
             console.warn('Failed to sync profile to Supabase:', remoteError);
@@ -293,6 +306,8 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
       setState((prev) => ({ ...prev, alias: settings.alias }));
     } catch (error) {
       setStatus({ loading: false, message: null, error: normalizeProfileError(error, 'Unable to save profile.') });
+    } finally {
+      saveInFlightRef.current = false;
     }
   }, [state, session]);
 

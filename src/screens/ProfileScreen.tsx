@@ -162,6 +162,7 @@ export default function ProfileScreen() {
           onChangeThemePreference={profile.actions.setThemePreference}
           profileError={profile.status.error}
           profileMessage={profile.status.message}
+          isSaving={profile.status.loading}
           onSave={profile.actions.save}
         />
       );
@@ -253,6 +254,7 @@ export default function ProfileScreen() {
           language={profile.state.language}
           onChangeLanguage={profile.actions.setLanguage}
           onSave={profile.actions.save}
+          isSaving={profile.status.loading}
           message={profile.status.message}
           error={profile.status.error}
         />
@@ -267,6 +269,7 @@ export default function ProfileScreen() {
           cardNamesEnabled={profile.state.experimental?.cardNamesEnabled ?? false}
           onToggleCardNames={profile.actions.setCardNamesEnabled}
           onSave={profile.actions.save}
+          isSaving={profile.status.loading}
           message={profile.status.message}
           error={profile.status.error}
         />

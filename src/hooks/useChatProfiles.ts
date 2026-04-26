@@ -17,6 +17,8 @@ type UseChatProfilesArgs = {
   enabled?: boolean;
 };
 
+const PROFILE_REFRESH_MS = 30_000;
+
 const chunk = <T,>(items: T[], size: number) => {
   const result: T[][] = [];
   for (let i = 0; i < items.length; i += size) {
@@ -36,7 +38,9 @@ const mapRowToProfile = (row: ProfileRow): ChatAuthorProfile => ({
 
 export function useChatProfiles({ authorIds, enabled = true }: UseChatProfilesArgs) {
   const [profilesById, setProfilesById] = useState<Record<string, ChatAuthorProfile>>({});
+  const [refreshTick, setRefreshTick] = useState(0);
   const inFlight = useRef<Set<string>>(new Set());
+  const lastFetchedAtRef = useRef<Record<string, number>>({});
 
   const uniqueIds = useMemo(() => {
     const next = new Set(authorIds.filter(Boolean));
@@ -44,13 +48,27 @@ export function useChatProfiles({ authorIds, enabled = true }: UseChatProfilesAr
   }, [authorIds]);
 
   useEffect(() => {
+    if (!enabled) return;
+    const timer = setInterval(() => {
+      setRefreshTick((prev) => prev + 1);
+    }, PROFILE_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [enabled]);
+
+  useEffect(() => {
     const supabaseClient = supabase;
     if (!enabled || !isSupabaseConfigured || !supabaseClient) return;
-    const missing = uniqueIds.filter((id) => !profilesById[id] && !inFlight.current.has(id));
-    if (missing.length === 0) return;
+    const now = Date.now();
+    const pending = uniqueIds.filter((id) => {
+      if (inFlight.current.has(id)) return false;
+      if (!profilesById[id]) return true;
+      const lastFetchedAt = lastFetchedAtRef.current[id] ?? 0;
+      return now - lastFetchedAt >= PROFILE_REFRESH_MS;
+    });
+    if (pending.length === 0) return;
 
     let active = true;
-    const batches = chunk(missing, 50);
+    const batches = chunk(pending, 50);
 
     const fetchProfiles = async () => {
       for (const ids of batches) {
@@ -61,6 +79,9 @@ export function useChatProfiles({ authorIds, enabled = true }: UseChatProfilesAr
           .in('id', ids);
         ids.forEach((id) => inFlight.current.delete(id));
         if (!active) return;
+        ids.forEach((id) => {
+          lastFetchedAtRef.current[id] = Date.now();
+        });
         if (error || !data) continue;
         setProfilesById((prev) => {
           const next = { ...prev };
@@ -76,7 +97,7 @@ export function useChatProfiles({ authorIds, enabled = true }: UseChatProfilesAr
     return () => {
       active = false;
     };
-  }, [enabled, profilesById, uniqueIds]);
+  }, [enabled, profilesById, refreshTick, uniqueIds]);
 
   return { profilesById };
 }

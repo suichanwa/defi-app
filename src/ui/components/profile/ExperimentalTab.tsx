@@ -11,6 +11,7 @@ type ExperimentalTabProps = {
   cardNamesEnabled: boolean;
   onToggleCardNames: (enabled: boolean) => void;
   onSave: () => Promise<void>;
+  isSaving?: boolean;
   message: string | null;
   error: string | null;
 };
@@ -22,6 +23,7 @@ export default function ExperimentalTab({
   cardNamesEnabled,
   onToggleCardNames,
   onSave,
+  isSaving,
   message,
   error,
 }: ExperimentalTabProps) {
@@ -57,8 +59,13 @@ export default function ExperimentalTab({
         </View>
         {error && <Text style={styles.errorText}>{error}</Text>}
         {message && <Text style={styles.successText}>{message}</Text>}
-        <TouchableOpacity style={styles.primaryButton} onPress={onSave} activeOpacity={0.9}>
-          <Text style={styles.primaryButtonText}>Save preferences</Text>
+        <TouchableOpacity
+          style={[styles.primaryButton, isSaving && styles.buttonDisabled]}
+          onPress={onSave}
+          activeOpacity={0.9}
+          disabled={Boolean(isSaving)}
+        >
+          <Text style={styles.primaryButtonText}>{isSaving ? 'Saving...' : 'Save preferences'}</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

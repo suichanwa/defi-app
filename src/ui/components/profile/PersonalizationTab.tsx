@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Image, ScrollView, Text, TextInput, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createProfileStyles } from '@styles/ProfileStyles';
@@ -27,6 +27,7 @@ type PersonalizationTabProps = {
   onChangeThemePreference: (value: ThemePreference) => Promise<void> | void;
   profileError: string | null;
   profileMessage: string | null;
+  isSaving?: boolean;
   onSave: () => void;
 };
 
@@ -46,10 +47,21 @@ export default function PersonalizationTab({
   onChangeThemePreference,
   profileError,
   profileMessage,
+  isSaving,
   onSave,
 }: PersonalizationTabProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createProfileStyles(colors), [colors]);
+  const [previewLoadFailed, setPreviewLoadFailed] = useState(false);
+
+  const imageUri = avatarType === 'custom' ? avatarUri : undefined;
+
+  useEffect(() => {
+    setPreviewLoadFailed(false);
+  }, [avatarType, imageUri]);
+
+  const hasCustomAvatar = Boolean(imageUri);
+  const canRenderCustomAvatar = hasCustomAvatar && !previewLoadFailed;
 
   return (
     <ScrollView contentContainerStyle={scrollStyle} showsVerticalScrollIndicator={false}>
@@ -68,7 +80,31 @@ export default function PersonalizationTab({
       </View>
 
       <View style={cardStyle}>
-        <Text style={styles.cardTitle}>Avatar</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <Text style={styles.cardTitle}>Avatar</Text>
+          <View
+            style={{
+              borderRadius: 999,
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.background,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: '700',
+                color: colors.muted,
+                textTransform: 'uppercase',
+                letterSpacing: 0.4,
+              }}
+            >
+              {avatarType === 'custom' ? 'Photo' : avatarType === 'identicon' ? 'Identicon' : 'Hidden'}
+            </Text>
+          </View>
+        </View>
         <View style={styles.avatarRow}>
           <View style={styles.avatarPreview}>
             {avatarType === 'identicon' ? (
@@ -80,8 +116,8 @@ export default function PersonalizationTab({
                   />
                 ))}
               </View>
-            ) : avatarType === 'custom' && avatarUri ? (
-              <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+            ) : canRenderCustomAvatar ? (
+              <Image source={{ uri: imageUri }} style={styles.avatarImage} onError={() => setPreviewLoadFailed(true)} />
             ) : (
               <Ionicons name="person" size={34} color={colors.muted} />
             )}
@@ -127,8 +163,18 @@ export default function PersonalizationTab({
           </View>
         </View>
         <Text style={styles.hint}>
-          Identicon is derived from your local wallet id. Custom photo stays on this device and appears in chat bubbles.
+          Identicon is derived from your wallet id. Custom photos sync to your profile when connected to Supabase.
         </Text>
+        {avatarType === 'custom' && !hasCustomAvatar ? (
+          <Text style={{ marginTop: 8, color: '#b45309', fontSize: 12, fontWeight: '500' }}>
+            Pick a photo to enable custom avatar.
+          </Text>
+        ) : null}
+        {previewLoadFailed ? (
+          <Text style={{ marginTop: 8, color: '#b45309', fontSize: 12, fontWeight: '500' }}>
+            Could not load this photo. Try selecting another image.
+          </Text>
+        ) : null}
       </View>
 
       <View style={cardStyle}>
@@ -153,8 +199,13 @@ export default function PersonalizationTab({
       {profileError && <Text style={styles.errorText}>{profileError}</Text>}
       {profileMessage && <Text style={styles.successText}>{profileMessage}</Text>}
 
-      <TouchableOpacity style={styles.primaryButton} onPress={onSave} activeOpacity={0.9}>
-        <Text style={styles.primaryButtonText}>Save changes</Text>
+      <TouchableOpacity
+        style={[styles.primaryButton, isSaving && styles.buttonDisabled]}
+        onPress={onSave}
+        activeOpacity={0.9}
+        disabled={Boolean(isSaving)}
+      >
+        <Text style={styles.primaryButtonText}>{isSaving ? 'Saving...' : 'Save changes'}</Text>
       </TouchableOpacity>
     </ScrollView>
   );

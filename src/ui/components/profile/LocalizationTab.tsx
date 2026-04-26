@@ -14,6 +14,7 @@ type LocalizationTabProps = {
   language: LanguageCode;
   onChangeLanguage: (code: LanguageCode) => void;
   onSave: () => void;
+  isSaving?: boolean;
   message?: string | null;
   error?: string | null;
 };
@@ -25,6 +26,7 @@ export default function LocalizationTab({
   language,
   onChangeLanguage,
   onSave,
+  isSaving,
   message,
   error,
 }: LocalizationTabProps) {
@@ -99,8 +101,13 @@ export default function LocalizationTab({
         </View>
         {error && <Text style={styles.errorText}>{error}</Text>}
         {message && <Text style={styles.successText}>{message}</Text>}
-        <TouchableOpacity style={styles.primaryButton} onPress={onSave} activeOpacity={0.9}>
-          <Text style={styles.primaryButtonText}>{t('language.save')}</Text>
+        <TouchableOpacity
+          style={[styles.primaryButton, isSaving && styles.buttonDisabled]}
+          onPress={onSave}
+          activeOpacity={0.9}
+          disabled={Boolean(isSaving)}
+        >
+          <Text style={styles.primaryButtonText}>{isSaving ? 'Saving...' : t('language.save')}</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
