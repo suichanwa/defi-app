@@ -183,3 +183,29 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+def rustWalletCoreDir = rootProject.file("../rust-api")
+def rustWalletJniLibsDir = file("src/main/jniLibs")
+
+def buildRustWalletCore = tasks.register("buildRustWalletCore", Exec) {
+    group = "build"
+    description = "Rebuilds the Rust wallet core native library for release packaging."
+    workingDir rustWalletCoreDir
+    commandLine(
+        "cargo",
+        "ndk",
+        "-t", "armeabi-v7a",
+        "-t", "arm64-v8a",
+        "-t", "x86_64",
+        "-o", rustWalletJniLibsDir.absolutePath,
+        "build",
+        "--lib",
+        "--release"
+    )
+}
+
+afterEvaluate {
+    tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+        dependsOn(buildRustWalletCore)
+    }
+}
