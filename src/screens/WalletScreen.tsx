@@ -79,6 +79,34 @@ const walletActions: WalletAction[] = [
 
 const Stack = createStackNavigator<WalletStackParamList>();
 
+const promptChainChange = ({
+  currentKey,
+  nextKey,
+  setChainKey,
+}: {
+  currentKey: ChainKey;
+  nextKey: ChainKey;
+  setChainKey: (key: ChainKey) => void;
+}) => {
+  if (nextKey === currentKey) return;
+
+  const nextChain = CHAINS[nextKey];
+  const nextChainName = nextChain?.name ?? nextKey;
+
+  Alert.alert('Reload app required', `You have to reload the app before switching to ${nextChainName}.`, [
+    {
+      text: 'Stay on current chain',
+      style: 'cancel',
+    },
+    {
+      text: `Move to ${nextChainName}`,
+      onPress: () => {
+        setChainKey(nextKey);
+      },
+    },
+  ]);
+};
+
 export function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<WalletStackParamList, 'WalletHome'> }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
@@ -248,27 +276,11 @@ export function WalletHomeScreen({ navigation }: { navigation: StackNavigationPr
 
   const confirmChainChange = useCallback(
     (nextKey: ChainKey) => {
-      if (nextKey === chainKey) return;
-
-      const nextChain = CHAINS[nextKey];
-      const nextChainName = nextChain?.name ?? nextKey;
-
-      Alert.alert(
-        'Reload app required',
-        `You have to reload the app before switching to ${nextChainName}.`,
-        [
-          {
-            text: 'Stay on current chain',
-            style: 'cancel',
-          },
-          {
-            text: `Move to ${nextChainName}`,
-            onPress: () => {
-              setChainKey(nextKey);
-            },
-          },
-        ],
-      );
+      promptChainChange({
+        currentKey: chainKey,
+        nextKey,
+        setChainKey,
+      });
     },
     [chainKey, setChainKey],
   );
@@ -427,6 +439,17 @@ export default function WalletScreen() {
   const setupNetworkLabel = useMemo(
     () => (chain.kind === 'solana' ? getSolanaClusterLabel(chain.cluster) : 'Ethereum'),
     [chain],
+  );
+
+  const confirmChainChange = useCallback(
+    (nextKey: ChainKey) => {
+      promptChainChange({
+        currentKey: chainKey,
+        nextKey,
+        setChainKey,
+      });
+    },
+    [chainKey, setChainKey],
   );
 
   const handleToggleSetupNetwork = useCallback(() => {

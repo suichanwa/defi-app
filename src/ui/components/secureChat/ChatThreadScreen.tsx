@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -16,6 +16,7 @@ import { useTheme } from '@theme/ThemeProvider';
 import ChatThreadHeader from '@components/secureChat/ChatThreadHeader';
 import ViewProfileScreen from '@components/secureChat/ViewProfileScreen';
 import ChatInputBar from '@components/secureChat/ChatInputBar';
+import { CHAT_HISTORY_SCROLL_THRESHOLD } from '@constants/secureChat.constants';
 import { convertToFlyerMessage, type FlyerMessageWithMeta } from '@utils/flyerChatAdapter';
 
 type Props = {
@@ -98,10 +99,12 @@ export default function ChatThreadScreen({
 
   const [selectedProfile, setSelectedProfile] = useState<SelectedProfile>(null);
   const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(null);
+  const loadOlderArmedRef = useRef(true);
 
   useEffect(() => {
     setSelectedProfile(null);
     setSelectedMessage(null);
+    loadOlderArmedRef.current = true;
   }, [chat?.id]);
 
   const sortedChatMessages = useMemo(() => {
@@ -206,6 +209,30 @@ export default function ChatThreadScreen({
     if (!hasMoreMessages) return;
     onLoadMore();
   }, [hasMoreMessages, isLoadingMore, onLoadMore]);
+
+  const handleFlatListScroll = useCallback(
+    (event: {
+      nativeEvent: {
+        contentOffset: { y: number };
+        contentSize: { height: number };
+        layoutMeasurement: { height: number };
+      };
+    }) => {
+      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+      const distanceFromEnd = contentSize.height - layoutMeasurement.height - contentOffset.y;
+      const isNearOlderMessages = distanceFromEnd <= CHAT_HISTORY_SCROLL_THRESHOLD;
+
+      if (!isNearOlderMessages) {
+        loadOlderArmedRef.current = true;
+        return;
+      }
+
+      if (!loadOlderArmedRef.current) return;
+      loadOlderArmedRef.current = false;
+      handleLoadOlder();
+    },
+    [handleLoadOlder]
+  );
 
   // Handle message long press for actions
   const handleMessageLongPress = useCallback(
@@ -512,8 +539,10 @@ export default function ChatThreadScreen({
                     paddingBottom: 0,
                     paddingHorizontal: 8,
                   },
+                  onScroll: handleFlatListScroll,
                   onEndReached: handleLoadOlder,
                   onEndReachedThreshold: 0.25,
+                  scrollEventThrottle: 16,
                   keyboardShouldPersistTaps: 'handled',
                   ListFooterComponent:
                     isLoadingMore && hasMoreMessages ? (
