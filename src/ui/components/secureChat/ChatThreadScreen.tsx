@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Keyboard,
   Linking,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,

@@ -35,7 +35,6 @@ import SendCryptoComplete from './walletScreens/SendCryptoComplete';
 import QRReceiveScreen from './walletScreens/QRReceiveScreen';
 import ExpressSwapScreen from './walletScreens/ExpressSwapScreen';
 import ExpressSwapSuccessScreen from './walletScreens/ExpressSwapSuccessScreen';
-import WalletCardSettingsScreen from './walletScreens/WalletCardSettingsScreen';
 import WalletSettingsScreen from './walletScreens/WalletSettingsScreen';
 import WalletTokensTab from './walletScreens/Tokens/WalletTokensTab';
 import WalletNFTsTab from './walletScreens/NFTs/WalletNFTsTab';
@@ -62,7 +61,6 @@ type WalletStackParamList = {
   SendCrypto: { symbol: string; name: string; balance: string };
   SendCryptoComplete: { symbol: string; amount: string; toAddress: string; signature: string };
   QRReceive: { symbol: string; name: string; address: string };
-  WalletCardSettings: { walletId: string };
   WalletSettings: { walletId: string };
 };
 
@@ -364,7 +362,6 @@ export function WalletHomeScreen({ navigation }: { navigation: StackNavigationPr
             navigation.navigate(action.screen as any);
           }
         }}
-        onEditWallet={(walletId) => navigation.navigate('WalletCardSettings', { walletId })}
         onSettingsWallet={(walletId) => navigation.navigate('WalletSettings', { walletId })}
         onActivateWallet={handleActivateWallet}
         activatingWalletId={activatingWalletId}
@@ -974,7 +971,6 @@ export default function WalletScreen() {
         <Stack.Screen name="Swap" component={SwapScreen} />
         <Stack.Screen name="ExpressSwap" component={ExpressSwapScreen} />
         <Stack.Screen name="ExpressSwapSuccess" component={ExpressSwapSuccessScreen} />
-        <Stack.Screen name="WalletCardSettings" component={WalletCardSettingsScreen} />
         <Stack.Screen name="WalletSettings" component={WalletSettingsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
