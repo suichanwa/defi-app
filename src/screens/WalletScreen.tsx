@@ -43,12 +43,13 @@ import WalletCardCarousel, { WalletActionItem } from './walletScreens/components
 import WalletSearchBar from './walletScreens/components/WalletSearchBar';
 import WalletTabSelector, { WalletTab } from './walletScreens/components/WalletTabSelector';
 import WalletTokenSearchOverlay from './walletScreens/components/WalletTokenSearchOverlay';
-import { clearProfileSettings } from '@services/profileStore';
+import { clearProfileSettings, loadProfileSettings } from '@services/profileStore';
 import { clearRewardsCache } from '@services/rewardsStore';
 import { signOut as authSignOut } from '@services/auth';
 import { isMasterPasscodeSet, clearMasterPasscode } from '@services/masterPasscodeStore';
 import { appFeatures } from '@config/appFeatures';
 import { useNavVisibility } from '@context/NavVisibilityProvider';
+import { clearBiometricPassword } from '../services/biometrics';
 
 type WalletStackParamList = {
   WalletHome: undefined;
@@ -213,6 +214,28 @@ export function WalletHomeScreen({ navigation }: { navigation: StackNavigationPr
     React.useCallback(() => {
       setNavHidden(false);
     }, [setNavHidden]),
+  );
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let cancelled = false;
+      loadProfileSettings()
+        .then((settings) => {
+          if (cancelled) return;
+          const enabled = settings.walletBiometricUnlockEnabled ?? true;
+          setBiometricUnlockEnabled(enabled);
+          if (!enabled) {
+            void clearBiometricPassword();
+          }
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setBiometricUnlockEnabled(true);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }, []),
   );
 
   const totalValueAnimated = useRef(new Animated.Value(0)).current;
@@ -431,6 +454,7 @@ export default function WalletScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [biometricsAvailable, setBiometricsAvailable] = useState(false);
+  const [biometricUnlockEnabled, setBiometricUnlockEnabled] = useState(true);
   const [hasMasterPasscode, setHasMasterPasscode] = useState(false);
 
   const setupNetworkLabel = useMemo(
@@ -481,12 +505,33 @@ export default function WalletScreen() {
     }
   }, [status]);
 
+  useEffect(() => {
+    let cancelled = false;
+    loadProfileSettings()
+      .then((settings) => {
+        if (cancelled) return;
+        const enabled = settings.walletBiometricUnlockEnabled ?? true;
+        setBiometricUnlockEnabled(enabled);
+        if (!enabled) {
+          void clearBiometricPassword();
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setBiometricUnlockEnabled(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [status]);
+
 
   useEffect(() => {
     let cancelled = false;
     
     const tryBiometricUnlock = async () => {
       if (status !== 'locked') return;
+      if (!biometricUnlockEnabled) return;
       if (biometricInFlightRef.current) return;
       if (resetInFlightRef.current) return;
 
@@ -520,7 +565,7 @@ export default function WalletScreen() {
     return () => {
       cancelled = true;
     };
-  }, [status, unlock]);
+  }, [status, unlock, biometricUnlockEnabled]);
 
   const resetFlowMessages = () => {
     setFlowError(null);
@@ -627,7 +672,7 @@ export default function WalletScreen() {
       setHasMasterPasscode(true);
       setFlowMessage('Wallet created. Back up your recovery phrase.');
       
-      if (biometricsAvailable) {
+      if (biometricsAvailable && biometricUnlockEnabled) {
         await saveBiometricPassword(passcode);
       }
       
@@ -695,7 +740,7 @@ export default function WalletScreen() {
       setHasMasterPasscode(true);
       setFlowMessage('Wallet imported.');
       setFlow('create-success');
-      if (biometricsAvailable) {
+      if (biometricsAvailable && biometricUnlockEnabled) {
         await saveBiometricPassword(passcode);
       }
     } catch (error) {
@@ -738,7 +783,7 @@ export default function WalletScreen() {
         createdDuringUnlock = true;
       }
 
-      if (biometricsAvailable) {
+      if (biometricsAvailable && biometricUnlockEnabled) {
         const existing = await getBiometricPassword({ requireAuthentication: false });
         if (!existing) {
           const confirmResult = await promptBiometric('Enable biometric unlock');

@@ -3,6 +3,7 @@ import {
   changeWalletPassword,
   createInitialWalletKey,
   loadEncryptedWalletKey,
+  loadProfileSettings,
   saveProfileSettings,
 } from '@services';
 import type { AvatarType, LanguageCode, ThemePreference } from '@app-types/profile';
@@ -132,7 +133,9 @@ export function useWalletSecurity({
       setupFields.resetFields();
       
       if (avatarType === 'identicon') {
+        const currentSettings = await loadProfileSettings();
         saveProfileSettings({
+          ...currentSettings,
           alias: alias.trim(),
           avatarType,
           avatarSeed: result.id,

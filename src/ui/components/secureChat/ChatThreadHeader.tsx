@@ -7,11 +7,13 @@ import ChatAvatar from '@components/secureChat/ChatAvatar';
 import GlobalChatAvatar from '@components/secureChat/GlobalChatAvatar';
 import PrivateChatSettingsMenu from '@components/secureChat/PrivateChatSettingsMenu';
 import type { ChatAvatarSource, ChatThread } from '@app-types/securechat-types/secureChat';
+import { getPrivateChatPresenceIndicator } from '@utils/secureChatUtils';
 
 type Props = {
   chat: ChatThread;
   onBack: () => void;
   participantCount?: number;
+  unreadCount?: number;
   isMuted?: boolean;
   onToggleMute?: () => void;
   onViewProfile?: () => void;
@@ -24,6 +26,7 @@ export default function ChatThreadHeader({
   chat,
   onBack,
   participantCount = 0,
+  unreadCount = 0,
   isMuted,
   onToggleMute,
   onViewProfile,
@@ -35,7 +38,15 @@ export default function ChatThreadHeader({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const isGlobalChat = chat.id === DEFAULT_GLOBAL_CHAT_ID || chat.peerAddress === DEFAULT_GLOBAL_CHAT_PEER;
-  const subtitle = isGlobalChat ? `${participantCount} participants` : '';
+  const presence = useMemo(
+    () => getPrivateChatPresenceIndicator({ chat, unreadCount }),
+    [chat, unreadCount],
+  );
+  const subtitle = isGlobalChat
+    ? `${participantCount} participants`
+    : presence.showBadge
+      ? presence.statusLabel
+      : presence.statusLabel;
   const avatarNode = isGlobalChat ? (
     <GlobalChatAvatar size={34} />
   ) : avatarSource && onAvatarPress ? (
@@ -63,7 +74,14 @@ export default function ChatThreadHeader({
           <Text style={styles.title} numberOfLines={1}>
             {chat.name}
           </Text>
-          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+          <View style={styles.subtitleRow}>
+            {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+            {!isGlobalChat && presence.showBadge ? (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadBadgeText}>{presence.badgeLabel}</Text>
+              </View>
+            ) : null}
+          </View>
         </View>
 
         <TouchableOpacity
@@ -127,10 +145,30 @@ const createStyles = (colors: {
       color: colors.text,
     },
     subtitle: {
-      marginTop: 2,
       fontSize: 12,
       color: colors.muted,
       fontWeight: '500',
+    },
+    subtitleRow: {
+      marginTop: 2,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      flexWrap: 'wrap',
+    },
+    unreadBadge: {
+      minWidth: 18,
+      height: 18,
+      paddingHorizontal: 5,
+      borderRadius: 9,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.accent,
+    },
+    unreadBadgeText: {
+      fontSize: 10,
+      fontWeight: '800',
+      color: '#ffffff',
     },
     settingsButton: {
       padding: 8,

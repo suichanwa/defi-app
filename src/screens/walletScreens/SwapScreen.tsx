@@ -47,8 +47,10 @@ export default function SwapScreen() {
           <View style={localStyles.headerSpacer} />
         </View>
 
-        <Text style={[localStyles.title, { color: colors.text }]}>Swap</Text>
-        <Text style={[localStyles.subtitle, { color: colors.muted }]}>Exchange one token for another</Text>
+        <View style={localStyles.headerCopy}>
+          <Text style={[styles.screenTitle, localStyles.title, { color: colors.text }]}>Swap</Text>
+          <Text style={[styles.screenSubtitle, localStyles.subtitle, { color: colors.muted }]}>Exchange one token for another</Text>
+        </View>
 
         <TouchableOpacity
           activeOpacity={0.9}
@@ -93,7 +95,7 @@ const localStyles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   backButton: {
     width: 36,
@@ -106,13 +108,13 @@ const localStyles = StyleSheet.create({
   headerSpacer: {
     flex: 1,
   },
+  headerCopy: {
+    marginBottom: 16,
+  },
   title: {
-    fontSize: 24,
-    fontWeight: '700',
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 14,
     marginBottom: 24,
   },
   optionCard: {

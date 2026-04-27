@@ -11,6 +11,7 @@ export type ProfileSettings = {
   avatarSeed?: string;
   themePreference: ThemePreference;
   language: LanguageCode;
+  walletBiometricUnlockEnabled?: boolean;
   experimental?: {
     cardNamesEnabled?: boolean;
   };

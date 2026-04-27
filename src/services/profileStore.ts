@@ -9,6 +9,7 @@ const defaultSettings = (): ProfileSettings => ({
   avatarType: 'identicon',
   themePreference: 'system',
   language: 'en',
+  walletBiometricUnlockEnabled: true,
   experimental: {
     cardNamesEnabled: false,
   },

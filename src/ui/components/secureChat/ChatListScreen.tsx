@@ -7,15 +7,23 @@ import { DEFAULT_GLOBAL_CHAT_ID } from '@constants/secureChat.constants';
 import { useTheme } from '@theme/ThemeProvider';
 import GlobalChatAvatar from './GlobalChatAvatar';
 import ChatAvatar from './ChatAvatar';
+import { getPrivateChatPresenceIndicator } from '@utils/secureChatUtils';
 
 type Props = {
   chats: ChatThread[];
   selectedChatId: string;
+  unreadCountByChatId?: Record<string, number>;
   onSelectChat: (chatId: string) => void;
   onOpenSelected: (chatId: string) => void;
 };
 
-export default function ChatListScreen({ chats, selectedChatId, onSelectChat, onOpenSelected }: Props) {
+export default function ChatListScreen({
+  chats,
+  selectedChatId,
+  unreadCountByChatId = {},
+  onSelectChat,
+  onOpenSelected,
+}: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -95,6 +103,10 @@ export default function ChatListScreen({ chats, selectedChatId, onSelectChat, on
         {orderedChats.map((chat) => {
           const isActive = chat.id === selectedChatId;
           const isPinned = chat.id === DEFAULT_GLOBAL_CHAT_ID;
+          const presence = getPrivateChatPresenceIndicator({
+            chat,
+            unreadCount: unreadCountByChatId[chat.id] ?? 0,
+          });
           const lastMessage = chat.lastMessage;
           const previewText = lastMessage
             ? `${lastMessage.from ? `${lastMessage.from}: ` : ''}${lastMessage.text}`
@@ -126,8 +138,14 @@ export default function ChatListScreen({ chats, selectedChatId, onSelectChat, on
                   <Text style={styles.chatPreview}>{previewText}</Text>
                 </View>
                 <View style={styles.chatStatus}>
-                  <PulseBadge size={9} color={chat.isOnline ? '#22c55e' : '#f97316'} />
-                  <Text style={styles.chatStatusText}>{chat.isOnline ? 'Online' : 'Offline'}</Text>
+                  {presence.showBadge ? (
+                    <View style={styles.chatBadge}>
+                      <Text style={styles.chatBadgeText}>{presence.badgeLabel}</Text>
+                    </View>
+                  ) : (
+                    <PulseBadge size={9} color={presence.statusColor} />
+                  )}
+                  <Text style={[styles.chatStatusText, { color: presence.statusColor }]}>{presence.statusLabel}</Text>
                 </View>
               </View>
               <Text style={styles.chatPeer}>
@@ -205,10 +223,25 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       flexDirection: 'row',
       alignItems: 'center',
     },
+    chatBadge: {
+      minWidth: 18,
+      height: 18,
+      paddingHorizontal: 4,
+      borderRadius: 9,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.accent,
+      marginRight: 6,
+    },
+    chatBadgeText: {
+      fontSize: 10,
+      fontWeight: '800',
+      color: '#ffffff',
+    },
     chatStatusText: {
       marginLeft: 6,
       fontSize: 12,
-      color: colors.text,
+      fontWeight: '600',
     },
     chatPeer: {
       marginTop: 8,

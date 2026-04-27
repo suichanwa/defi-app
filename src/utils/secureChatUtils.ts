@@ -1,4 +1,4 @@
-import type { ChatMessage } from '@app-types/securechat-types/secureChat';
+import type { ChatMessage, ChatPresenceIndicator, ChatThread } from '@app-types/securechat-types/secureChat';
 import type { AvatarType } from '@app-types/profile';
 import type { SecureChatMessageRow } from '@app-types/securechat-types/secureChatScreen';
 import { UUID_REGEX } from '@constants/secureChat.constants';
@@ -110,3 +110,21 @@ export const createOutgoingImageMessage = ({
     imageUri,
     imagePath,
   });
+
+export const getPrivateChatPresenceIndicator = ({
+  chat,
+  unreadCount = 0,
+}: {
+  chat: ChatThread;
+  unreadCount?: number;
+}): ChatPresenceIndicator => {
+  const isOnline = chat.isOnline === true;
+  const normalizedUnread = Number.isFinite(unreadCount) ? Math.max(0, Math.floor(unreadCount)) : 0;
+
+  return {
+    statusLabel: isOnline ? 'Online' : 'Offline',
+    statusColor: isOnline ? '#22c55e' : '#9ca3af',
+    badgeLabel: normalizedUnread > 0 ? (normalizedUnread === 1 ? '1' : `${Math.min(normalizedUnread, 99)}+`) : undefined,
+    showBadge: normalizedUnread > 0,
+  };
+};

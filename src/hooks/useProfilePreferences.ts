@@ -16,6 +16,7 @@ import {
   upsertRemoteProfile,
   type AuthSession,
 } from '@services';
+import { clearBiometricPassword } from '@services/biometrics';
 import { makeSeed } from '@utils/identicon';
 import type { StyleProp, ViewStyle } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -33,6 +34,7 @@ type ProfilePreferencesState = {
   avatarUri?: string;
   themePreference: ThemePreference;
   language: LanguageCode;
+  walletBiometricUnlockEnabled: boolean;
   experimental?: {
     cardNamesEnabled?: boolean;
   };
@@ -62,6 +64,7 @@ const initialState: ProfilePreferencesState = {
   avatarUri: undefined,
   themePreference: 'system',
   language: 'en',
+  walletBiometricUnlockEnabled: true,
   experimental: {
     cardNamesEnabled: false,
   },
@@ -117,6 +120,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
     bio: initialState.bio,
     avatarType: initialState.avatarType,
     avatarUri: initialState.avatarUri,
+    walletBiometricUnlockEnabled: initialState.walletBiometricUnlockEnabled,
   });
 
   const updateStatus = (next: Partial<ProfilePreferencesStatus>) =>
@@ -165,6 +169,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
           avatarUri: merged.avatarUri,
           themePreference: mergedTheme,
           language: mergedLanguage,
+          walletBiometricUnlockEnabled: merged.walletBiometricUnlockEnabled ?? true,
           experimental: localExperimental,
           profileSource: remoteProfile ? 'supabase' : 'local',
         });
@@ -208,6 +213,8 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
     setState((prev) => ({ ...prev, themePreference: value }));
     await applyThemePreference(value);
   };
+  const setWalletBiometricUnlockEnabled = (value: boolean) =>
+    setState((prev) => ({ ...prev, walletBiometricUnlockEnabled: value }));
   const setCardNamesEnabled = (enabled: boolean) => 
     setState((prev) => ({ ...prev, experimental: { ...prev.experimental, cardNamesEnabled: enabled } }));
 
@@ -282,11 +289,15 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
         avatarUri: state.avatarType === 'custom' ? remoteAvatarUrl : undefined,
         themePreference: state.themePreference,
         language: state.language,
+        walletBiometricUnlockEnabled: state.walletBiometricUnlockEnabled,
         experimental: state.experimental,
         updatedAt: new Date().toISOString(),
       };
       // Always save locally first (including experimental settings)
       await saveProfileSettings(settings);
+      if (!state.walletBiometricUnlockEnabled) {
+        await clearBiometricPassword();
+      }
       setStatus({ loading: false, message: 'Profile saved locally.', error: null });
 
       // Save remotely when a remote profile id is available (signed-in or anon profile id).
@@ -324,6 +335,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
         bio: state.bio,
         avatarType: state.avatarType,
         avatarUri: state.avatarUri,
+        walletBiometricUnlockEnabled: state.walletBiometricUnlockEnabled,
       };
       return;
     }
@@ -333,13 +345,15 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
     const bioChanged = prev.bio !== state.bio;
     const avatarTypeChanged = prev.avatarType !== state.avatarType;
     const avatarUriChanged = prev.avatarUri !== state.avatarUri;
-    if (!aliasChanged && !bioChanged && !avatarTypeChanged && !avatarUriChanged) return;
+    const biometricChanged = prev.walletBiometricUnlockEnabled !== state.walletBiometricUnlockEnabled;
+    if (!aliasChanged && !bioChanged && !avatarTypeChanged && !avatarUriChanged && !biometricChanged) return;
 
     prevProfileRef.current = {
       alias: state.alias,
       bio: state.bio,
       avatarType: state.avatarType,
       avatarUri: state.avatarUri,
+      walletBiometricUnlockEnabled: state.walletBiometricUnlockEnabled,
     };
 
     if (aliasChanged) {
@@ -356,7 +370,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
       Boolean(state.avatarUri) &&
       state.avatarUri?.startsWith('http');
 
-    if (avatarBecameRemote && !aliasChanged && !avatarTypeChanged) {
+    if (avatarBecameRemote && !aliasChanged && !avatarTypeChanged && !biometricChanged) {
       return;
     }
 
@@ -364,7 +378,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
       clearTimeout(autoSaveTimerRef.current);
     }
 
-    const delayMs = avatarTypeChanged || avatarUriChanged ? 0 : 600;
+    const delayMs = avatarTypeChanged || avatarUriChanged || biometricChanged ? 0 : 600;
     autoSaveTimerRef.current = setTimeout(() => {
       save();
     }, delayMs);
@@ -374,7 +388,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
         clearTimeout(autoSaveTimerRef.current);
       }
     };
-  }, [save, state.alias, state.bio, state.avatarType, state.avatarUri]);
+  }, [save, state.alias, state.bio, state.avatarType, state.avatarUri, state.walletBiometricUnlockEnabled]);
 
   useEffect(() => {
     if (state.profileSource !== 'local') return;
@@ -397,6 +411,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
         avatarUri: undefined,
         themePreference: 'system',
         language: 'en',
+        walletBiometricUnlockEnabled: true,
         experimental: { cardNamesEnabled: false },
       });
       await loadProfile(() => true);
@@ -417,6 +432,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
       setAvatarUri,
       setLanguage,
       setThemePreference,
+      setWalletBiometricUnlockEnabled,
       setCardNamesEnabled,
       pickAvatar,
       save,

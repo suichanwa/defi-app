@@ -91,10 +91,12 @@ export default function ReceiveScreen() {
           >
             <MaterialCommunityIcons name="chevron-left" size={22} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Receive</Text>
           <View style={localStyles.headerSpacer} />
         </View>
-        <Text style={styles.headerSubtitle}>Choose the asset to receive funds.</Text>
+        <View style={localStyles.headerCopy}>
+          <Text style={styles.screenTitle}>Receive</Text>
+          <Text style={styles.screenSubtitle}>Choose the asset to receive funds.</Text>
+        </View>
 
         {walletList.length > 0 && (
           <View style={localStyles.walletSection}>
@@ -198,8 +200,7 @@ const localStyles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   backButton: {
     width: 36,
@@ -211,6 +212,9 @@ const localStyles = StyleSheet.create({
   },
   headerSpacer: {
     width: 36,
+  },
+  headerCopy: {
+    marginBottom: 16,
   },
   list: {
     gap: 12,

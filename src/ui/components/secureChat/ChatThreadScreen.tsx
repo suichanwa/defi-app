@@ -35,6 +35,7 @@ type Props = {
   replyTarget?: ChatReplyReference | null;
   serverInfo: ServerInfo | null;
   participantCount?: number;
+  unreadCount?: number;
   currentUserId?: string;
   currentUserLabel?: string;
   onBack: () => void;
@@ -85,6 +86,7 @@ export default function ChatThreadScreen({
   replyTarget,
   serverInfo,
   participantCount = 0,
+  unreadCount = 0,
   currentUserId,
   currentUserLabel,
   onBack,
@@ -622,6 +624,7 @@ export default function ChatThreadScreen({
             chat={chat}
             onBack={handleBackPress}
             participantCount={participantCount}
+            unreadCount={unreadCount}
             isMuted={isMuted}
             onToggleMute={onToggleMute}
             onViewProfile={isDirectChat ? handleViewProfile : undefined}

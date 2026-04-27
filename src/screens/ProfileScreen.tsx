@@ -210,6 +210,8 @@ export default function ProfileScreen() {
           confirmPassword={privacy.changeFields.fields.confirmPassword}
           privacyMessage={privacy.status.message}
           privacyError={privacy.status.error}
+          biometricUnlockEnabled={profile.state.walletBiometricUnlockEnabled}
+          onChangeBiometricUnlockEnabled={profile.actions.setWalletBiometricUnlockEnabled}
           onChangeSetupPassword={(value) => privacy.setupFields.setField('setupPassword', value)}
           onChangeSetupConfirm={(value) => privacy.setupFields.setField('setupConfirm', value)}
           onChangeCurrentPassword={(value) => privacy.changeFields.setField('currentPassword', value)}

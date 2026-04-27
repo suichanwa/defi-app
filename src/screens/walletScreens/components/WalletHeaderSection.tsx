@@ -35,8 +35,8 @@ export default function WalletHeaderSection({
   return (
     <View style={styles.headerRow}>
       <View style={localStyles.titleBlock}>
-        <Text style={styles.headerTitle}>Wallet</Text>
-        <Text style={styles.headerSubtitle}>On-chain balances with live pricing.</Text>
+        <Text style={styles.screenTitle}>Wallet</Text>
+        <Text style={styles.screenSubtitle}>On-chain balances with live pricing.</Text>
       </View>
       <View style={[localStyles.headerPills, { maxWidth: pillsMaxWidth }]}>
         <NetworkBadge onPress={onToggleNetwork} />

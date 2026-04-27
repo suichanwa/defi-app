@@ -1,8 +1,30 @@
 import { StyleSheet } from 'react-native';
 import type { useTheme } from '@theme/ThemeProvider';
 
+const sharedTitleStyle = {
+  fontSize: 28,
+  fontWeight: '800' as const,
+  letterSpacing: -0.5,
+};
+
+const sharedSubtitleStyle = {
+  fontSize: 15,
+  fontWeight: '500' as const,
+  lineHeight: 22,
+};
+
 export const createWalletStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
   StyleSheet.create({
+    // Shared wallet screen typography
+    screenTitle: {
+      ...sharedTitleStyle,
+      color: colors.text,
+    },
+    screenSubtitle: {
+      ...sharedSubtitleStyle,
+      color: colors.muted,
+    },
+
     scrollContent: {
       flexGrow: 1,
       paddingHorizontal: 20,
@@ -20,16 +42,13 @@ export const createWalletStyles = (colors: ReturnType<typeof useTheme>['colors']
       rowGap: 12,
     },
     headerTitle: {
-      fontSize: 32,
-      fontWeight: '800',
+      ...sharedTitleStyle,
       color: colors.text,
-      letterSpacing: -0.5,
     },
     headerSubtitle: {
-      fontSize: 14,
+      ...sharedSubtitleStyle,
       color: colors.muted,
       marginTop: 4,
-      fontWeight: '500',
     },
     headerPills: {
       flexDirection: 'row',
@@ -353,18 +372,14 @@ export const createWalletStyles = (colors: ReturnType<typeof useTheme>['colors']
       overflow: 'hidden',
     },
     setupTitle: {
-      fontSize: 28,
-      fontWeight: '800',
+      ...sharedTitleStyle,
       color: colors.text,
       marginBottom: 8,
-      letterSpacing: -0.5,
     },
     setupSubtitle: {
-      fontSize: 15,
+      ...sharedSubtitleStyle,
       color: colors.muted,
       marginBottom: 32,
-      lineHeight: 22,
-      fontWeight: '500',
     },
     mnemonicGrid: {
       flexDirection: 'row',

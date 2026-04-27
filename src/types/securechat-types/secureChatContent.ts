@@ -20,6 +20,7 @@ export type SecureChatThreadProps = {
   replyTarget?: ChatReplyReference | null;
   serverInfo: ServerInfo | null;
   participantCount: number;
+  unreadCount?: number;
   currentUserId?: string;
   currentUserLabel?: string;
   onBack: () => void;
@@ -50,6 +51,7 @@ export type SecureChatThreadProps = {
 export type SecureChatListProps = {
   chats: ChatThread[];
   selectedChatId: string;
+  unreadCountByChatId?: Record<string, number>;
   onSelectChat: (chatId: string) => void;
   onOpenSelected: (chatId: string) => void;
 };

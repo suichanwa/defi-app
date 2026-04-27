@@ -222,8 +222,8 @@ export default function AddScreen() {
 
   const renderModeStep = () => (
     <View style={localStyles.section}>
-      <Text style={[localStyles.title, { color: colors.text }]}>Add Wallet</Text>
-      <Text style={[localStyles.subtitle, { color: colors.muted }]}>
+      <Text style={[styles.screenTitle, localStyles.title, { color: colors.text }]}>Add Wallet</Text>
+      <Text style={[styles.screenSubtitle, localStyles.subtitle, { color: colors.muted }]}>
         Create a new wallet or import an existing one.
       </Text>
       <TouchableOpacity
@@ -255,10 +255,10 @@ export default function AddScreen() {
 
   const renderCredentialsStep = () => (
     <View style={localStyles.section}>
-      <Text style={[localStyles.title, { color: colors.text }]}>
+      <Text style={[styles.screenTitle, localStyles.title, { color: colors.text }]}>
         {mode === 'create' ? 'Create Wallet' : 'Import Wallet'}
       </Text>
-      <Text style={[localStyles.subtitle, { color: colors.muted }]}>
+      <Text style={[styles.screenSubtitle, localStyles.subtitle, { color: colors.muted }]}>
         {mode === 'create'
           ? 'Pick a wallet name and card color.'
           : 'Enter your 12 or 24 word phrase to import this wallet.'}
@@ -316,8 +316,8 @@ export default function AddScreen() {
     const [i1, i2] = confirmIndices;
     return (
       <View style={localStyles.section}>
-        <Text style={[localStyles.title, { color: colors.text }]}>Confirm Recovery Phrase</Text>
-        <Text style={[localStyles.subtitle, { color: colors.muted }]}>
+        <Text style={[styles.screenTitle, localStyles.title, { color: colors.text }]}>Confirm Recovery Phrase</Text>
+        <Text style={[styles.screenSubtitle, localStyles.subtitle, { color: colors.muted }]}>
           Save these words offline. Then verify the requested words.
         </Text>
         <View style={styles.mnemonicGrid}>
@@ -382,8 +382,8 @@ export default function AddScreen() {
 
   const renderSuccessStep = () => (
     <View style={localStyles.section}>
-      <Text style={[localStyles.title, { color: colors.text }]}>Wallet Ready</Text>
-      <Text style={[localStyles.subtitle, { color: colors.muted }]}>
+      <Text style={[styles.screenTitle, localStyles.title, { color: colors.text }]}>Wallet Ready</Text>
+      <Text style={[styles.screenSubtitle, localStyles.subtitle, { color: colors.muted }]}>
         {flowMessage ?? 'Wallet has been added to your cards.'}
       </Text>
       <TouchableOpacity
@@ -409,7 +409,6 @@ export default function AddScreen() {
           >
             <Ionicons name="chevron-back" size={20} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[localStyles.headerTitle, { color: colors.text }]}>Add Wallet</Text>
           <View style={localStyles.headerSpacer} />
         </View>
 
@@ -435,7 +434,7 @@ const localStyles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   backButton: {
     width: 36,
@@ -445,12 +444,6 @@ const localStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    textAlign: 'center',
-    flex: 1,
-  },
   headerSpacer: {
     width: 36,
   },
@@ -458,12 +451,9 @@ const localStyles = StyleSheet.create({
     marginTop: 8,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '700',
     marginBottom: 8,
   },
   subtitle: {
-    fontSize: 14,
     marginBottom: 20,
     lineHeight: 20,
   },

@@ -125,11 +125,12 @@ export default function SendScreen() {
           >
             <Ionicons name="chevron-back" size={18} color={colors.text} />
           </TouchableOpacity>
-          <View style={localStyles.headerTextBlock}>
-            <Text style={styles.headerTitle}>Send</Text>
-            <Text style={styles.headerSubtitle}>Pick a coin to send from your wallet.</Text>
-          </View>
           <View style={localStyles.headerSpacer} />
+        </View>
+
+        <View style={localStyles.headerCopy}>
+          <Text style={styles.screenTitle}>Send</Text>
+          <Text style={styles.screenSubtitle}>Pick a coin to send from your wallet.</Text>
         </View>
 
         <View style={styles.searchContainer}>
@@ -238,16 +239,13 @@ const localStyles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    gap: 12,
-  },
-  headerTextBlock: {
-    flex: 1,
-    minWidth: 0,
+    marginBottom: 12,
   },
   headerSpacer: {
     width: 36,
+  },
+  headerCopy: {
+    marginBottom: 16,
   },
   backButton: {
     width: 36,

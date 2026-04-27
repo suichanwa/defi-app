@@ -73,6 +73,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
   const [connectionLog, setConnectionLog] = useState<string[]>([SecureChatConstants.DEFAULT_CONNECTION_LOG]);
   const [roomId, setRoomId] = useState<string>(SecureChatConstants.DEFAULT_GLOBAL_CHAT_ID);
   const [mutedChatIds, setMutedChatIds] = useState<Set<string>>(() => new Set());
+  const [unreadCountByChatId, setUnreadCountByChatId] = useState<Record<string, number>>({});
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const [replyTarget, setReplyTarget] = useState<ChatReplyReference | null>(null);
   const [typingByChatId, setTypingByChatId] = useState<Record<string, string | null>>({});
@@ -243,6 +244,16 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     return getChatById(selectedChatId);
   }, [getChatById, selectedChatId]);
 
+  useEffect(() => {
+    if (!selectedChatId) return;
+    setUnreadCountByChatId((prev) => {
+      if (!prev[selectedChatId]) return prev;
+      const next = { ...prev };
+      delete next[selectedChatId];
+      return next;
+    });
+  }, [selectedChatId]);
+
   const handleDeleteChat = useCallback(async () => {
     if (!selectedChat || !selectedChat.isDM) return;
     try {
@@ -280,8 +291,8 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
   const typingSenderId = useMemo(() => authorId ?? effectiveUserId, [authorId, effectiveUserId]);
 
   const notifyIncomingMessage = useMemo(
-    () =>
-      createNotifyIncomingMessage({
+    () => {
+      const baseNotify = createNotifyIncomingMessage({
         effectiveUserId,
         displayLabel,
         mutedChatIds,
@@ -292,8 +303,31 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
         showToast: scopedShowToast,
         notifyNative,
         showInAppNotification: false,
-      }),
-    [chatView, displayLabel, effectiveUserId, getChatById, mutedChatIds, notifyNative, scopedShowToast, secureTab, selectedChatId],
+      });
+
+      return (chatId: string, message: ChatMessage) => {
+        baseNotify(chatId, message);
+        const chat = getChatById(chatId);
+        const isDirectMessage = chat?.isDM === true;
+        const isOpenThread = secureTab === 'chats' && chatView === 'thread' && selectedChatId === chatId;
+        if (!isDirectMessage || isOpenThread || message.outgoing === true) return;
+        setUnreadCountByChatId((prev) => ({
+          ...prev,
+          [chatId]: (prev[chatId] ?? 0) + 1,
+        }));
+      };
+    },
+    [
+      chatView,
+      displayLabel,
+      effectiveUserId,
+      getChatById,
+      mutedChatIds,
+      notifyNative,
+      scopedShowToast,
+      secureTab,
+      selectedChatId,
+    ],
   );
 
   useEffect(() => {
@@ -818,6 +852,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
             replyTarget,
             serverInfo,
             participantCount,
+            unreadCount: selectedChatId ? unreadCountByChatId[selectedChatId] ?? 0 : 0,
             currentUserId: threadCurrentUserId,
             currentUserLabel: displayLabel,
             onBack: () => setView('list'),
@@ -847,6 +882,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
           list={{
             chats: allChats,
             selectedChatId,
+            unreadCountByChatId,
             onSelectChat: handleSelectChat,
             onOpenSelected: handleSelectChat,
           }}

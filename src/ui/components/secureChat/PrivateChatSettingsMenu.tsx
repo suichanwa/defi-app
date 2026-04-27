@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import {
   BottomSheetBackdrop,
@@ -75,7 +75,12 @@ export default function PrivateChatSettingsMenu({
 }: PrivateChatSettingsMenuProps) {
   const { colors, resolved } = useTheme();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(colors, insets.bottom), [colors, insets.bottom]);
+  const { width, height } = useWindowDimensions();
+  const isCompactPhone = width < 380 || height < 760;
+  const styles = useMemo(
+    () => createStyles(colors, insets.bottom, isCompactPhone),
+    [colors, insets.bottom, isCompactPhone],
+  );
   const isDarkTheme = resolved === 'dark';
   const surfaceIconColor = isDarkTheme ? '#f8fafc' : colors.accentText;
   const accentSurface = isDarkTheme ? withAlpha(colors.accent, '1A') : withAlpha(colors.accent, '22');
@@ -87,7 +92,7 @@ export default function PrivateChatSettingsMenu({
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
   const muted = typeof isMuted === 'boolean' ? isMuted : localMuted;
 
-  const snapPoints = useMemo(() => ['42%', '62%'], []);
+  const snapPoints = useMemo(() => (isCompactPhone ? ['58%', '88%'] : ['42%', '62%']), [isCompactPhone]);
 
   useEffect(() => {
     if (visible) {
@@ -170,7 +175,7 @@ export default function PrivateChatSettingsMenu({
 
             <IconButton
               icon="close"
-              size={18}
+              size={isCompactPhone ? 16 : 18}
               iconColor={colors.text}
               containerColor={colors.border}
               style={styles.closeButton}
@@ -271,10 +276,21 @@ export default function PrivateChatSettingsMenu({
               This removes the conversation from this device only. It may still exist on the other device or the XMTP network.
             </Text>
             <View style={styles.confirmActions}>
-              <Button mode="outlined" onPress={() => setDeleteConfirmVisible(false)} style={styles.confirmButton}>
+              <Button
+                mode="outlined"
+                onPress={() => setDeleteConfirmVisible(false)}
+                style={styles.confirmButton}
+                contentStyle={styles.confirmButtonContent}
+              >
                 Cancel
               </Button>
-              <Button mode="contained" buttonColor="#ef4444" onPress={handleDeleteChat} style={styles.confirmButton}>
+              <Button
+                mode="contained"
+                buttonColor="#ef4444"
+                onPress={handleDeleteChat}
+                style={styles.confirmButton}
+                contentStyle={styles.confirmButtonContent}
+              >
                 Delete
               </Button>
             </View>
@@ -285,7 +301,7 @@ export default function PrivateChatSettingsMenu({
   );
 }
 
-const createStyles = (colors: ReturnType<typeof useTheme>['colors'], bottomInset: number) =>
+const createStyles = (colors: ReturnType<typeof useTheme>['colors'], bottomInset: number, isCompactPhone: boolean) =>
   StyleSheet.create({
     sheetContent: {
       flex: 1,
@@ -306,23 +322,23 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors'], bottomInset
       backgroundColor: colors.border,
     },
     content: {
-      paddingHorizontal: 16,
-      paddingTop: 8,
-      paddingBottom: 10,
-      gap: 14,
+      paddingHorizontal: isCompactPhone ? 14 : 16,
+      paddingTop: isCompactPhone ? 6 : 8,
+      paddingBottom: isCompactPhone ? 14 : 10,
+      gap: isCompactPhone ? 12 : 14,
     },
     scroll: {
       flex: 1,
     },
     header: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: 12,
+      alignItems: 'center',
+      gap: isCompactPhone ? 10 : 12,
     },
     headerIconWrap: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
+      width: isCompactPhone ? 40 : 44,
+      height: isCompactPhone ? 40 : 44,
+      borderRadius: isCompactPhone ? 20 : 22,
       backgroundColor: colors.accent,
       alignItems: 'center',
       justifyContent: 'center',
@@ -330,23 +346,22 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors'], bottomInset
     headerText: {
       flex: 1,
       minWidth: 0,
-      paddingTop: 1,
     },
     title: {
-      fontSize: 18,
+      fontSize: isCompactPhone ? 17 : 18,
       fontWeight: '700',
       color: colors.text,
     },
     subtitle: {
-      marginTop: 3,
-      fontSize: 12,
+      marginTop: 2,
+      fontSize: isCompactPhone ? 11 : 12,
       color: colors.muted,
     },
     closeButton: {
       margin: 0,
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+      width: isCompactPhone ? 36 : 38,
+      height: isCompactPhone ? 36 : 38,
+      borderRadius: isCompactPhone ? 18 : 19,
     },
     list: {
       gap: 0,
@@ -354,18 +369,18 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors'], bottomInset
     row: {
       flexDirection: 'row',
       alignItems: 'center',
-      minHeight: 68,
-      paddingHorizontal: 12,
-      paddingVertical: 11,
-      gap: 12,
+      minHeight: isCompactPhone ? 60 : 68,
+      paddingHorizontal: isCompactPhone ? 10 : 12,
+      paddingVertical: isCompactPhone ? 9 : 11,
+      gap: isCompactPhone ? 10 : 12,
     },
     rowPressed: {
       opacity: 0.9,
     },
     iconWrap: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
+      width: isCompactPhone ? 40 : 44,
+      height: isCompactPhone ? 40 : 44,
+      borderRadius: isCompactPhone ? 20 : 22,
       alignItems: 'center',
       justifyContent: 'center',
       flexShrink: 0,
@@ -375,24 +390,24 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors'], bottomInset
       minWidth: 0,
     },
     rowTitle: {
-      fontSize: 15,
+      fontSize: isCompactPhone ? 14 : 15,
       fontWeight: '700',
       color: colors.text,
     },
     rowSubtitle: {
-      marginTop: 3,
-      fontSize: 12,
-      lineHeight: 16,
+      marginTop: 2,
+      fontSize: isCompactPhone ? 11 : 12,
+      lineHeight: isCompactPhone ? 15 : 16,
       color: colors.muted,
     },
     rowTrailing: {
-      marginLeft: 6,
+      marginLeft: isCompactPhone ? 4 : 6,
       alignItems: 'center',
       justifyContent: 'center',
       flexShrink: 0,
     },
     divider: {
-      marginLeft: 68,
+      marginLeft: isCompactPhone ? 60 : 68,
       backgroundColor: colors.border,
       height: StyleSheet.hairlineWidth,
     },
@@ -400,15 +415,15 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors'], bottomInset
       flexDirection: 'row',
       alignItems: 'flex-start',
       gap: 8,
-      paddingLeft: 68,
-      paddingRight: 12,
-      paddingTop: 8,
+      paddingLeft: isCompactPhone ? 60 : 68,
+      paddingRight: isCompactPhone ? 10 : 12,
+      paddingTop: isCompactPhone ? 6 : 8,
       paddingBottom: 4,
     },
     helperText: {
       flex: 1,
-      fontSize: 12,
-      lineHeight: 16,
+      fontSize: isCompactPhone ? 11 : 12,
+      lineHeight: isCompactPhone ? 15 : 16,
       color: colors.muted,
       opacity: 0.9,
     },
@@ -416,56 +431,59 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors'], bottomInset
       flex: 1,
       backgroundColor: 'rgba(0, 0, 0, 0.55)',
       justifyContent: 'center',
-      padding: 24,
+      padding: isCompactPhone ? 16 : 24,
     },
     confirmCard: {
       borderRadius: 20,
       backgroundColor: colors.card,
       borderWidth: 1,
       borderColor: colors.border,
-      padding: 18,
-      gap: 12,
+      padding: isCompactPhone ? 16 : 18,
+      gap: isCompactPhone ? 10 : 12,
     },
     confirmIconWrap: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
+      width: isCompactPhone ? 40 : 44,
+      height: isCompactPhone ? 40 : 44,
+      borderRadius: isCompactPhone ? 20 : 22,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: withAlpha('#ef4444', '16'),
     },
     confirmTitle: {
-      fontSize: 17,
+      fontSize: isCompactPhone ? 16 : 17,
       fontWeight: '700',
       color: colors.text,
     },
     confirmText: {
-      fontSize: 13,
-      lineHeight: 18,
+      fontSize: isCompactPhone ? 12 : 13,
+      lineHeight: isCompactPhone ? 17 : 18,
       color: colors.muted,
     },
     confirmActions: {
-      flexDirection: 'row',
+      flexDirection: isCompactPhone ? 'column' : 'row',
       gap: 10,
       justifyContent: 'flex-end',
       marginTop: 4,
     },
     confirmButton: {
-      minWidth: 96,
+      width: isCompactPhone ? '100%' : 96,
+    },
+    confirmButtonContent: {
+      height: 44,
     },
     footer: {
-      paddingHorizontal: 16,
+      paddingHorizontal: isCompactPhone ? 14 : 16,
       paddingTop: 8,
-      paddingBottom: bottomInset + 12,
+      paddingBottom: bottomInset + (isCompactPhone ? 16 : 12),
     },
     doneButton: {
       borderRadius: 14,
     },
     doneButtonContent: {
-      height: 46,
+      height: isCompactPhone ? 44 : 46,
     },
     doneButtonLabel: {
-      fontSize: 13,
+      fontSize: isCompactPhone ? 12 : 13,
       fontWeight: '700',
     },
   });

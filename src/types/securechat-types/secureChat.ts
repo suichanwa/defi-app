@@ -70,6 +70,13 @@ export type ChatThread = {
   };
 };
 
+export type ChatPresenceIndicator = {
+  statusLabel: string;
+  statusColor: string;
+  badgeLabel?: string;
+  showBadge: boolean;
+};
+
 export type ServerInfo = {
   address: string;
   port: number;

@@ -28,6 +28,8 @@ type PrivacyTabProps = {
   confirmPassword: string;
   privacyMessage: string | null;
   privacyError: string | null;
+  biometricUnlockEnabled: boolean;
+  onChangeBiometricUnlockEnabled: (value: boolean) => void;
   onChangeSetupPassword: (value: string) => void;
   onChangeSetupConfirm: (value: string) => void;
   onChangeCurrentPassword: (value: string) => void;
@@ -49,6 +51,8 @@ export default function PrivacyTab({
   confirmPassword,
   privacyMessage,
   privacyError,
+  biometricUnlockEnabled,
+  onChangeBiometricUnlockEnabled,
   onChangeSetupPassword,
   onChangeSetupConfirm,
   onChangeCurrentPassword,
@@ -94,6 +98,28 @@ export default function PrivacyTab({
             <Text style={privacyStyles.settingSubtitle}>Coming soon. This control is present for layout only.</Text>
           </View>
           <Switch value={false} disabled />
+        </View>
+      </View>
+
+      <View style={cardStyle}>
+        <View style={styles.cardRow}>
+          <Text style={styles.cardTitle}>Wallet unlock</Text>
+          <MaterialCommunityIcons name="fingerprint" size={20} color={colors.accent} />
+        </View>
+        <Text style={styles.cardSubtitle}>Use biometrics to unlock the wallet faster.</Text>
+
+        <View style={privacyStyles.settingRow}>
+          <View style={privacyStyles.settingTextBlock}>
+            <Text style={privacyStyles.settingTitle}>Biometric unlock</Text>
+            <Text style={privacyStyles.settingSubtitle}>
+              When off, the wallet uses passcode only and never shows fingerprint or Face ID.
+            </Text>
+          </View>
+          <Switch
+            value={biometricUnlockEnabled}
+            onValueChange={onChangeBiometricUnlockEnabled}
+            color={colors.accent}
+          />
         </View>
       </View>
 
