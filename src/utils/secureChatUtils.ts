@@ -3,6 +3,7 @@ import type { AvatarType } from '@app-types/profile';
 import type { SecureChatMessageRow } from '@app-types/securechat-types/secureChatScreen';
 import { UUID_REGEX } from '@constants/secureChat.constants';
 import { decodeChatImageContent } from '@utils/secureChatImages';
+import { hydrateSecureChatMessageContent, parseSecureChatMessageContent } from '@utils/secureChatMessageEnvelope';
 
 type MapRowOptions = {
   authorId?: string;
@@ -41,7 +42,12 @@ export const mapRowToMessage = (row: SecureChatMessageRow, options: MapRowOption
   const outgoingAvatarUri = isOutgoing && options.userAvatarType === 'custom' ? options.userAvatarUri : undefined;
   const imagePath = row.image_path ?? decodeChatImageContent(row.content);
   const type = row.message_type ?? (imagePath ? 'image' : 'text');
-  const content = imagePath && row.content.startsWith('__image__:') ? 'Photo' : row.content;
+  const parsed = parseSecureChatMessageContent(row.content);
+  const content = imagePath
+    ? parsed.isEnvelope
+      ? parsed.text.trim() || 'Photo'
+      : 'Photo'
+    : parsed.text || row.content;
 
   return {
     id: row.id,
@@ -55,6 +61,7 @@ export const mapRowToMessage = (row: SecureChatMessageRow, options: MapRowOption
     avatarUri: outgoingAvatarUri,
     type,
     imagePath: imagePath ?? undefined,
+    replyTo: parsed.replyTo,
   };
 };
 
@@ -65,18 +72,19 @@ export const createOutgoingTextMessage = ({
   content,
   avatarUri,
   now = new Date(),
-}: OutgoingTextArgs): ChatMessage => ({
-  id: now.getTime().toString(),
-  chatId,
-  authorId,
-  author,
-  content,
-  timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-  createdAt: now.toISOString(),
-  avatarUri,
-  outgoing: true,
-  type: 'text',
-});
+}: OutgoingTextArgs): ChatMessage =>
+  hydrateSecureChatMessageContent({
+    id: now.getTime().toString(),
+    chatId,
+    authorId,
+    author,
+    content,
+    timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    createdAt: now.toISOString(),
+    avatarUri,
+    outgoing: true,
+    type: 'text',
+  });
 
 export const createOutgoingImageMessage = ({
   chatId,
@@ -87,17 +95,18 @@ export const createOutgoingImageMessage = ({
   imagePath,
   content,
   now = new Date(),
-}: OutgoingImageArgs): ChatMessage => ({
-  id: `${now.getTime()}-image`,
-  chatId,
-  authorId,
-  author,
-  content: content?.trim() ? content : 'Photo',
-  timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-  createdAt: now.toISOString(),
-  avatarUri,
-  outgoing: true,
-  type: 'image',
-  imageUri,
-  imagePath,
-});
+}: OutgoingImageArgs): ChatMessage =>
+  hydrateSecureChatMessageContent({
+    id: `${now.getTime()}-image`,
+    chatId,
+    authorId,
+    author,
+    content: content?.trim() ? content : 'Photo',
+    timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    createdAt: now.toISOString(),
+    avatarUri,
+    outgoing: true,
+    type: 'image',
+    imageUri,
+    imagePath,
+  });

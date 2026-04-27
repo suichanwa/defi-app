@@ -72,13 +72,13 @@ export function useChatTransport({
   );
 
   const persistRoomMessage = useCallback(
-    async (chatId: string, message: ChatMessage) => {
+    async (chatId: string, message: ChatMessage, wireContent: string) => {
       if (!supabaseClient) return;
       const { error } = await supabaseClient.from('messages').insert({
         room_id: chatId,
         author: displayLabel,
         author_id: authorId ?? null,
-        content: message.content,
+        content: wireContent,
         message_type: message.type ?? 'text',
         created_at: new Date().toISOString(),
       });
@@ -89,7 +89,7 @@ export function useChatTransport({
           room_id: chatId,
           author: displayLabel,
           author_id: authorId ?? null,
-          content: message.content,
+          content: wireContent,
           created_at: new Date().toISOString(),
         });
         if (fallback.error) {
@@ -103,13 +103,13 @@ export function useChatTransport({
   );
 
   const persistRoomImage = useCallback(
-    async (chatId: string, payload: ChatMessage, imagePath: string) => {
+    async (chatId: string, payload: ChatMessage, imagePath: string, wireContent: string) => {
       if (!supabaseClient) return;
       const { error } = await supabaseClient.from('messages').insert({
         room_id: chatId,
         author: payload.author,
         author_id: payload.authorId ?? null,
-        content: payload.content,
+        content: wireContent,
         message_type: payload.type ?? 'image',
         image_path: imagePath,
         created_at: payload.createdAt ?? new Date().toISOString(),
@@ -146,17 +146,18 @@ export function useChatTransport({
       }
 
       const outgoingAvatarUri = userAvatarType === 'custom' ? userAvatarUri : undefined;
+      const wireContent = content;
       const message = createOutgoingTextMessage({
         chatId,
         authorId,
         author: displayLabel,
-        content,
+        content: wireContent,
         avatarUri: outgoingAvatarUri,
       });
 
       appendLocalMessage(chatId, message);
-      await persistRoomMessage(chatId, message);
-      await sendRoomBroadcast({ ...message, outgoing: false });
+      await persistRoomMessage(chatId, message, wireContent);
+      await sendRoomBroadcast({ ...message, content: wireContent, outgoing: false });
       return { sent: true };
     },
     [
@@ -197,8 +198,9 @@ export function useChatTransport({
 
       appendLocalMessage(chatId, imagePayload);
 
-      await persistRoomImage(chatId, imagePayload, upload.path);
-      await sendRoomBroadcast({ ...imagePayload, outgoing: false });
+      const wireContent = content ?? imagePayload.content;
+      await persistRoomImage(chatId, imagePayload, upload.path, wireContent);
+      await sendRoomBroadcast({ ...imagePayload, content: wireContent, outgoing: false });
       return { sent: true };
     },
     [

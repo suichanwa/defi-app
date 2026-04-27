@@ -11,6 +11,7 @@ import {
 } from '@services/xmtp/mappers';
 import { resolvePeerXmtpAddress } from '@services/xmtp/addressResolver';
 import { isXmtpNativeModuleAvailable, XmtpConversationVersion, XmtpPublicIdentity } from '@services/xmtp/sdk';
+import { hydrateSecureChatMessageContent, parseSecureChatMessageContent } from '@utils/secureChatMessageEnvelope';
 
 type UseXmtpDirectMessagesArgs = {
   displayLabel: string;
@@ -19,6 +20,9 @@ type UseXmtpDirectMessagesArgs = {
   isThreadOpen?: boolean;
   notifyIncoming: (chatId: string, message: ChatMessage) => void;
   setMessagesByChat: React.Dispatch<React.SetStateAction<Record<string, ChatMessage[]>>>;
+  isConversationHidden?: (chatId: string) => boolean;
+  isMessageHidden?: (chatId: string, messageId: string) => boolean;
+  restoreConversation?: (chatId: string) => Promise<void> | void;
   onError?: (message: string) => void;
 };
 
@@ -65,18 +69,18 @@ const createOutgoingXmtpMessage = ({
   content: string;
 }): ChatMessage => {
   const now = new Date();
-  return {
+  return hydrateSecureChatMessageContent({
     id,
     chatId,
     authorId,
     author,
-    content,
     timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     createdAt: now.toISOString(),
     outgoing: true,
     deliveryStatus: 'sent',
     type: 'text',
-  };
+    content,
+  });
 };
 
 const isDmConversation = (value: unknown): value is Dm =>
@@ -92,6 +96,9 @@ export function useXmtpDirectMessages({
   isThreadOpen = false,
   notifyIncoming,
   setMessagesByChat,
+  isConversationHidden,
+  isMessageHidden,
+  restoreConversation,
   onError,
 }: UseXmtpDirectMessagesArgs) {
   const { client, status: xmtpStatus, error: xmtpError } = useXmtpClient();
@@ -146,6 +153,7 @@ export function useXmtpDirectMessages({
       const mapped: ChatThread[] = [];
       for (const dm of dms) {
         const chatId = xmtpConversationIdToChatId(dm.id as string);
+        if (isConversationHidden?.(chatId)) continue;
         conversationCacheRef.current.set(chatId, dm);
         const preferredName = preferredNameByChatIdRef.current[chatId];
         mapped.push(
@@ -161,7 +169,7 @@ export function useXmtpDirectMessages({
       const message = error instanceof Error ? error.message : 'Failed to refresh XMTP conversations.';
       onErrorRef.current?.(message);
     }
-  }, [client, displayLabel]);
+  }, [client, displayLabel, isConversationHidden]);
 
   const setThreadMessages = useCallback(
     (chatId: string, incoming: ChatMessage[]) => {
@@ -238,7 +246,13 @@ export function useXmtpDirectMessages({
             }
             return mappedMessage;
           });
-        setThreadMessages(chatId, mapped);
+        setThreadMessages(
+          chatId,
+          isMessageHidden ? mapped.filter((message) => !isMessageHidden(chatId, message.id)) : mapped,
+        );
+        if (isConversationHidden?.(chatId)) {
+          await restoreConversation?.(chatId);
+        }
         if (selectedChatId === chatId && isThreadOpen) {
           await sendReadReceipt(chatId, latestIncomingNs);
         }
@@ -247,7 +261,18 @@ export function useXmtpDirectMessages({
         onErrorRef.current?.(message);
       }
     },
-    [client, displayLabel, isThreadOpen, resolveDmConversation, selectedChatId, sendReadReceipt, setThreadMessages],
+    [
+      client,
+      displayLabel,
+      isConversationHidden,
+      isMessageHidden,
+      isThreadOpen,
+      resolveDmConversation,
+      restoreConversation,
+      selectedChatId,
+      sendReadReceipt,
+      setThreadMessages,
+    ],
   );
 
   const startDM = useCallback(
@@ -337,7 +362,14 @@ export function useXmtpDirectMessages({
         return;
       }
 
+      if (isConversationHidden?.(chatId)) {
+        await restoreConversation?.(chatId);
+      }
+
       const mapped = mapXmtpMessageToChatMessage(message, chatId, displayLabel, client.inboxId);
+      if (isMessageHidden?.(chatId, mapped.id)) {
+        return;
+      }
 
       let shouldNotify = false;
       setMessagesByChat((prev) => {
@@ -400,10 +432,13 @@ export function useXmtpDirectMessages({
   }, [
     client,
     displayLabel,
+    isConversationHidden,
     isActive,
+    isMessageHidden,
     isThreadOpen,
     markOutgoingMessagesSeen,
     notifyIncoming,
+    restoreConversation,
     selectedChatId,
     sendReadReceipt,
     setMessagesByChat,

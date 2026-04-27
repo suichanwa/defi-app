@@ -13,6 +13,7 @@ type Props = {
   isMuted?: boolean;
   onToggleMute?: () => void;
   onViewProfile?: () => void;
+  onDeleteChat?: () => void;
   avatarSource?: ChatAvatarSource;
   onAvatarPress?: () => void;
 };
@@ -24,6 +25,7 @@ export default function ChatThreadHeader({
   isMuted,
   onToggleMute,
   onViewProfile,
+  onDeleteChat,
   avatarSource,
   onAvatarPress,
 }: Props) {
@@ -74,9 +76,11 @@ export default function ChatThreadHeader({
         <PrivateChatSettingsMenu
           visible={settingsVisible}
           chatName={chat.name}
+          canDeleteChat={chat.isDM === true}
           isMuted={isMuted}
           onToggleMute={onToggleMute}
           onViewProfile={onViewProfile}
+          onDeleteChat={onDeleteChat}
           onClose={() => setSettingsVisible(false)}
         />
     </View>

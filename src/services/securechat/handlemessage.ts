@@ -1,8 +1,10 @@
 import type { ChatMessage, ChatThread } from '@app-types/securechat-types/secureChat';
 import { decodeChatImageContent, resolveChatImageMessage } from '@utils/secureChatImages';
+import { buildReplyReferenceFromMessage, serializeSecureChatMessageContent } from '@utils/secureChatMessageEnvelope';
 import { CHAT_IMAGE_BUCKET } from '@constants/chatImages.constants';
 import { DEFAULT_GLOBAL_CHAT_ID } from '@constants/secureChat.constants';
 import { isSupabaseConfigured, supabase } from '@services/supabaseClient';
+import type { ChatReplyReference } from '@app-types/securechat-types/secureChat';
 
 import type * as HandleMessageTypes from '@app-types/securechat-types/secureChatHandleMessage';
 
@@ -128,11 +130,13 @@ export const createSendMessageHandler = ({
   pendingImageUri,
   pendingFile,
   editingMessage,
+  replyTarget,
   messagesByChat,
   setMessagesByChat,
   setChats,
   setDraft,
   setEditingMessage,
+  clearReplyTarget,
   setAttachment,
   setFileAttachment,
   sendText,
@@ -148,11 +152,13 @@ export const createSendMessageHandler = ({
   pendingImageUri: string | null;
   pendingFile?: HandleMessageTypes.PendingFile | null;
   editingMessage: ChatMessage | null;
+  replyTarget?: ChatReplyReference | null;
   messagesByChat: Record<string, ChatMessage[]>;
   setMessagesByChat: HandleMessageTypes.SetState<Record<string, ChatMessage[]>>;
   setChats: HandleMessageTypes.SetState<ChatThread[]>;
   setDraft: (value: string) => void;
   setEditingMessage: (value: ChatMessage | null) => void;
+  clearReplyTarget: () => void;
   setAttachment: (value: string | null) => void;
   setFileAttachment?: (value: HandleMessageTypes.PendingFile | null) => void;
   sendText: (args: { chatId: string; content: string; isDM: boolean }) => Promise<{ sent: boolean; error?: string }>;
@@ -219,15 +225,18 @@ export const createSendMessageHandler = ({
     if (hasText) {
       setDraft('');
     }
+    const wireContent = serializeSecureChatMessageContent(hasText ? trimmed : '', replyTarget);
     try {
       const result = await sendImage({
         chatId: selectedChat.id,
         imageUri,
         isDM,
-        content: hasText ? trimmed : undefined,
+        content: wireContent,
       });
       if (!result.sent && result.error) {
         showAlert('Image upload error', result.error);
+      } else {
+        clearReplyTarget();
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to send image.';
@@ -241,9 +250,12 @@ export const createSendMessageHandler = ({
 
   if (hasText && !hasImage) {
     setDraft('');
-    const result = await sendText({ chatId: selectedChat.id, content: trimmed, isDM });
+    const wireContent = serializeSecureChatMessageContent(trimmed, replyTarget);
+    const result = await sendText({ chatId: selectedChat.id, content: wireContent, isDM });
     if (!result.sent && result.error) {
       showAlert(isDM ? 'Direct message unavailable' : 'Supabase not configured', result.error);
+    } else {
+      clearReplyTarget();
     }
   }
 
@@ -302,10 +314,12 @@ export const createCopyMessageHandler =
   };
 
 export const createReplyMessageHandler =
-  (resolveAuthorName: (message: ChatMessage) => string, setDraft: (value: string) => void) =>
+  (
+    resolveAuthorName: (message: ChatMessage) => string,
+    setReplyTarget: (value: ChatReplyReference | null) => void,
+  ) =>
   (message: ChatMessage) => {
-    const author = resolveAuthorName(message);
-    setDraft(`@${author} `);
+    setReplyTarget(buildReplyReferenceFromMessage(message, resolveAuthorName));
   };
 
 export const createEditMessageHandler =
@@ -325,9 +339,58 @@ export const createDeleteMessageHandler =
     setChats: HandleMessageTypes.SetState<ChatThread[]>,
     resolveAuthorName: (message: ChatMessage) => string,
     showToast: HandleMessageTypes.ToastFn,
+    hideMessageLocally?: (chatId: string, messageId: string) => Promise<void>,
   ) =>
   async (message: ChatMessage) => {
-    if (!isOwnMessage(message)) return;
+    const isDirectMessage = message.chatId.startsWith('dm:');
+    if (!isOwnMessage(message) && !isDirectMessage) return;
+
+    if (isDirectMessage && hideMessageLocally) {
+      const currentList = messagesByChat[message.chatId] ?? [];
+      const isLastMessage = currentList[currentList.length - 1]?.id === message.id;
+      const nextList = currentList.filter((item) => item.id !== message.id);
+      try {
+        await hideMessageLocally(message.chatId, message.id);
+        setMessagesByChat((prev) => ({ ...prev, [message.chatId]: nextList }));
+        if (isLastMessage) {
+          const last = nextList[nextList.length - 1];
+          setChats((prev) =>
+            prev.map((chat) =>
+              chat.id === message.chatId
+                ? {
+                    ...chat,
+                    lastMessage: last
+                      ? {
+                          text: last.content,
+                          ts: last.timestamp,
+                          from: resolveAuthorName(last),
+                          authorId: last.authorId,
+                        }
+                      : undefined,
+                  }
+                : chat,
+            ),
+          );
+        }
+        showToast({
+          type: 'default',
+          text1: 'Deleted for me',
+          position: 'top',
+          visibilityTime: 2000,
+        });
+        return;
+      } catch (error) {
+        showToast({
+          type: 'default',
+          text1: 'Delete failed',
+          text2: error instanceof Error ? error.message : 'Unable to hide message locally.',
+          position: 'top',
+          visibilityTime: 3000,
+        });
+        return;
+      }
+    }
+
     const currentList = messagesByChat[message.chatId] ?? [];
     const isLastMessage = currentList[currentList.length - 1]?.id === message.id;
     const nextList = currentList.filter((item) => item.id !== message.id);

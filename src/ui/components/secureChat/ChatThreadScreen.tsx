@@ -11,18 +11,27 @@ import {
 import { Chat, ImageMessage, MessageType } from '@flyerhq/react-native-chat-ui';
 import { KeyboardAccessoryView } from '@flyerhq/react-native-keyboard-accessory-view';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import type { ChatAvatarSource, ChatMessage, ChatThread, ServerInfo } from '@app-types/securechat-types/secureChat';
+import type {
+  ChatAvatarSource,
+  ChatMessage,
+  ChatReplyReference,
+  ChatThread,
+  ServerInfo,
+} from '@app-types/securechat-types/secureChat';
 import { useTheme } from '@theme/ThemeProvider';
 import ChatThreadHeader from '@components/secureChat/ChatThreadHeader';
 import ViewProfileScreen from '@components/secureChat/ViewProfileScreen';
 import ChatInputBar from '@components/secureChat/ChatInputBar';
 import { CHAT_HISTORY_SCROLL_THRESHOLD } from '@constants/secureChat.constants';
 import { convertToFlyerMessage, type FlyerMessageWithMeta } from '@utils/flyerChatAdapter';
+import ChatAvatar from './ChatAvatar';
+import { buildReplyReferenceFromMessage, getReplyPreviewText } from '@utils/secureChatMessageEnvelope';
 
 type Props = {
   chat: ChatThread | null;
   messages: ChatMessage[];
   draft: string;
+  replyTarget?: ChatReplyReference | null;
   serverInfo: ServerInfo | null;
   participantCount?: number;
   currentUserId?: string;
@@ -30,6 +39,7 @@ type Props = {
   onBack: () => void;
   onDraftChange: (value: string) => void;
   onSend: () => void;
+  onClearReplyTarget?: () => void;
   onPickImage?: () => void;
   onPickFile?: () => void;
   onClearAttachment?: () => void;
@@ -46,6 +56,7 @@ type Props = {
   onReplyMessage?: (message: ChatMessage) => void;
   onEditMessage?: (message: ChatMessage) => void;
   onDeleteMessage?: (message: ChatMessage) => void;
+  onDeleteChat?: () => void;
   isMuted?: boolean;
   onToggleMute?: () => void;
 };
@@ -70,6 +81,7 @@ export default function ChatThreadScreen({
   chat,
   messages,
   draft,
+  replyTarget,
   serverInfo,
   participantCount = 0,
   currentUserId,
@@ -77,6 +89,7 @@ export default function ChatThreadScreen({
   onBack,
   onDraftChange,
   onSend,
+  onClearReplyTarget,
   onPickImage,
   onPickFile,
   onClearAttachment,
@@ -93,6 +106,7 @@ export default function ChatThreadScreen({
   onReplyMessage,
   onEditMessage,
   onDeleteMessage,
+  onDeleteChat,
   isMuted,
   onToggleMute,
 }: Props) {
@@ -101,12 +115,15 @@ export default function ChatThreadScreen({
 
   const [selectedProfile, setSelectedProfile] = useState<SelectedProfile>(null);
   const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(null);
+  const [replyJumpId, setReplyJumpId] = useState<string | null>(null);
   const loadOlderArmedRef = useRef(true);
 
   useEffect(() => {
     setSelectedProfile(null);
     setSelectedMessage(null);
+    setReplyJumpId(null);
     loadOlderArmedRef.current = true;
+    onClearReplyTarget?.();
   }, [chat?.id]);
 
   const sortedChatMessages = useMemo(() => {
@@ -194,6 +211,14 @@ export default function ChatThreadScreen({
       COMPACT_TEXT_BUBBLE_MAX_WIDTH,
       Math.max(COMPACT_TEXT_BUBBLE_MIN_WIDTH, Math.ceil(estimatedTextWidth)),
     );
+  }, []);
+
+  const flashReplyTarget = useCallback((messageId?: string) => {
+    if (!messageId) return;
+    setReplyJumpId(messageId);
+    setTimeout(() => {
+      setReplyJumpId((current) => (current === messageId ? null : current));
+    }, 1500);
   }, []);
 
   // Handle send
@@ -376,18 +401,29 @@ export default function ChatThreadScreen({
       const isOwn = message.author.id === flyerUser.id;
       const timeLabel = getTimeLabel(typed);
       const authorLabel = message.author.firstName ?? message.author.id ?? '';
-      const avatarColor = getAvatarColor(authorLabel);
-      const initials = getInitials(authorLabel);
       const shouldShowAuthor = !isOwn && showName && !isDirectChat;
       const compactBubbleWidth = getCompactBubbleWidth(message.text);
+      const reply = typed.metadata?.reply;
 
       return (
-        <View style={[styles.messageShell, isOwn ? styles.messageShellOutgoing : styles.messageShellIncoming]}>
+        <View
+          style={[
+            styles.messageShell,
+            isOwn ? styles.messageShellOutgoing : styles.messageShellIncoming,
+            replyJumpId === message.id ? styles.messageShellHighlighted : null,
+          ]}
+        >
           {shouldShowAuthor ? (
             <View style={styles.metaRow}>
-              <View style={[styles.avatarBadge, { backgroundColor: avatarColor }]}>
-                <Text style={styles.avatarBadgeText}>{initials}</Text>
-              </View>
+              <ChatAvatar
+                source={{
+                  avatarType: message.author.imageUrl ? 'custom' : 'identicon',
+                  uri: message.author.imageUrl,
+                  seed: message.author.id ?? authorLabel,
+                }}
+                variant="incoming"
+                size={22}
+              />
               <Text style={styles.authorLabel}>{authorLabel}</Text>
             </View>
           ) : null}
@@ -398,14 +434,24 @@ export default function ChatThreadScreen({
               compactBubbleWidth ? { minWidth: compactBubbleWidth } : null,
             ]}
           >
+            {reply ? (
+              <TouchableOpacity style={styles.replyQuote} onPress={() => flashReplyTarget(reply.messageId)}>
+                <View style={styles.replyQuoteBar} />
+                <View style={styles.replyQuoteBody}>
+                  <Text style={styles.replyQuoteAuthor} numberOfLines={1}>
+                    {reply.author}
+                  </Text>
+                  <Text style={styles.replyQuoteText} numberOfLines={2}>
+                    {getReplyPreviewText(reply)}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ) : null}
             <Text style={[styles.messageText, isOwn ? styles.messageTextOutgoing : styles.messageTextIncoming]}>
               {message.text}
             </Text>
             {timeLabel ? (
-              <Text
-                numberOfLines={1}
-                style={[styles.timeText, isOwn ? styles.timeTextOutgoing : styles.timeTextIncoming]}
-              >
+              <Text numberOfLines={1} style={[styles.timeText, isOwn ? styles.timeTextOutgoing : styles.timeTextIncoming]}>
                 {timeLabel}
               </Text>
             ) : null}
@@ -413,7 +459,7 @@ export default function ChatThreadScreen({
         </View>
       );
     },
-    [flyerUser.id, getAvatarColor, getCompactBubbleWidth, getInitials, getTimeLabel, isDirectChat, styles]
+    [flyerUser.id, flashReplyTarget, getCompactBubbleWidth, getReplyPreviewText, getTimeLabel, isDirectChat, replyJumpId, styles],
   );
 
   const renderImageMessage = useCallback(
@@ -422,20 +468,44 @@ export default function ChatThreadScreen({
       const isOwn = message.author.id === flyerUser.id;
       const timeLabel = getTimeLabel(typed);
       const caption = typed.metadata?.caption;
+      const reply = typed.metadata?.reply;
       const authorLabel = message.author.firstName ?? message.author.id ?? '';
-      const avatarColor = getAvatarColor(authorLabel);
-      const initials = getInitials(authorLabel);
       const shouldShowAuthor = !isOwn && !isDirectChat;
 
       return (
-        <View style={[styles.messageShell, isOwn ? styles.messageShellOutgoing : styles.messageShellIncoming]}>
+        <View
+          style={[
+            styles.messageShell,
+            isOwn ? styles.messageShellOutgoing : styles.messageShellIncoming,
+            replyJumpId === message.id ? styles.messageShellHighlighted : null,
+          ]}
+        >
           {shouldShowAuthor ? (
             <View style={styles.metaRow}>
-              <View style={[styles.avatarBadge, { backgroundColor: avatarColor }]}>
-                <Text style={styles.avatarBadgeText}>{initials}</Text>
-              </View>
+              <ChatAvatar
+                source={{
+                  avatarType: message.author.imageUrl ? 'custom' : 'identicon',
+                  uri: message.author.imageUrl,
+                  seed: message.author.id ?? authorLabel,
+                }}
+                variant="incoming"
+                size={22}
+              />
               <Text style={styles.authorLabel}>{authorLabel}</Text>
             </View>
+          ) : null}
+          {reply ? (
+            <TouchableOpacity style={styles.replyQuote} onPress={() => flashReplyTarget(reply.messageId)}>
+              <View style={styles.replyQuoteBar} />
+              <View style={styles.replyQuoteBody}>
+                <Text style={styles.replyQuoteAuthor} numberOfLines={1}>
+                  {reply.author}
+                </Text>
+                <Text style={styles.replyQuoteText} numberOfLines={2}>
+                  {getReplyPreviewText(reply)}
+                </Text>
+              </View>
+            </TouchableOpacity>
           ) : null}
           <View style={styles.imageContainer}>
             <ImageMessage message={message as any} messageWidth={messageWidth} />
@@ -456,7 +526,7 @@ export default function ChatThreadScreen({
         </View>
       );
     },
-    [flyerUser.id, getAvatarColor, getInitials, getTimeLabel, isDirectChat, styles]
+    [flyerUser.id, flashReplyTarget, getReplyPreviewText, getTimeLabel, isDirectChat, replyJumpId, styles],
   );
 
   const renderInputBar = useCallback(
@@ -472,6 +542,8 @@ export default function ChatThreadScreen({
           fileAttachment={fileAttachment}
           onClearAttachment={onClearAttachment}
           onClearFile={onClearFile}
+          replyTarget={replyTarget}
+          onClearReplyTarget={onClearReplyTarget}
           placeholder="Type a message..."
         />
       </View>
@@ -482,12 +554,14 @@ export default function ChatThreadScreen({
       fileAttachment,
       onClearAttachment,
       onClearFile,
+      onClearReplyTarget,
       onDraftChange,
       onPickFile,
       onPickImage,
       onSend,
+      replyTarget,
       styles,
-    ]
+    ],
   );
 
   if (!chat) {
@@ -503,6 +577,8 @@ export default function ChatThreadScreen({
   const canManage = selectedMessage ? canManageMessage(selectedMessage) : false;
   const canEdit =
     selectedMessage && selectedMessage.type !== 'image' && selectedMessage.type !== 'file';
+  const canDelete = Boolean(selectedMessage && onDeleteMessage && (isDirectChat || canManage));
+  const deleteLabel = isDirectChat ? 'Delete for me' : 'Delete';
   const handleBackPress = useCallback(() => {
     Keyboard.dismiss();
     setTimeout(onBack, 20);
@@ -522,16 +598,17 @@ export default function ChatThreadScreen({
     <View style={styles.outerContainer}>
       <View style={styles.container}>
         {/* Header */}
-        <ChatThreadHeader
-          chat={chat}
-          onBack={handleBackPress}
-          participantCount={participantCount}
-          isMuted={isMuted}
-          onToggleMute={onToggleMute}
-          onViewProfile={isDirectChat ? handleViewProfile : undefined}
-          avatarSource={isDirectChat ? selectedPeerProfile.avatarSource : undefined}
-          onAvatarPress={isDirectChat ? handleViewProfile : undefined}
-        />
+          <ChatThreadHeader
+            chat={chat}
+            onBack={handleBackPress}
+            participantCount={participantCount}
+            isMuted={isMuted}
+            onToggleMute={onToggleMute}
+            onViewProfile={isDirectChat ? handleViewProfile : undefined}
+            onDeleteChat={onDeleteChat}
+            avatarSource={isDirectChat ? selectedPeerProfile.avatarSource : undefined}
+            onAvatarPress={isDirectChat ? handleViewProfile : undefined}
+          />
 
         {/* Flyer Chat Component */}
         <View style={styles.chatWrapper}>
@@ -556,7 +633,7 @@ export default function ChatThreadScreen({
                 customBottomComponent={() => null}
                 disableImageGallery={false}
                 enableAnimation={true}
-                showUserAvatars={false}
+                  showUserAvatars={false}
                 showUserNames={!isDirectChat}
                 flatListProps={{
                   ...panHandlers,
@@ -615,12 +692,12 @@ export default function ChatThreadScreen({
                 <Text style={styles.actionText}>Edit</Text>
               </TouchableOpacity>
             )}
-            {canManage && onDeleteMessage && (
+            {canDelete ? (
               <TouchableOpacity style={styles.actionButton} onPress={handleDeleteMessage}>
-                <MaterialCommunityIcons name="delete" size={20} color={'#ef4444'} />
-                <Text style={[styles.actionText, { color: '#ef4444' }]}>Delete</Text>
+                <MaterialCommunityIcons name="delete" size={20} color="#ef4444" />
+                <Text style={[styles.actionText, { color: '#ef4444' }]}>{deleteLabel}</Text>
               </TouchableOpacity>
-            )}
+            ) : null}
           </View>
         </View>
       )}
@@ -711,6 +788,12 @@ const createChatStyles = (colors: {
       maxWidth: '86%',
       gap: 3,
     },
+    messageShellHighlighted: {
+      shadowColor: colors.accent,
+      shadowOpacity: 0.22,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 0 },
+    },
     messageShellIncoming: {
       alignSelf: 'flex-start',
     },
@@ -744,6 +827,39 @@ const createChatStyles = (colors: {
       backgroundColor: withAlpha(colors.accent, '18'),
       borderWidth: 1,
       borderColor: withAlpha(colors.accent, '3A'),
+    },
+    replyQuote: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 8,
+      marginBottom: 8,
+      paddingVertical: 6,
+      paddingHorizontal: 8,
+      borderRadius: 12,
+      backgroundColor: withAlpha(colors.border, '2A'),
+      borderWidth: 1,
+      borderColor: withAlpha(colors.border, '60'),
+    },
+    replyQuoteBar: {
+      width: 3,
+      alignSelf: 'stretch',
+      borderRadius: 999,
+      backgroundColor: colors.accent,
+    },
+    replyQuoteBody: {
+      flex: 1,
+      minWidth: 0,
+    },
+    replyQuoteAuthor: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.accent,
+    },
+    replyQuoteText: {
+      marginTop: 1,
+      fontSize: 12,
+      lineHeight: 16,
+      color: colors.muted,
     },
     metaRow: {
       flexDirection: 'row',

@@ -17,32 +17,18 @@ export default function ChatAvatar({ source, variant, style, size = 32, onPress 
   const { colors } = useTheme();
   const [imageFailed, setImageFailed] = useState(false);
 
-  // Check if custom URI is usable (not a local file on web)
-  const isCustomUriUsable = useMemo(() => {
-    if (source.avatarType !== 'custom' || !source.uri) return false;
-    // On web, file:// URIs cannot be displayed
-    if (Platform.OS === 'web') {
-      const uri = source.uri;
-      if (uri.startsWith('file://') || uri.startsWith('/data/')) {
-        return false;
-      }
-    }
-    return true;
-  }, [source]);
-
-  const imageUri = isCustomUriUsable && source.uri ? source.uri : undefined;
+  const imageUri = useMemo(() => normalizeAvatarUri(source.avatarType, source.uri), [source.avatarType, source.uri]);
 
   useEffect(() => {
     setImageFailed(false);
   }, [imageUri, source.avatarType]);
 
   const identiconData = useMemo(() => {
-    // Use identicon if custom URI is not usable
-    if ((source.avatarType === 'identicon' || !isCustomUriUsable || imageFailed) && source.seed) {
+    if ((source.avatarType === 'identicon' || !imageUri || imageFailed) && source.seed) {
       return buildIdenticon(source.seed);
     }
     return null;
-  }, [source, isCustomUriUsable, imageFailed]);
+  }, [source.avatarType, source.seed, imageFailed, imageUri]);
 
   const containerStyle = [
     styles.container,
@@ -59,7 +45,7 @@ export default function ChatAvatar({ source, variant, style, size = 32, onPress 
     if (!identiconData) return null;
     const { grid, color } = identiconData;
     const rects: React.ReactNode[] = [];
-    for (let i = 0; i < 25; i++) {
+    for (let i = 0; i < 25; i += 1) {
       if (grid[i]) {
         const row = Math.floor(i / 5);
         const col = i % 5;
@@ -71,7 +57,7 @@ export default function ChatAvatar({ source, variant, style, size = 32, onPress 
             width={cellSize}
             height={cellSize}
             fill={color}
-          />
+          />,
         );
       }
     }
@@ -89,6 +75,7 @@ export default function ChatAvatar({ source, variant, style, size = 32, onPress 
         <Image
           source={{ uri: imageUri }}
           style={{ width: imageSize, height: imageSize, borderRadius: imageSize / 2 }}
+          resizeMode="cover"
           onError={() => setImageFailed(true)}
         />
       ) : identiconData ? (
@@ -114,6 +101,24 @@ export default function ChatAvatar({ source, variant, style, size = 32, onPress 
 
   return content;
 }
+
+const normalizeAvatarUri = (avatarType: ChatAvatarProps['source']['avatarType'], uri?: string) => {
+  if (avatarType !== 'custom' || !uri) return undefined;
+  const trimmed = uri.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.startsWith('ipfs://') || trimmed.startsWith('ipns://')) return undefined;
+  if (Platform.OS === 'web' && (trimmed.startsWith('file://') || trimmed.startsWith('/data/'))) return undefined;
+  if (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('file://') ||
+    trimmed.startsWith('content://') ||
+    trimmed.startsWith('data:')
+  ) {
+    return trimmed;
+  }
+  return undefined;
+};
 
 const styles = StyleSheet.create({
   container: {

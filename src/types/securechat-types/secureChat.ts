@@ -18,6 +18,7 @@ export type ChatMessage = {
   fileName?: string;
   fileSize?: number;
   fileMime?: string;
+  replyTo?: ChatReplyReference;
 };
 
 export type ChatAuthorProfile = {
@@ -35,6 +36,24 @@ export type ChatAvatarSource = {
   seed?: string;
 };
 
+export type ChatReplyAttachment = {
+  kind: 'text' | 'image' | 'file';
+  label: string;
+  uri?: string;
+  name?: string;
+  mimeType?: string;
+  size?: number;
+};
+
+export type ChatReplyReference = {
+  messageId?: string;
+  authorId?: string;
+  author: string;
+  content: string;
+  attachment?: ChatReplyAttachment;
+  source?: 'xmtp' | 'supabase' | 'local';
+};
+
 export type ChatThread = {
   id: string;
   name: string;
@@ -42,6 +61,7 @@ export type ChatThread = {
   peerAddress: string;
   isOnline: boolean;
   isDM?: boolean; // Optional flag to identify DM threads
+  avatarSource?: ChatAvatarSource;
   lastMessage?: {
     text: string;
     ts: string;

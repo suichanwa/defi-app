@@ -2,9 +2,10 @@ import React, { useMemo, useRef } from 'react';
 import { Animated, PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import PulseBadge from '@components/PulseBadge';
-import type { ChatThread } from '@app-types/securechat-types/secureChat';
+import type { ChatAvatarSource, ChatThread } from '@app-types/securechat-types/secureChat';
 import { DEFAULT_GLOBAL_CHAT_ID } from '@constants/secureChat.constants';
 import { useTheme } from '@theme/ThemeProvider';
+import ChatAvatar from './ChatAvatar';
 
 type Props = {
   chats: ChatThread[];
@@ -105,6 +106,11 @@ export default function ChatListScreen({ chats, selectedChatId, onSelectChat, on
               activeOpacity={0.85}
             >
               <View style={styles.chatRow}>
+                <ChatAvatar
+                  source={chat.avatarSource ?? deriveChatAvatarSource(chat)}
+                  variant="incoming"
+                  size={42}
+                />
                 <View style={styles.chatMeta}>
                   <View style={styles.chatNameRow}>
                     <Text style={styles.chatName}>{chat.name}</Text>
@@ -171,6 +177,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       flexDirection: 'row',
       alignItems: 'flex-start',
       justifyContent: 'space-between',
+      gap: 10,
     },
     chatMeta: {
       flex: 1,
@@ -204,3 +211,8 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       color: colors.muted,
     },
   });
+
+const deriveChatAvatarSource = (chat: ChatThread): ChatAvatarSource => ({
+  avatarType: 'identicon',
+  seed: chat.peerAddress || chat.id || chat.name || 'chat',
+});

@@ -9,7 +9,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import type { ChatMessage, ChatThread, ServerInfo } from '@app-types/securechat-types/secureChat';
+import type { ChatMessage, ChatReplyReference, ChatThread, ServerInfo } from '@app-types/securechat-types/secureChat';
 import type { SecureChatMessageRow, SecureChatScreenProps } from '@app-types/securechat-types/secureChatScreen';
 import type { ToastFn } from '@app-types/securechat-types/secureChatHandleMessage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -21,6 +21,7 @@ import SecureChatLayout from './components/SecureChatLayout';
 import * as SecureChatConstants from '@constants/secureChat.constants';
 import { useSecureChatIdentity } from '@hooks/useSecureChatIdentity';
 import { useSecureChatImageAttachment } from '@hooks/useSecureChatImageAttachment';
+import { useSecureChatLocalState } from '@hooks/secureChat/useSecureChatLocalState';
 import { useSecureChatUIState } from '@hooks/secureChat/useSecureChatUIState';
 import { useXmtpDirectMessages } from '@hooks/secureChat/useXmtpDirectMessages';
 import { useRealtimeRoom, type TypingPayload } from '@hooks/secureChat/useRealtimeRoom';
@@ -42,6 +43,7 @@ import { useChatProfiles } from '../../hooks/useChatProfiles';
 import { useTheme } from '@theme/ThemeProvider';
 import { useXmtpClient } from '@context/XmtpProvider';
 import { notifyAndroidSecureChatMessage } from '@services/androidNotifications';
+import { DEFAULT_GLOBAL_CHAT_ID } from '@constants/secureChat.constants';
 
 type PendingFile = {
   uri: string;
@@ -72,6 +74,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
   const [roomId, setRoomId] = useState<string>(SecureChatConstants.DEFAULT_GLOBAL_CHAT_ID);
   const [mutedChatIds, setMutedChatIds] = useState<Set<string>>(() => new Set());
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
+  const [replyTarget, setReplyTarget] = useState<ChatReplyReference | null>(null);
   const [typingByChatId, setTypingByChatId] = useState<Record<string, string | null>>({});
   const [pendingFile, setPendingFile] = useState<PendingFile | null>(null);
   const { width } = useWindowDimensions();
@@ -98,6 +101,14 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     },
   } = useSecureChatUIState();
   const { pickImage, clearImage } = useSecureChatImageAttachment(setAttachment);
+  const {
+    hiddenChatIds,
+    hideConversation,
+    restoreConversation,
+    hideMessage,
+    isConversationHidden,
+    isMessageHidden,
+  } = useSecureChatLocalState();
 
   const devicePublicKey = useMemo(
     () => (xmtpClient?.inboxId ? `xmtp:${xmtpClient.inboxId}` : `user:${displayLabel}`),
@@ -148,84 +159,26 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
       },
     });
 
-  const appendMessageToChat = useCallback(
-    (chatId: string, message: ChatMessage) => {
-      setMessagesByChat((prev) => {
-        const existing = prev[chatId] ?? [];
-        if (existing.some((m) => m.id === message.id)) return prev;
-        const updated = [...existing, message];
-        
-        // Limit messages in memory to prevent crashes from excessive message accumulation
-        // Keep only the most recent MAX_MESSAGES_IN_MEMORY messages
-        const limited = updated.length > SecureChatConstants.MAX_MESSAGES_IN_MEMORY
-          ? updated.slice(-SecureChatConstants.MAX_MESSAGES_IN_MEMORY)
-          : updated;
-        
-        return { ...prev, [chatId]: limited };
-      });
-      setChats((prev) => {
-        const next = prev.map((chat) =>
-          chat.id === chatId
-            ? {
-                ...chat,
-                lastMessage: {
-                  text:
-                    message.type === 'image'
-                      ? message.content?.trim() && message.content !== 'Photo'
-                        ? message.content
-                        : 'Photo'
-                      : message.content,
-                  ts: message.timestamp,
-                  from: message.author,
-                  authorId: message.authorId,
-                },
-              }
-            : chat,
-        );
-        if (next.some((chat) => chat.id === chatId)) return next;
-        const fallbackName = message.author || 'Direct Message';
-        return [
-          {
-            id: chatId,
-            name: fallbackName,
-            participants: [displayLabel, fallbackName],
-            peerAddress: 'direct',
-            isOnline: true,
-            isDM: true,
-            lastMessage: {
-              text:
-                message.type === 'image'
-                  ? message.content?.trim() && message.content !== 'Photo'
-                    ? message.content
-                    : 'Photo'
-                  : message.content,
-              ts: message.timestamp,
-              from: message.author,
-              authorId: message.authorId,
-            },
-          },
-          ...next,
-        ];
-      });
-    },
-    [displayLabel, setChats, setMessagesByChat],
-  );
-
   const loadInitialRef = useRef(loadInitial);
   useEffect(() => {
     loadInitialRef.current = loadInitial;
   }, [loadInitial]);
 
-  const selectedMessages = useMemo(
-    () => messagesByChat[selectedChatId] ?? [],
-    [messagesByChat, selectedChatId],
-  );
+  const selectedMessages = useMemo(() => {
+    const current = messagesByChat[selectedChatId] ?? [];
+    return current.filter((message) => !isMessageHidden(selectedChatId, message.id));
+  }, [isMessageHidden, messagesByChat, selectedChatId]);
 
   const selectedHistoryState = historyStateByChat[selectedChatId];
 
   const handleXmtpSyncError = useCallback((message: string) => {
     setConnectionLog((prev) => [`DM sync error: ${message}`, ...prev]);
   }, []);
+
+  const scopedShowToast = useCallback<ToastFn>(
+    (params) => showToast({ ...params, scope: 'chat', animation: 'slide' }),
+    [],
+  );
 
   const {
     dmChannels,
@@ -241,6 +194,9 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     isThreadOpen: secureTab === 'chats' && chatView === 'thread',
     notifyIncoming,
     setMessagesByChat,
+    isConversationHidden,
+    isMessageHidden,
+    restoreConversation,
     onError: handleXmtpSyncError,
   });
 
@@ -287,6 +243,33 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     return getChatById(selectedChatId);
   }, [getChatById, selectedChatId]);
 
+  const handleDeleteChat = useCallback(async () => {
+    if (!selectedChat || !selectedChat.isDM) return;
+    try {
+      await hideConversation(selectedChat.id);
+      setMessagesByChat((prev) => {
+        const next = { ...prev };
+        delete next[selectedChat.id];
+        return next;
+      });
+      setChats((prev) => prev.filter((chat) => chat.id !== selectedChat.id));
+      setReplyTarget(null);
+      if (selectedChatId === selectedChat.id) {
+        selectChat(DEFAULT_GLOBAL_CHAT_ID);
+        setRoomId(DEFAULT_GLOBAL_CHAT_ID);
+        setView('list');
+      }
+    } catch (error) {
+      scopedShowToast({
+        type: 'error',
+        text1: 'Delete failed',
+        text2: error instanceof Error ? error.message : 'Unable to delete chat locally.',
+        position: 'top',
+        visibilityTime: 3000,
+      });
+    }
+  }, [hideConversation, scopedShowToast, selectChat, selectedChat, selectedChatId, setChats, setMessagesByChat, setReplyTarget, setRoomId, setView]);
+
   const threadCurrentUserId = useMemo(() => {
     if (selectedChat?.id.startsWith('dm:xmtp:')) {
       return xmtpClient?.inboxId ?? effectiveUserId;
@@ -295,11 +278,6 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
   }, [effectiveUserId, selectedChat?.id, xmtpClient?.inboxId]);
 
   const typingSenderId = useMemo(() => authorId ?? effectiveUserId, [authorId, effectiveUserId]);
-
-  const scopedShowToast = useCallback<ToastFn>(
-    (params) => showToast({ ...params, scope: 'chat', animation: 'slide' }),
-    [],
-  );
 
   const notifyIncomingMessage = useMemo(
     () =>
@@ -555,8 +533,8 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
   // Combine global chats with DM channels
   const allChats = useMemo(() => {
     const globalChats = chats.filter((c) => !c.id.startsWith('dm:'));
-    return [...globalChats, ...dmChannels];
-  }, [chats, dmChannels]);
+    return [...globalChats, ...dmChannels].filter((chat) => !hiddenChatIds.has(chat.id));
+  }, [chats, dmChannels, hiddenChatIds]);
 
   // Handle starting a DM from profile view
   const handleStartDM = useCallback(async (otherUserId: string, otherUserName: string) => {
@@ -650,11 +628,13 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
         pendingImageUri,
         pendingFile,
         editingMessage,
+        replyTarget,
         messagesByChat,
         setMessagesByChat,
         setChats,
         setDraft,
         setEditingMessage,
+        clearReplyTarget: () => setReplyTarget(null),
         setAttachment,
         setFileAttachment: setPendingFile,
         sendText,
@@ -671,11 +651,13 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
       pendingImageUri,
       pendingFile,
       editingMessage,
+      replyTarget,
       messagesByChat,
       setMessagesByChat,
       setChats,
       setDraft,
       setEditingMessage,
+      setReplyTarget,
       setAttachment,
       setPendingFile,
       sendText,
@@ -693,31 +675,35 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     handleToggleMute,
   } = useMemo(
     () =>
-      createSecureChatUserActions({
-        setClipboard: Clipboard.setStringAsync,
-        showToast: scopedShowToast,
+        createSecureChatUserActions({
+          setClipboard: Clipboard.setStringAsync,
+          showToast: scopedShowToast,
+          resolveAuthorName,
+          setDraft,
+          setReplyTarget,
+          isOwnMessage,
+          setEditingMessage,
+          messagesByChat,
+          setMessagesByChat,
+          setChats,
+          selectedChatId: selectedChat?.id,
+          setMutedChatIds,
+          hideMessageLocally: hideMessage,
+        }),
+      [
+        scopedShowToast,
         resolveAuthorName,
         setDraft,
+        setReplyTarget,
         isOwnMessage,
         setEditingMessage,
         messagesByChat,
         setMessagesByChat,
         setChats,
-        selectedChatId: selectedChat?.id,
+        selectedChat?.id,
         setMutedChatIds,
-      }),
-    [
-      scopedShowToast,
-      resolveAuthorName,
-      setDraft,
-      isOwnMessage,
-      setEditingMessage,
-      messagesByChat,
-      setMessagesByChat,
-      setChats,
-      selectedChat?.id,
-      setMutedChatIds,
-    ],
+        hideMessage,
+      ],
   );
 
   const handleConnectPeer = useCallback(async () => {
@@ -828,6 +814,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
             chat: selectedChat,
             messages: selectedMessages,
             draft,
+            replyTarget,
             serverInfo,
             participantCount,
             currentUserId: threadCurrentUserId,
@@ -835,6 +822,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
             onBack: () => setView('list'),
             onDraftChange: setDraft,
             onSend: handleSendMessage,
+            onClearReplyTarget: () => setReplyTarget(null),
             onPickImage: handlePickImage,
             onPickFile: undefined,
             onClearAttachment: handleClearAttachment,
@@ -851,6 +839,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
             onReplyMessage: handleReplyMessage,
             onEditMessage: handleEditMessage,
             onDeleteMessage: handleDeleteMessage,
+            onDeleteChat: handleDeleteChat,
             isMuted: selectedChat ? mutedChatIds.has(selectedChat.id) : false,
             onToggleMute: handleToggleMute,
           }}

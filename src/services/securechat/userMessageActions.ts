@@ -1,9 +1,10 @@
-import type { ChatMessage } from '@app-types/securechat-types/secureChat';
+import type { ChatMessage, ChatReplyReference } from '@app-types/securechat-types/secureChat';
 import type {
   ClipboardFn,
   SetState,
   ToastFn,
 } from '@app-types/securechat-types/secureChatHandleMessage';
+import { buildReplyReferenceFromMessage } from '@utils/secureChatMessageEnvelope';
 import {
   createCopyMessageHandler,
   createDeleteMessageHandler,
@@ -32,6 +33,7 @@ export const createSecureChatUserActions = ({
   showToast,
   resolveAuthorName,
   setDraft,
+  setReplyTarget,
   isOwnMessage,
   setEditingMessage,
   messagesByChat,
@@ -39,11 +41,13 @@ export const createSecureChatUserActions = ({
   setChats,
   selectedChatId,
   setMutedChatIds,
+  hideMessageLocally,
 }: {
   setClipboard: ClipboardFn;
   showToast: ToastFn;
   resolveAuthorName: (message: ChatMessage) => string;
   setDraft: (value: string) => void;
+  setReplyTarget: (value: ChatReplyReference | null) => void;
   isOwnMessage: (message: ChatMessage) => boolean;
   setEditingMessage: (value: ChatMessage | null) => void;
   messagesByChat: Record<string, ChatMessage[]>;
@@ -51,9 +55,10 @@ export const createSecureChatUserActions = ({
   setChats: SetState<import('@app-types/securechat-types/secureChat').ChatThread[]>;
   selectedChatId?: string;
   setMutedChatIds: SetState<Set<string>>;
+  hideMessageLocally?: (chatId: string, messageId: string) => Promise<void>;
 }) => ({
   handleCopyMessage: createCopyMessageHandler(setClipboard, showToast),
-  handleReplyMessage: createReplyMessageHandler(resolveAuthorName, setDraft),
+  handleReplyMessage: createReplyMessageHandler(resolveAuthorName, setReplyTarget),
   handleEditMessage: createEditMessageHandler(isOwnMessage, setEditingMessage, setDraft),
   handleDeleteMessage: createDeleteMessageHandler(
     isOwnMessage,
@@ -62,6 +67,7 @@ export const createSecureChatUserActions = ({
     setChats,
     resolveAuthorName,
     showToast,
+    hideMessageLocally,
   ),
   handleToggleMute: createToggleMuteHandler(selectedChatId, setMutedChatIds),
 });

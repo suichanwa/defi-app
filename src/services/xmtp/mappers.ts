@@ -1,6 +1,12 @@
 import type { ChatMessage, ChatThread } from '@app-types/securechat-types/secureChat';
 import type { DecodedMessageUnion, Dm } from '@xmtp/react-native-sdk';
 import { XMTP_DM_CHAT_ID_PREFIX } from './constants';
+import {
+  buildReplyAttachmentLabel,
+  buildReplyReferenceFromMessage,
+  hydrateSecureChatMessageContent,
+  parseSecureChatMessageContent,
+} from '@utils/secureChatMessageEnvelope';
 
 const shortPeerLabel = (value: string) =>
   value.length > 16 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value;
@@ -39,16 +45,41 @@ export const mapXmtpMessageToChatMessage = (
 ): ChatMessage => {
   const sentAt = nsToDate(message.sentNs);
   const outgoing = message.senderInboxId === currentInboxId;
+  const rawContent = readMessageContent(message);
+  const parsed = parseSecureChatMessageContent(rawContent);
+  const replyTo =
+    parsed.replyTo ??
+    (outgoing
+      ? undefined
+      : {
+          messageId: message.id as string,
+          authorId: message.senderInboxId,
+          author: shortPeerLabel(message.senderInboxId),
+          content: parsed.text || rawContent,
+          attachment: buildReplyAttachmentLabel({
+            id: message.id as string,
+            chatId,
+            authorId: message.senderInboxId,
+            author: shortPeerLabel(message.senderInboxId),
+            content: parsed.text || rawContent,
+            timestamp: sentAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            createdAt: sentAt.toISOString(),
+            outgoing,
+            type: 'text',
+          }),
+          source: 'xmtp' as const,
+        });
   return {
     id: message.id as string,
     chatId,
     authorId: message.senderInboxId,
     author: outgoing ? senderLabel : shortPeerLabel(message.senderInboxId),
-    content: readMessageContent(message),
+    content: parsed.text || rawContent,
     timestamp: sentAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     createdAt: sentAt.toISOString(),
     outgoing,
     type: 'text',
+    replyTo,
   };
 };
 
@@ -76,6 +107,10 @@ export const mapXmtpDmToChatThread = async (
     peerAddress: peerInboxId,
     isOnline: true,
     isDM: true,
+    avatarSource: {
+      avatarType: 'identicon',
+      seed: peerInboxId,
+    },
     lastMessage: lastMessage
       ? {
           text: lastMessage.content,

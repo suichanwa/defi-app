@@ -1,6 +1,7 @@
 import type { ChatMessage } from '@app-types/securechat-types/secureChat';
 import { CHAT_IMAGE_CONTENT_PREFIX, CHAT_IMAGE_SIGNED_URL_TTL_SECONDS } from '@constants/chatImages.constants';
 import { createSignedChatImageUrl } from '@services/chatImageStorage';
+import { parseSecureChatMessageContent } from './secureChatMessageEnvelope';
 
 type SignedUrlCacheEntry = {
   url: string;
@@ -17,6 +18,8 @@ export const decodeChatImageContent = (content: string) =>
 export const resolveChatImageMessage = async (message: ChatMessage): Promise<ChatMessage> => {
   const imagePath = message.imagePath ?? decodeChatImageContent(message.content);
   if (!imagePath) return message;
+  const parsed = parseSecureChatMessageContent(message.content ?? '');
+  const displayContent = parsed.text.trim() || 'Photo';
 
   try {
     const cached = signedUrlCache.get(imagePath);
@@ -36,14 +39,16 @@ export const resolveChatImageMessage = async (message: ChatMessage): Promise<Cha
       type: 'image',
       imagePath,
       imageUri,
-      content: message.content.startsWith(CHAT_IMAGE_CONTENT_PREFIX) ? 'Photo' : message.content,
+      content: displayContent,
+      replyTo: message.replyTo ?? parsed.replyTo,
     };
   } catch (error) {
     return {
       ...message,
       type: 'image',
       imagePath,
-      content: message.content.startsWith(CHAT_IMAGE_CONTENT_PREFIX) ? 'Photo' : message.content,
+      content: displayContent,
+      replyTo: message.replyTo ?? parsed.replyTo,
     };
   }
 };

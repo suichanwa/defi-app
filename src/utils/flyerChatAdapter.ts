@@ -1,10 +1,12 @@
 import type { ChatMessage } from '@app-types/securechat-types/secureChat';
 import type { MessageType } from '@flyerhq/react-native-chat-ui';
+import type { ChatReplyReference } from '@app-types/securechat-types/secureChat';
 
 export type FlyerMessageMeta = {
   timeLabel?: string;
   createdAtMs?: number;
   caption?: string;
+  reply?: ChatReplyReference;
 };
 
 export type FlyerMessageWithMeta = (MessageType.Text | MessageType.Image) & {
@@ -25,6 +27,7 @@ export function convertToFlyerMessage(
   const author = {
     id: isOwn && currentUserId ? currentUserId : (msg.authorId || msg.author),
     firstName: msg.author,
+    imageUrl: msg.avatarUri ?? undefined,
   };
 
   const createdAtMs =
@@ -37,6 +40,7 @@ export function convertToFlyerMessage(
     timeLabel: msg.timestamp,
     createdAtMs: msg.createdAt ? new Date(msg.createdAt).getTime() : undefined,
     caption,
+    reply: msg.replyTo,
   };
 
   // Handle image messages

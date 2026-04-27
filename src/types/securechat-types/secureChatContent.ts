@@ -1,4 +1,4 @@
-import type { ChatAvatarSource, ChatMessage, ChatThread, ServerInfo } from './secureChat';
+import type { ChatAvatarSource, ChatMessage, ChatReplyReference, ChatThread, ServerInfo } from './secureChat';
 
 export type SecureChatConnectProps = {
   connectAddress: string;
@@ -16,6 +16,7 @@ export type SecureChatThreadProps = {
   chat: ChatThread | null;
   messages: ChatMessage[];
   draft: string;
+  replyTarget?: ChatReplyReference | null;
   serverInfo: ServerInfo | null;
   participantCount: number;
   currentUserId?: string;
@@ -23,6 +24,7 @@ export type SecureChatThreadProps = {
   onBack: () => void;
   onDraftChange: (value: string) => void;
   onSend: () => void;
+  onClearReplyTarget?: () => void;
   onPickImage: () => void;
   onPickFile?: () => void;
   onClearAttachment: () => void;
@@ -39,6 +41,7 @@ export type SecureChatThreadProps = {
   onReplyMessage?: (message: ChatMessage) => void;
   onEditMessage?: (message: ChatMessage) => void;
   onDeleteMessage?: (message: ChatMessage) => void;
+  onDeleteChat?: () => void;
   isMuted?: boolean;
   onToggleMute?: () => void;
 };
