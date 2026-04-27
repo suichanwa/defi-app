@@ -10,6 +10,7 @@ export type ChatMessage = {
   createdAt?: string;
   avatarUri?: string;
   outgoing?: boolean;
+  deliveryStatus?: 'sent' | 'seen';
   type?: 'text' | 'system' | 'image' | 'file';
   imageUri?: string;
   imagePath?: string;

@@ -1,12 +1,14 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { Client } from '@xmtp/react-native-sdk';
+import { useChain } from './ChainProvider';
 import { useWalletSession } from './WalletSessionProvider';
 import { getOrCreateXmtpDbKey } from '@services/xmtp/dbKeyStore';
 import { createXmtpEoaSigner, isEvmAddress, isEvmMessageSigner } from '@services/xmtp/signer';
 import { getXmtpEnvironment } from '@services/xmtp/config';
 import { XMTP_APP_VERSION } from '@services/xmtp/constants';
 import { publishWalletLinkToProfile, readLocalWalletLinkCandidates } from '@services/xmtp/profileWalletLink';
-import { getXmtpSdkErrorMessage, isXmtpNativeModuleAvailable, XmtpClient } from '@services/xmtp/sdk';
+import { createXmtpReadReceiptCodec, getXmtpSdkErrorMessage, isXmtpNativeModuleAvailable, XmtpClient } from '@services/xmtp/sdk';
+import { getActiveWalletId, loadEncryptedWalletKeyById, loadWalletRecords } from '@services/walletKeyStore';
 
 type XmtpStatus = 'idle' | 'unsupported' | 'initializing' | 'ready' | 'error';
 
@@ -30,7 +32,8 @@ async function dropXmtpClient(client: Client | null): Promise<void> {
 }
 
 export function XmtpProvider({ children }: { children: React.ReactNode }) {
-  const { status: walletStatus, wallet, address } = useWalletSession();
+  const { chainKey, setChainKey } = useChain();
+  const { status: walletStatus, wallet, address, switchWallet } = useWalletSession();
   const [client, setClient] = useState<Client | null>(null);
   const [status, setStatus] = useState<XmtpStatus>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +41,7 @@ export function XmtpProvider({ children }: { children: React.ReactNode }) {
   const activeInitRef = useRef(0);
   const clientRef = useRef<Client | null>(null);
   const lastPublishedLinkRef = useRef('');
+  const ethereumWalletSwitchInFlightRef = useRef(false);
 
   useEffect(() => {
     clientRef.current = client;
@@ -50,6 +54,48 @@ export function XmtpProvider({ children }: { children: React.ReactNode }) {
     setWalletAddress(null);
     await dropXmtpClient(existing);
   }, []);
+
+  const resolveEthereumWalletId = useCallback(async (): Promise<string | null> => {
+    const activeEthereumWalletId = await getActiveWalletId('ethereum');
+    if (activeEthereumWalletId) {
+      const activeEthereumWallet = await loadEncryptedWalletKeyById(activeEthereumWalletId, 'ethereum');
+      if (activeEthereumWallet) {
+        return activeEthereumWalletId;
+      }
+    }
+
+    const ethereumWallets = await loadWalletRecords('ethereum');
+    return ethereumWallets[0]?.id ?? null;
+  }, []);
+
+  const switchToEthereumWallet = useCallback(async (): Promise<'switched' | 'missing' | 'failed'> => {
+    if (ethereumWalletSwitchInFlightRef.current) {
+      return 'switched';
+    }
+
+    const ethereumWalletId = await resolveEthereumWalletId();
+    if (!ethereumWalletId) {
+      return 'missing';
+    }
+
+    const previousChainKey = chainKey;
+    ethereumWalletSwitchInFlightRef.current = true;
+    try {
+      if (previousChainKey !== 'ethereumMainnet') {
+        await setChainKey('ethereumMainnet');
+      }
+      await switchWallet(ethereumWalletId);
+      return 'switched';
+    } catch (switchError) {
+      if (previousChainKey !== 'ethereumMainnet') {
+        await setChainKey(previousChainKey);
+      }
+      console.warn('Failed to auto-switch to an Ethereum wallet for XMTP.', switchError);
+      return 'failed';
+    } finally {
+      ethereumWalletSwitchInFlightRef.current = false;
+    }
+  }, [chainKey, resolveEthereumWalletId, setChainKey, switchWallet]);
 
   const initClient = useCallback(async () => {
     if (!isXmtpNativeModuleAvailable() || !XmtpClient) {
@@ -81,8 +127,18 @@ export function XmtpProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       if (!isEvmAddress(address)) {
+        setStatus('initializing');
+        setError(null);
+        const switchResult = await switchToEthereumWallet();
+        if (switchResult === 'switched') {
+          return;
+        }
         setStatus('unsupported');
-        setError('Active unlocked wallet is not Ethereum. Switch to an Ethereum wallet for XMTP.');
+        setError(
+          switchResult === 'missing'
+            ? 'No Ethereum wallet is available on this device. Add or unlock one for XMTP.'
+            : 'Could not switch to your Ethereum wallet for XMTP.',
+        );
         return;
       }
       if (!isEvmMessageSigner(wallet)) {
@@ -110,10 +166,12 @@ export function XmtpProvider({ children }: { children: React.ReactNode }) {
     try {
       const dbEncryptionKey = await getOrCreateXmtpDbKey(normalizedAddress);
       const signer = createXmtpEoaSigner(wallet, normalizedAddress);
+      const readReceiptCodec = createXmtpReadReceiptCodec();
       const options = {
         env: getXmtpEnvironment(),
         dbEncryptionKey,
         appVersion: XMTP_APP_VERSION,
+        codecs: readReceiptCodec ? [readReceiptCodec] : [],
       };
       const nextClient = await XmtpClient.create(signer, options);
 
@@ -135,7 +193,7 @@ export function XmtpProvider({ children }: { children: React.ReactNode }) {
       setStatus('error');
       setError(nextError instanceof Error ? nextError.message : 'Failed to initialize XMTP client.');
     }
-  }, [address, disconnectCurrentClient, wallet, walletAddress, walletStatus]);
+  }, [address, disconnectCurrentClient, switchToEthereumWallet, wallet, walletAddress, walletStatus]);
 
   useEffect(() => {
     void initClient();

@@ -51,6 +51,7 @@ type Props = {
 };
 
 const AVATAR_PALETTE = ['#2563eb', '#0ea5e9', '#14b8a6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7'];
+const MIN_TEXT_BUBBLE_WIDTH = 132;
 
 const withAlpha = (hex: string, alphaHex: string) => {
   if (!hex.startsWith('#')) return hex;
@@ -331,6 +332,8 @@ export default function ChatThreadScreen({
         attachmentButtonIcon: () => (
           <MaterialCommunityIcons name="image-outline" size={20} color={colors.text} />
         ),
+        deliveredIcon: () => <MaterialCommunityIcons name="check" size={18} color={colors.accent} />,
+        seenIcon: () => <MaterialCommunityIcons name="check-all" size={18} color={colors.accent} />,
         sendButtonIcon: () => <MaterialCommunityIcons name="send" size={20} color={colors.text} />,
       },
     }),
@@ -381,7 +384,10 @@ export default function ChatThreadScreen({
               {message.text}
             </Text>
             {timeLabel ? (
-              <Text style={[styles.timeText, isOwn ? styles.timeTextOutgoing : styles.timeTextIncoming]}>
+              <Text
+                numberOfLines={1}
+                style={[styles.timeText, isOwn ? styles.timeTextOutgoing : styles.timeTextIncoming]}
+              >
                 {timeLabel}
               </Text>
             ) : null}
@@ -686,6 +692,7 @@ const createChatStyles = (colors: {
     messageShell: {
       maxWidth: '86%',
       gap: 4,
+      minWidth: MIN_TEXT_BUBBLE_WIDTH,
     },
     messageShellIncoming: {
       alignSelf: 'flex-start',
@@ -695,6 +702,7 @@ const createChatStyles = (colors: {
     },
     messageSurface: {
       backgroundColor: 'transparent',
+      minWidth: MIN_TEXT_BUBBLE_WIDTH,
     },
     messageSurfaceIncoming: {
       alignSelf: 'flex-start',
@@ -752,6 +760,7 @@ const createChatStyles = (colors: {
     messageText: {
       fontSize: 15,
       lineHeight: 20,
+      flexShrink: 1,
     },
     messageTextIncoming: {
       color: colors.text,
@@ -763,6 +772,7 @@ const createChatStyles = (colors: {
       fontSize: 11,
       letterSpacing: 0.4,
       marginTop: 2,
+      minWidth: 58,
     },
     timeTextIncoming: {
       color: colors.muted,

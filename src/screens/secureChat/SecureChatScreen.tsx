@@ -239,6 +239,8 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
   } = useXmtpDirectMessages({
     displayLabel,
     isActive,
+    selectedChatId,
+    isThreadOpen: secureTab === 'chats' && chatView === 'thread',
     notifyIncoming,
     setMessagesByChat,
     onError: handleXmtpSyncError,

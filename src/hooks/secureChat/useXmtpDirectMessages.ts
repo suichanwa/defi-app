@@ -15,6 +15,8 @@ import { isXmtpNativeModuleAvailable, XmtpConversationVersion, XmtpPublicIdentit
 type UseXmtpDirectMessagesArgs = {
   displayLabel: string;
   isActive: boolean;
+  selectedChatId?: string | null;
+  isThreadOpen?: boolean;
   notifyIncoming: (chatId: string, message: ChatMessage) => void;
   setMessagesByChat: React.Dispatch<React.SetStateAction<Record<string, ChatMessage[]>>>;
   onError?: (message: string) => void;
@@ -26,10 +28,55 @@ type SendTextArgs = {
 };
 
 const DM_CONSENT_STATES: ConsentState[] = ['allowed', 'unknown'];
+const READ_RECEIPT_CONTENT_TYPE_ID = 'xmtp.org/readReceipt:1.0';
 
 const parseSentNs = (value?: number): number => {
   if (!value || !Number.isFinite(value)) return 0;
   return value;
+};
+
+const messageCreatedAtNs = (message: ChatMessage): number => {
+  const timeMs = message.createdAt ? new Date(message.createdAt).getTime() : 0;
+  if (!Number.isFinite(timeMs) || timeMs <= 0) return 0;
+  return timeMs * 1_000_000;
+};
+
+const isReadReceiptMessage = (message: DecodedMessageUnion): boolean =>
+  message.contentTypeId === READ_RECEIPT_CONTENT_TYPE_ID ||
+  Boolean((message as unknown as { nativeContent?: { readReceipt?: unknown } }).nativeContent?.readReceipt);
+
+const latestPeerReadReceiptNs = (messages: DecodedMessageUnion[], currentInboxId: string): number =>
+  messages.reduce((latest, message) => {
+    if (message.senderInboxId === currentInboxId || !isReadReceiptMessage(message)) return latest;
+    return Math.max(latest, parseSentNs(message.sentNs));
+  }, 0);
+
+const createOutgoingXmtpMessage = ({
+  id,
+  chatId,
+  authorId,
+  author,
+  content,
+}: {
+  id: string;
+  chatId: string;
+  authorId: string;
+  author: string;
+  content: string;
+}): ChatMessage => {
+  const now = new Date();
+  return {
+    id,
+    chatId,
+    authorId,
+    author,
+    content,
+    timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    createdAt: now.toISOString(),
+    outgoing: true,
+    deliveryStatus: 'sent',
+    type: 'text',
+  };
 };
 
 const isDmConversation = (value: unknown): value is Dm =>
@@ -41,6 +88,8 @@ const isDmConversation = (value: unknown): value is Dm =>
 export function useXmtpDirectMessages({
   displayLabel,
   isActive,
+  selectedChatId,
+  isThreadOpen = false,
   notifyIncoming,
   setMessagesByChat,
   onError,
@@ -50,6 +99,7 @@ export function useXmtpDirectMessages({
   const conversationCacheRef = useRef<Map<string, Dm>>(new Map());
   const preferredNameByChatIdRef = useRef<Record<string, string>>({});
   const streamStartNsRef = useRef(0);
+  const lastReadReceiptSentNsRef = useRef<Record<string, number>>({});
   const onErrorRef = useRef(onError);
 
   useEffect(() => {
@@ -127,6 +177,41 @@ export function useXmtpDirectMessages({
     [setMessagesByChat],
   );
 
+  const markOutgoingMessagesSeen = useCallback(
+    (chatId: string, readReceiptNs: number) => {
+      if (readReceiptNs <= 0) return;
+      setMessagesByChat((prev) => {
+        const existing = prev[chatId] ?? [];
+        let changed = false;
+        const next = existing.map((message) => {
+          if (!message.outgoing || message.deliveryStatus === 'seen') return message;
+          if (messageCreatedAtNs(message) > readReceiptNs) return message;
+          changed = true;
+          return { ...message, deliveryStatus: 'seen' as const };
+        });
+        return changed ? { ...prev, [chatId]: next } : prev;
+      });
+    },
+    [setMessagesByChat],
+  );
+
+  const sendReadReceipt = useCallback(async (chatId: string, latestIncomingNs: number) => {
+    if (!client || latestIncomingNs <= 0) return;
+    const previousReceiptNs = lastReadReceiptSentNsRef.current[chatId] ?? 0;
+    if (latestIncomingNs <= previousReceiptNs) return;
+
+    const dm = await resolveDmConversation(chatId);
+    if (!dm) return;
+
+    lastReadReceiptSentNsRef.current[chatId] = latestIncomingNs;
+    try {
+      await dm.send({ readReceipt: {} } as any);
+    } catch (error) {
+      lastReadReceiptSentNsRef.current[chatId] = previousReceiptNs;
+      console.warn('Failed to send XMTP read receipt.', error);
+    }
+  }, [client, resolveDmConversation]);
+
   const loadThread = useCallback(
     async (chatId: string) => {
       if (!isXmtpNativeModuleAvailable()) return;
@@ -139,16 +224,30 @@ export function useXmtpDirectMessages({
           direction: 'ASCENDING',
           limit: MAX_MESSAGES_IN_MEMORY,
         });
-        const mapped = messages.map((message) =>
-          mapXmtpMessageToChatMessage(message, chatId, displayLabel, client.inboxId),
-        );
+        const readReceiptNs = latestPeerReadReceiptNs(messages, client.inboxId);
+        const latestIncomingNs = messages.reduce((latest, message) => {
+          if (message.senderInboxId === client.inboxId || isReadReceiptMessage(message)) return latest;
+          return Math.max(latest, parseSentNs(message.sentNs));
+        }, 0);
+        const mapped = messages
+          .filter((message) => !isReadReceiptMessage(message))
+          .map((message) => {
+            const mappedMessage = mapXmtpMessageToChatMessage(message, chatId, displayLabel, client.inboxId);
+            if (mappedMessage.outgoing && parseSentNs(message.sentNs) <= readReceiptNs) {
+              return { ...mappedMessage, deliveryStatus: 'seen' as const };
+            }
+            return mappedMessage;
+          });
         setThreadMessages(chatId, mapped);
+        if (selectedChatId === chatId && isThreadOpen) {
+          await sendReadReceipt(chatId, latestIncomingNs);
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to load XMTP thread.';
         onErrorRef.current?.(message);
       }
     },
-    [client, displayLabel, resolveDmConversation, setThreadMessages],
+    [client, displayLabel, isThreadOpen, resolveDmConversation, selectedChatId, sendReadReceipt, setThreadMessages],
   );
 
   const startDM = useCallback(
@@ -189,34 +288,25 @@ export function useXmtpDirectMessages({
         return { sent: false, error: 'XMTP conversation is not ready.' };
       }
 
-      const optimistic: ChatMessage = {
-        id: `pending-${Date.now()}`,
-        chatId,
-        authorId: client.inboxId,
-        author: displayLabel,
-        content,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        createdAt: new Date().toISOString(),
-        outgoing: true,
-        type: 'text',
-      };
-
-      setMessagesByChat((prev) => {
-        const existing = prev[chatId] ?? [];
-        const limited = [...existing, optimistic].slice(-MAX_MESSAGES_IN_MEMORY);
-        return { ...prev, [chatId]: limited };
-      });
-
       try {
-        await dm.send(content);
+        const sentMessageId = await dm.send(content);
+        setMessagesByChat((prev) => {
+          const existing = prev[chatId] ?? [];
+          if (existing.some((message) => message.id === sentMessageId)) return prev;
+          const sentMessage = createOutgoingXmtpMessage({
+            id: sentMessageId as string,
+            chatId,
+            authorId: client.inboxId,
+            author: displayLabel,
+            content,
+          });
+          const limited = [...existing, sentMessage].slice(-MAX_MESSAGES_IN_MEMORY);
+          return { ...prev, [chatId]: limited };
+        });
         await loadThread(chatId);
         await refreshChannels();
         return { sent: true as const };
       } catch (error) {
-        setMessagesByChat((prev) => {
-          const existing = prev[chatId] ?? [];
-          return { ...prev, [chatId]: existing.filter((message) => message.id !== optimistic.id) };
-        });
         return {
           sent: false as const,
           error: error instanceof Error ? error.message : 'Failed to send XMTP message.',
@@ -239,6 +329,14 @@ export function useXmtpDirectMessages({
 
       const chatId = xmtpConversationIdToChatId(conversation.id as string);
       conversationCacheRef.current.set(chatId, conversation);
+
+      if (isReadReceiptMessage(message)) {
+        if (message.senderInboxId !== client.inboxId) {
+          markOutgoingMessagesSeen(chatId, parseSentNs(message.sentNs));
+        }
+        return;
+      }
+
       const mapped = mapXmtpMessageToChatMessage(message, chatId, displayLabel, client.inboxId);
 
       let shouldNotify = false;
@@ -252,6 +350,10 @@ export function useXmtpDirectMessages({
 
       if (shouldNotify) {
         notifyIncoming(chatId, mapped);
+      }
+
+      if (!mapped.outgoing && isThreadOpen && selectedChatId === chatId) {
+        await sendReadReceipt(chatId, parseSentNs(message.sentNs));
       }
 
       setDmChannels((prev) => {
@@ -295,7 +397,17 @@ export function useXmtpDirectMessages({
       cancelled = true;
       client.conversations.cancelStreamAllMessages();
     };
-  }, [client, displayLabel, isActive, notifyIncoming, setMessagesByChat]);
+  }, [
+    client,
+    displayLabel,
+    isActive,
+    isThreadOpen,
+    markOutgoingMessagesSeen,
+    notifyIncoming,
+    selectedChatId,
+    sendReadReceipt,
+    setMessagesByChat,
+  ]);
 
   useEffect(() => {
     if (!client) {

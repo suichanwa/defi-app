@@ -41,12 +41,16 @@ type HookApi = ReturnType<typeof useXmtpDirectMessages>;
 type HookHarnessProps = {
   onReady: (api: HookApi) => void;
   setMessagesByChat: React.Dispatch<React.SetStateAction<Record<string, any[]>>>;
+  selectedChatId?: string;
+  isThreadOpen?: boolean;
 };
 
-function HookHarness({ onReady, setMessagesByChat }: HookHarnessProps) {
+function HookHarness({ onReady, setMessagesByChat, selectedChatId, isThreadOpen }: HookHarnessProps) {
   const api = useXmtpDirectMessages({
     displayLabel: 'Alice',
     isActive: false,
+    selectedChatId,
+    isThreadOpen,
     notifyIncoming: jest.fn(),
     setMessagesByChat,
     onError: jest.fn(),
@@ -95,7 +99,7 @@ describe('useXmtpDirectMessages', () => {
           fallback: null,
         },
       ]),
-      send: jest.fn().mockResolvedValue(undefined),
+      send: jest.fn().mockResolvedValue('msg-1'),
     };
 
     const mockClient = {
@@ -167,6 +171,7 @@ describe('useXmtpDirectMessages', () => {
     expect(result).toEqual({ sent: true });
     expect(mockDm.send).toHaveBeenCalledWith('hello from alice');
     expect(messagesByChat[chatId]).toBeDefined();
+    expect(messagesByChat[chatId].some((message) => String(message.id).startsWith('pending-'))).toBe(false);
     expect(messagesByChat[chatId][0].content).toBe('hello from alice');
   });
 
@@ -195,5 +200,149 @@ describe('useXmtpDirectMessages', () => {
     await expect(api!.startDM('0xe159a1193c224C7b4AD819fC653A2eA59b9d8725', 'Augustin')).rejects.toThrow(
       'XMTP create failed: java.lang.ExceptionInInitializerError',
     );
+  });
+
+  it('marks outgoing XMTP messages as seen when a peer read receipt is loaded', async () => {
+    const chatId = 'dm:xmtp:conv-1';
+    const mockDm = {
+      id: 'conv-1',
+      version: 'DM',
+      sync: jest.fn().mockResolvedValue(undefined),
+      messages: jest.fn().mockResolvedValue([
+        {
+          id: 'msg-1',
+          sentNs: 1_000_000,
+          senderInboxId: 'inbox-a',
+          contentTypeId: 'xmtp.org/text:1.0',
+          content: () => 'seen message',
+          fallback: null,
+        },
+        {
+          id: 'receipt-1',
+          sentNs: 2_000_000,
+          senderInboxId: 'inbox-b',
+          contentTypeId: 'xmtp.org/readReceipt:1.0',
+          content: () => ({}),
+          fallback: null,
+        },
+      ]),
+    };
+
+    const mockClient = {
+      inboxId: 'inbox-a',
+      conversations: {
+        findConversation: jest.fn().mockResolvedValue(mockDm),
+        sync: jest.fn().mockResolvedValue(undefined),
+        listDms: jest.fn().mockResolvedValue([]),
+      },
+    };
+
+    mockUseXmtpClient.mockReturnValue({
+      client: mockClient,
+      status: 'ready',
+      error: null,
+    });
+
+    mockMapXmtpMessageToChatMessage.mockImplementation((message: any, nextChatId: string, _label: string, inboxId: string) => ({
+      id: message.id,
+      chatId: nextChatId,
+      authorId: message.senderInboxId,
+      author: message.senderInboxId === inboxId ? 'Alice' : 'Peer',
+      content: message.content(),
+      timestamp: '21:52',
+      createdAt: '1970-01-01T00:00:00.001Z',
+      outgoing: message.senderInboxId === inboxId,
+      type: 'text',
+    }));
+
+    let api: HookApi | null = null;
+    let messagesByChat: Record<string, any[]> = {};
+    const setMessagesByChat: React.Dispatch<React.SetStateAction<Record<string, any[]>>> = (updater) => {
+      messagesByChat =
+        typeof updater === 'function'
+          ? (updater as (prev: Record<string, any[]>) => Record<string, any[]>)(messagesByChat)
+          : updater;
+    };
+
+    await act(async () => {
+      renderer.create(<HookHarness onReady={(nextApi) => { api = nextApi; }} setMessagesByChat={setMessagesByChat} />);
+    });
+
+    await act(async () => {
+      await api!.loadThread(chatId);
+    });
+
+    expect(messagesByChat[chatId]).toHaveLength(1);
+    expect(messagesByChat[chatId][0]).toMatchObject({
+      id: 'msg-1',
+      deliveryStatus: 'seen',
+    });
+  });
+
+  it('sends an XMTP read receipt when an open thread loads incoming messages', async () => {
+    const chatId = 'dm:xmtp:conv-1';
+    const mockDm = {
+      id: 'conv-1',
+      version: 'DM',
+      sync: jest.fn().mockResolvedValue(undefined),
+      send: jest.fn().mockResolvedValue('receipt-1'),
+      messages: jest.fn().mockResolvedValue([
+        {
+          id: 'msg-2',
+          sentNs: 3_000_000,
+          senderInboxId: 'inbox-b',
+          contentTypeId: 'xmtp.org/text:1.0',
+          content: () => 'hello alice',
+          fallback: null,
+        },
+      ]),
+    };
+
+    const mockClient = {
+      inboxId: 'inbox-a',
+      conversations: {
+        findConversation: jest.fn().mockResolvedValue(mockDm),
+        sync: jest.fn().mockResolvedValue(undefined),
+        listDms: jest.fn().mockResolvedValue([]),
+      },
+    };
+
+    mockUseXmtpClient.mockReturnValue({
+      client: mockClient,
+      status: 'ready',
+      error: null,
+    });
+
+    mockMapXmtpMessageToChatMessage.mockImplementation((message: any, nextChatId: string) => ({
+      id: message.id,
+      chatId: nextChatId,
+      authorId: message.senderInboxId,
+      author: 'Peer',
+      content: message.content(),
+      timestamp: '21:52',
+      createdAt: '1970-01-01T00:00:00.003Z',
+      outgoing: false,
+      type: 'text',
+    }));
+
+    let api: HookApi | null = null;
+    const setMessagesByChat = jest.fn();
+
+    await act(async () => {
+      renderer.create(
+        <HookHarness
+          onReady={(nextApi) => { api = nextApi; }}
+          setMessagesByChat={setMessagesByChat}
+          selectedChatId={chatId}
+          isThreadOpen
+        />,
+      );
+    });
+
+    await act(async () => {
+      await api!.loadThread(chatId);
+    });
+
+    expect(mockDm.send).toHaveBeenCalledWith({ readReceipt: {} });
   });
 });

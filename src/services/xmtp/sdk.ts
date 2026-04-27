@@ -74,3 +74,4 @@ export const getXmtpSdkErrorMessage = () => sdkErrorMessage;
 export const XmtpClient = sdk?.Client ?? null;
 export const XmtpPublicIdentity = sdk?.PublicIdentity ?? null;
 export const XmtpConversationVersion = sdk?.ConversationVersion ?? null;
+export const createXmtpReadReceiptCodec = () => (sdk?.ReadReceiptCodec ? new sdk.ReadReceiptCodec() : null);

@@ -29,7 +29,7 @@ export function convertToFlyerMessage(
 
   const createdAtMs =
     createdAtOverrideMs ?? (msg.createdAt ? new Date(msg.createdAt).getTime() : undefined);
-  const status = isOwn ? 'sent' : undefined;
+  const status = isOwn ? msg.deliveryStatus ?? 'sent' : undefined;
   const rawCaption = msg.type === 'image' ? msg.content?.trim() : undefined;
   const caption =
     rawCaption && rawCaption !== 'Photo' && !rawCaption.startsWith('__image__:') ? rawCaption : undefined;
