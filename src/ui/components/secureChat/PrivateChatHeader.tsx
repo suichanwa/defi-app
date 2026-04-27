@@ -5,6 +5,7 @@ import PulseBadge from '@components/PulseBadge';
 import type { ChatThread } from '@app-types/securechat-types/secureChat';
 import { useTheme } from '@theme/ThemeProvider';
 import PrivateChatSettingsMenu from '@components/secureChat/PrivateChatSettingsMenu';
+import { createSecureChatStyles } from '@styles/SecureChat';
 
 type PrivateChatHeaderProps = {
   chat: ChatThread;
@@ -15,7 +16,8 @@ type PrivateChatHeaderProps = {
 
 export default function PrivateChatHeader({ chat, isMuted, onToggleMute, onViewProfile }: PrivateChatHeaderProps) {
   const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const shared = useMemo(() => createSecureChatStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colors, shared), [colors, shared]);
   const isPrivate = chat.isDM ?? chat.id.startsWith('dm:');
   const [settingsVisible, setSettingsVisible] = useState(false);
 
@@ -29,12 +31,14 @@ export default function PrivateChatHeader({ chat, isMuted, onToggleMute, onViewP
     <>
       <View style={styles.container}>
         <View style={styles.textBlock}>
-          <Text style={styles.name} numberOfLines={1}>
+          <Text style={shared.headerTitle} numberOfLines={1}>
             {chat.name}
           </Text>
           <View style={styles.statusRow}>
             <PulseBadge size={8} color={statusColor} />
-            <Text style={styles.statusText}>{statusLabel}</Text>
+            <Text style={styles.statusText} numberOfLines={1} ellipsizeMode="tail">
+              {statusLabel}
+            </Text>
           </View>
         </View>
         <TouchableOpacity
@@ -59,7 +63,10 @@ export default function PrivateChatHeader({ chat, isMuted, onToggleMute, onViewP
   );
 }
 
-const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
+const createStyles = (
+  colors: ReturnType<typeof useTheme>['colors'],
+  shared: ReturnType<typeof createSecureChatStyles>,
+) =>
   StyleSheet.create({
     container: {
       flex: 1,
@@ -70,26 +77,20 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     },
     textBlock: {
       flex: 1,
-    },
-    name: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: colors.text,
+      minWidth: 0,
     },
     statusRow: {
       flexDirection: 'row',
       alignItems: 'center',
       marginTop: 4,
       gap: 6,
+      minWidth: 0,
     },
     statusText: {
-      fontSize: 12,
-      color: colors.muted,
-      fontWeight: '600',
+      ...shared.headerSubtitle,
+      flexShrink: 1,
     },
     settingsButton: {
-      padding: 6,
-      borderRadius: 16,
-      backgroundColor: colors.border,
+      ...shared.chatHeaderActionButton,
     },
   });

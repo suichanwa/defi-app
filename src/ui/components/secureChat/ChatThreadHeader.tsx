@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { DEFAULT_GLOBAL_CHAT_ID, DEFAULT_GLOBAL_CHAT_PEER } from '@constants/secureChat.constants';
 import { useTheme } from '@theme/ThemeProvider';
@@ -8,6 +8,7 @@ import GlobalChatAvatar from '@components/secureChat/GlobalChatAvatar';
 import PrivateChatSettingsMenu from '@components/secureChat/PrivateChatSettingsMenu';
 import type { ChatAvatarSource, ChatThread } from '@app-types/securechat-types/secureChat';
 import { getPrivateChatPresenceIndicator } from '@utils/secureChatUtils';
+import { createNavigationChromeStyles } from '@styles/NavigationChrome';
 
 type Props = {
   chat: ChatThread;
@@ -35,21 +36,25 @@ export default function ChatThreadHeader({
   onAvatarPress,
 }: Props) {
   const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { width } = useWindowDimensions();
+  const isCompact = width < 380;
+  const avatarSize = isCompact ? 38 : 40;
+  const chrome = useMemo(() => createNavigationChromeStyles(colors, { compact: isCompact }), [colors, isCompact]);
+  const styles = useMemo(() => createStyles(colors, { isCompact }, chrome), [colors, isCompact, chrome]);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const isGlobalChat = chat.id === DEFAULT_GLOBAL_CHAT_ID || chat.peerAddress === DEFAULT_GLOBAL_CHAT_PEER;
   const presence = useMemo(
     () => getPrivateChatPresenceIndicator({ chat, unreadCount }),
     [chat, unreadCount],
   );
-  const subtitle = isGlobalChat
-    ? `${participantCount} participants`
-    : presence.showBadge
-      ? presence.statusLabel
-      : presence.statusLabel;
+  const subtitle = isGlobalChat ? formatParticipants(participantCount) : presence.statusLabel;
+  const privateAvatarSource = avatarSource ?? {
+    avatarType: 'identicon' as const,
+    seed: chat.peerAddress || chat.id || chat.name || 'chat',
+  };
   const avatarNode = isGlobalChat ? (
-    <GlobalChatAvatar size={34} />
-  ) : avatarSource && onAvatarPress ? (
+    <GlobalChatAvatar size={avatarSize} />
+  ) : onAvatarPress ? (
     <TouchableOpacity
       onPress={onAvatarPress}
       style={styles.avatarButton}
@@ -57,44 +62,59 @@ export default function ChatThreadHeader({
       accessibilityLabel={`Open ${chat.name} profile`}
       hitSlop={8}
     >
-      <ChatAvatar source={avatarSource} variant="incoming" size={34} />
+      <ChatAvatar source={privateAvatarSource} variant="incoming" size={avatarSize} />
     </TouchableOpacity>
-  ) : null;
+  ) : (
+    <View style={styles.avatarButton}>
+      <ChatAvatar source={privateAvatarSource} variant="incoming" size={avatarSize} />
+    </View>
+  );
 
   return (
-    <View>
-      <View style={styles.headerRow}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton} accessibilityLabel="Back to chats">
-          <MaterialCommunityIcons name="arrow-left" size={18} color={colors.text} />
-        </TouchableOpacity>
+    <View style={styles.outerHeader}>
+      <View style={styles.innerHeader}>
+        <View style={styles.leftCluster}>
+          <TouchableOpacity
+            onPress={onBack}
+            style={styles.actionButton}
+            accessibilityRole="button"
+            accessibilityLabel="Back to chats"
+            hitSlop={8}
+          >
+            <MaterialCommunityIcons name="arrow-left" size={18} color={colors.text} />
+          </TouchableOpacity>
 
-        {avatarNode}
+          {avatarNode}
 
-        <View style={styles.titleBlock}>
-          <Text style={styles.title} numberOfLines={1}>
-            {chat.name}
-          </Text>
-          <View style={styles.subtitleRow}>
-            {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-            {!isGlobalChat && presence.showBadge ? (
-              <View style={styles.unreadBadge}>
-                <Text style={styles.unreadBadgeText}>{presence.badgeLabel}</Text>
-              </View>
-            ) : null}
+          <View style={styles.titleBlock}>
+            <Text style={styles.titleText} numberOfLines={1} ellipsizeMode="tail">
+              {chat.name}
+            </Text>
+            <View style={styles.subtitleRow}>
+              {subtitle ? (
+                <Text style={styles.subtitleText} numberOfLines={1} ellipsizeMode="tail">
+                  {subtitle}
+                </Text>
+              ) : null}
+              {!isGlobalChat && presence.showBadge ? (
+                <View style={styles.presenceBadge}>
+                  <Text style={styles.presenceBadgeText}>{presence.badgeLabel}</Text>
+                </View>
+              ) : null}
+            </View>
           </View>
         </View>
 
-        <TouchableOpacity
-          onPress={() => setSettingsVisible(true)}
-          style={styles.settingsButton}
-          accessibilityLabel="Open chat settings"
-          hitSlop={8}
-        >
-          <MaterialCommunityIcons name="dots-vertical" size={18} color={colors.text} />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.divider} />
+          <TouchableOpacity
+            onPress={() => setSettingsVisible(true)}
+            style={styles.actionButton}
+            accessibilityRole="button"
+            accessibilityLabel="Open chat settings"
+            hitSlop={8}
+          >
+            <MaterialCommunityIcons name="dots-vertical" size={18} color={colors.text} />
+          </TouchableOpacity>
+        </View>
 
       <PrivateChatSettingsMenu
         visible={settingsVisible}
@@ -111,73 +131,105 @@ export default function ChatThreadHeader({
 }
 
 const createStyles = (colors: {
+  background: string;
   card: string;
+  nav: string;
   border: string;
   text: string;
   muted: string;
   accent: string;
-}) =>
+  accentText: string;
+}, options: { isCompact: boolean }, chrome: ReturnType<typeof createNavigationChromeStyles>) =>
   StyleSheet.create({
-    headerRow: {
+    outerHeader: {
+      backgroundColor: colors.background,
+      paddingHorizontal: 0,
+      paddingTop: 6,
+      paddingBottom: 2,
+    },
+    innerHeader: {
+      ...chrome.surface,
+      ...chrome.row,
+      width: '100%',
+      maxWidth: 900,
+      alignSelf: 'center',
+      minHeight: options.isCompact ? 58 : 62,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 18,
+    },
+    leftCluster: {
+      flex: 1,
+      minWidth: 0,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 10,
-      minHeight: 40,
-    },
-    backButton: {
-      padding: 8,
-      borderRadius: 16,
-      backgroundColor: colors.border,
     },
     avatarButton: {
-      width: 40,
-      height: 40,
+      width: 44,
+      height: 44,
       alignItems: 'center',
       justifyContent: 'center',
+      flexShrink: 0,
     },
     titleBlock: {
       flex: 1,
       minWidth: 0,
-    },
-    title: {
-      fontSize: 16,
-      fontWeight: '700',
-      color: colors.text,
-    },
-    subtitle: {
-      fontSize: 12,
-      color: colors.muted,
-      fontWeight: '500',
+      justifyContent: 'center',
     },
     subtitleRow: {
       marginTop: 2,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
-      flexWrap: 'wrap',
+      minWidth: 0,
+      flexWrap: 'nowrap',
     },
-    unreadBadge: {
-      minWidth: 18,
-      height: 18,
-      paddingHorizontal: 5,
-      borderRadius: 9,
+    titleText: {
+      fontSize: options.isCompact ? 16 : 18,
+      lineHeight: options.isCompact ? 20 : 22,
+      fontWeight: '800',
+      letterSpacing: 0.1,
+      color: colors.text,
+    },
+    subtitleText: {
+      fontSize: options.isCompact ? 11 : 12,
+      lineHeight: options.isCompact ? 15 : 16,
+      fontWeight: '500',
+      color: colors.text,
+      opacity: 0.72,
+      flexShrink: 1,
+    },
+    presenceBadge: {
+      minHeight: 18,
+      paddingHorizontal: 7,
+      borderRadius: 999,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.accent,
+      backgroundColor: withAlpha(colors.accent, '22'),
+      borderWidth: 1,
+      borderColor: withAlpha(colors.accent, '44'),
+      flexShrink: 0,
     },
-    unreadBadgeText: {
-      fontSize: 10,
+    presenceBadgeText: {
+      fontSize: 9,
       fontWeight: '800',
-      color: '#ffffff',
+      letterSpacing: 0.4,
+      color: colors.accentText,
     },
-    settingsButton: {
-      padding: 8,
-      borderRadius: 16,
-      backgroundColor: colors.border,
-    },
-    divider: {
-      marginTop: 10,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.border,
+    actionButton: {
+      ...chrome.actionButton,
     },
   });
+
+const formatParticipants = (count: number) => {
+  const safeCount = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+  return `${safeCount} ${safeCount === 1 ? 'participant' : 'participants'}`;
+};
+
+const withAlpha = (hex: string, alphaHex: string) => {
+  if (!hex.startsWith('#')) return hex;
+  const value = hex.slice(1);
+  if (value.length === 6) return `#${value}${alphaHex}`;
+  return hex;
+};

@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@theme/ThemeProvider';
+import { createSecureChatStyles } from '@styles/SecureChat';
 
 type TabKey = 'chats' | 'connect';
 
@@ -13,14 +14,14 @@ type Props = {
 
 export default function ChatTabs({ activeTab, onTabChange, timeLabel }: Props) {
   const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const styles = useMemo(() => createSecureChatStyles(colors), [colors]);
   const isChatsActive = activeTab === 'chats';
 
   return (
-    <View style={styles.container}>
-      <View style={styles.tabsRow}>
+    <View style={styles.chatTabsContainer}>
+      <View style={styles.chatTabsRow}>
         <TouchableOpacity
-          style={[styles.tab, isChatsActive && styles.tabActive]}
+          style={[styles.chatTab, isChatsActive && styles.chatTabActive]}
           onPress={() => onTabChange('chats')}
           activeOpacity={0.8}
         >
@@ -28,56 +29,16 @@ export default function ChatTabs({ activeTab, onTabChange, timeLabel }: Props) {
             name="message-outline"
             size={18}
             color={isChatsActive ? colors.accentText : colors.text}
+            style={styles.chatTabIcon}
           />
-          <Text style={[styles.tabText, isChatsActive && styles.tabTextActive]}>Chats</Text>
+          <Text style={[styles.chatTabText, isChatsActive && styles.chatTabTextActive]}>Chats</Text>
         </TouchableOpacity>
       </View>
       {timeLabel ? (
-        <Text style={styles.timeText}>{timeLabel}</Text>
+        <Text style={styles.chatTabsTimeText}>{timeLabel}</Text>
       ) : (
-        <View style={styles.spacer} />
+        <View style={styles.chatTabsSpacer} />
       )}
     </View>
   );
 }
-
-const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
-  StyleSheet.create({
-    container: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 12,
-    },
-    spacer: {
-      flex: 1,
-    },
-    timeText: {
-      fontSize: 12,
-      color: colors.muted,
-    },
-    tabsRow: {
-      flexDirection: 'row',
-      gap: 8,
-    },
-    tab: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      paddingHorizontal: 20,
-      paddingVertical: 6,
-      borderRadius: 16,
-      backgroundColor: colors.border,
-    },
-    tabActive: {
-      backgroundColor: colors.accent,
-    },
-    tabText: {
-      fontSize: 13,
-      fontWeight: '500',
-      color: colors.text,
-    },
-    tabTextActive: {
-      color: colors.accentText,
-    },
-  });

@@ -1,19 +1,14 @@
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { View } from 'react-native';
+import { useTheme } from '@theme/ThemeProvider';
+import { createSecureChatStyles } from '@styles/SecureChat';
 
 type Props = {
   isCompact: boolean;
 };
 
 export default function ChatHeader({ isCompact }: Props) {
-  return <View style={[styles.container, isCompact && styles.containerCompact]} />;
+  const { colors } = useTheme();
+  const shared = useMemo(() => createSecureChatStyles(colors, { compact: isCompact }), [colors, isCompact]);
+  return <View style={shared.chatHeaderSpacer} />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    height: 36,
-  },
-  containerCompact: {
-    height: 28,
-  },
-});

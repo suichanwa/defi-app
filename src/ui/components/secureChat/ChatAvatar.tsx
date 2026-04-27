@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Image, Platform, StyleSheet, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Image, Platform, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
 import { useTheme } from '@theme/ThemeProvider';
 import { buildIdenticon } from '@utils/identicon';
 import type { ChatAvatarSource } from '@app-types/securechat-types/secureChat';
+import { createSecureChatStyles } from '@styles/SecureChat';
 
 type ChatAvatarProps = {
   source: ChatAvatarSource;
@@ -15,6 +16,7 @@ type ChatAvatarProps = {
 
 export default function ChatAvatar({ source, variant, style, size = 32, onPress }: ChatAvatarProps) {
   const { colors } = useTheme();
+  const shared = useMemo(() => createSecureChatStyles(colors), [colors]);
   const [imageFailed, setImageFailed] = useState(false);
 
   const imageUri = useMemo(() => normalizeAvatarUri(source.avatarType, source.uri), [source.avatarType, source.uri]);
@@ -31,10 +33,12 @@ export default function ChatAvatar({ source, variant, style, size = 32, onPress 
   }, [source.avatarType, source.seed, imageFailed, imageUri]);
 
   const containerStyle = [
-    styles.container,
+    shared.chatAvatarFrame,
     { width: size, height: size, borderRadius: size / 2 },
-    variant === 'outgoing' ? styles.outgoing : styles.incoming,
-    { backgroundColor: colors.border },
+    {
+      backgroundColor: colors.border,
+      borderColor: variant === 'outgoing' ? colors.accent + '30' : colors.border,
+    },
     style,
   ];
 
@@ -74,7 +78,7 @@ export default function ChatAvatar({ source, variant, style, size = 32, onPress 
       {imageUri && !imageFailed ? (
         <Image
           source={{ uri: imageUri }}
-          style={{ width: imageSize, height: imageSize, borderRadius: imageSize / 2 }}
+          style={[shared.chatAvatarImage, { width: imageSize, height: imageSize, borderRadius: imageSize / 2 }]}
           resizeMode="cover"
           onError={() => setImageFailed(true)}
         />
@@ -83,7 +87,7 @@ export default function ChatAvatar({ source, variant, style, size = 32, onPress 
       ) : (
         <View
           style={[
-            styles.placeholder,
+            shared.chatAvatarPlaceholder,
             { width: imageSize, height: imageSize, borderRadius: imageSize / 2, backgroundColor: colors.muted },
           ]}
         />
@@ -119,14 +123,3 @@ const normalizeAvatarUri = (avatarType: ChatAvatarProps['source']['avatarType'],
   }
   return undefined;
 };
-
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  incoming: {},
-  outgoing: {},
-  placeholder: {},
-});

@@ -4,7 +4,6 @@ import {
   Keyboard,
   Linking,
   Platform,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -26,7 +25,8 @@ import ChatInputBar from '@components/secureChat/ChatInputBar';
 import { CHAT_HISTORY_SCROLL_THRESHOLD } from '@constants/secureChat.constants';
 import { convertToFlyerMessage, type FlyerMessageWithMeta } from '@utils/flyerChatAdapter';
 import ChatAvatar from './ChatAvatar';
-import { buildReplyReferenceFromMessage, getReplyPreviewText } from '@utils/secureChatMessageEnvelope';
+import { getReplyPreviewText } from '@utils/secureChatMessageEnvelope';
+import { createSecureChatStyles } from '@styles/SecureChat';
 
 type Props = {
   chat: ChatThread | null;
@@ -66,13 +66,6 @@ type Props = {
 const AVATAR_PALETTE = ['#2563eb', '#0ea5e9', '#14b8a6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7'];
 const COMPACT_TEXT_BUBBLE_MIN_WIDTH = 88;
 const COMPACT_TEXT_BUBBLE_MAX_WIDTH = 122;
-
-const withAlpha = (hex: string, alphaHex: string) => {
-  if (!hex.startsWith('#')) return hex;
-  const value = hex.slice(1);
-  if (value.length === 6) return `#${value}${alphaHex}`;
-  return hex;
-};
 
 type SelectedProfile = {
   name: string;
@@ -114,7 +107,8 @@ export default function ChatThreadScreen({
   onToggleMute,
 }: Props) {
   const { colors } = useTheme();
-  const styles = useMemo(() => createChatStyles(colors), [colors]);
+  const shared = useMemo(() => createSecureChatStyles(colors), [colors]);
+  const styles = useMemo(() => createChatStyles(colors, shared), [colors, shared]);
   const statusIconSize = 12;
 
   const [selectedProfile, setSelectedProfile] = useState<SelectedProfile>(null);
@@ -729,342 +723,88 @@ export default function ChatThreadScreen({
   );
 }
 
-const createChatStyles = (colors: {
-  background: string;
-  card: string;
-  text: string;
-  muted: string;
-  border: string;
-  accent: string;
-  accentText: string;
-  error?: string;
-}) =>
-  StyleSheet.create({
-    outerContainer: {
-      flex: 1,
-    },
-    emptyState: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.card,
-      padding: 24,
-    },
-    emptyTitle: {
-      marginTop: 16,
-      fontSize: 20,
-      fontWeight: '600',
-      color: colors.text,
-    },
-    emptySubtitle: {
-      marginTop: 8,
-      textAlign: 'center',
-      color: colors.muted,
-    },
-    container: {
-      flex: 1,
-      width: '100%',
-      alignSelf: 'stretch',
-      backgroundColor: colors.background,
-      padding: 0,
-    },
-    chatWrapper: {
-      flex: 1,
-      marginTop: 0,
-      backgroundColor: colors.background,
-    },
-    keyboardScrollable: {
-      backgroundColor: colors.background,
-    },
-    keyboardAccessory: {
-      backgroundColor: colors.background,
-    },
-    keyboardAccessoryContent: {
-      backgroundColor: colors.background,
-    },
-    messageItem: {
-      paddingHorizontal: 4,
-      paddingVertical: 1,
-      backgroundColor: 'transparent',
-      borderRadius: 0,
-    },
-    messageItemIncoming: {
-      alignItems: 'flex-start',
-    },
-    messageItemOutgoing: {
-      alignItems: 'flex-end',
-    },
-    messageItemGrouped: {
-      paddingTop: 1,
-    },
-    messageItemUngrouped: {
-      paddingTop: 3,
-    },
-    messageBody: {
-      gap: 4,
-      backgroundColor: 'transparent',
-    },
-    messageShell: {
-      maxWidth: '86%',
-      gap: 3,
-    },
-    messageShellHighlighted: {
-      shadowColor: colors.accent,
-      shadowOpacity: 0.22,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 0 },
-    },
-    messageShellIncoming: {
-      alignSelf: 'flex-start',
-    },
-    messageShellOutgoing: {
-      alignSelf: 'flex-end',
-    },
-    messageSurface: {
-      backgroundColor: 'transparent',
-    },
-    messageSurfaceIncoming: {
-      alignSelf: 'flex-start',
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 18,
-      borderTopLeftRadius: 8,
-      backgroundColor: colors.card,
-      borderWidth: 1,
-      borderColor: colors.border,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.08,
-      shadowRadius: 2,
-      elevation: 1,
-    },
-    messageSurfaceOutgoing: {
-      alignSelf: 'flex-end',
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 18,
-      borderTopRightRadius: 8,
-      backgroundColor: withAlpha(colors.accent, '18'),
-      borderWidth: 1,
-      borderColor: withAlpha(colors.accent, '3A'),
-    },
-    replyQuote: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: 8,
-      marginBottom: 8,
-      paddingVertical: 6,
-      paddingHorizontal: 8,
-      borderRadius: 12,
-      backgroundColor: withAlpha(colors.border, '2A'),
-      borderWidth: 1,
-      borderColor: withAlpha(colors.border, '60'),
-    },
-    replyQuoteBar: {
-      width: 3,
-      alignSelf: 'stretch',
-      borderRadius: 999,
-      backgroundColor: colors.accent,
-    },
-    replyQuoteBody: {
-      flex: 1,
-      minWidth: 0,
-    },
-    replyQuoteAuthor: {
-      fontSize: 11,
-      fontWeight: '700',
-      color: colors.accent,
-    },
-    replyQuoteText: {
-      marginTop: 1,
-      fontSize: 12,
-      lineHeight: 16,
-      color: colors.muted,
-    },
-    metaRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      marginBottom: 2,
-    },
-    avatarBadge: {
-      width: 24,
-      height: 24,
-      borderRadius: 8,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.35)',
-    },
-    avatarBadgeText: {
-      color: '#ffffff',
-      fontSize: 11,
-      fontWeight: '700',
-      letterSpacing: 0.4,
-    },
-    authorLabel: {
-      fontSize: 11,
-      fontWeight: '700',
-      letterSpacing: 0.6,
-      textTransform: 'uppercase',
-      color: colors.muted,
-    },
-    messageText: {
-      fontSize: 15,
-      lineHeight: 20,
-    },
-    messageTextIncoming: {
-      color: colors.text,
-    },
-    messageTextOutgoing: {
-      color: colors.text,
-    },
-    timeText: {
-      fontSize: 11,
-      letterSpacing: 0.4,
-      lineHeight: 14,
-      marginTop: 1,
-    },
-    timeTextIncoming: {
-      color: colors.muted,
-    },
-    timeTextOutgoing: {
-      color: colors.muted,
-      alignSelf: 'flex-end',
-    },
-    imageContainer: {
-      borderRadius: 18,
-      overflow: 'hidden',
-      backgroundColor: 'transparent',
-    },
-    imageCaption: {
-      fontSize: 14,
-      lineHeight: 20,
-    },
-    imageCaptionIncoming: {
-      color: colors.text,
-    },
-    imageCaptionOutgoing: {
-      color: colors.text,
-    },
-    imageOverlay: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      bottom: 0,
-    },
-    imageOverlayInner: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-      backgroundColor: 'rgba(0, 0, 0, 0.35)',
-    },
-    imageMetaText: {
-      fontSize: 11,
-      color: '#f8fafc',
-      fontWeight: '600',
-    },
-    imageMetaTime: {
-      fontSize: 11,
-      color: '#e2e8f0',
-      fontWeight: '600',
-    },
-    inputBarWrapper: {
-      paddingTop: 6,
-      paddingBottom: 2,
-      paddingHorizontal: 0,
-      backgroundColor: colors.background,
-    },
-    typingRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      alignSelf: 'flex-start',
-      marginLeft: 12,
-      marginBottom: 4,
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-      borderRadius: 999,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.card,
-    },
-    typingText: {
-      fontSize: 12,
-      color: colors.muted,
-      fontWeight: '500',
-    },
-    loadMoreFooter: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      paddingVertical: 10,
-    },
-    loadMoreText: {
-      fontSize: 12,
-      color: colors.muted,
-      fontWeight: '500',
-    },
-    statusIconWrap: {
-      width: 16,
-      height: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    statusIconGlyph: {
-      textAlign: 'center',
-      includeFontPadding: false,
-      textAlignVertical: 'center',
-      marginTop: Platform.OS === 'android' ? -1 : 0,
-    },
-    actionOverlay: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      justifyContent: 'center',
-      alignItems: 'center',
-      zIndex: 1000,
-    },
-    actionBackdrop: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    },
-    actionMenu: {
-      backgroundColor: colors.card,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-      padding: 8,
-      minWidth: 200,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
-      elevation: 8,
-    },
-    actionButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 12,
-      paddingHorizontal: 16,
-      borderRadius: 8,
-      gap: 12,
-    },
-    actionText: {
-      fontSize: 15,
-      fontWeight: '500',
-      color: colors.text,
-    },
-  });
+const createChatStyles = (
+  colors: {
+    background: string;
+    card: string;
+    text: string;
+    muted: string;
+    border: string;
+    accent: string;
+    accentText: string;
+    error?: string;
+  },
+  shared: ReturnType<typeof createSecureChatStyles>,
+) => ({
+  ...shared,
+  outerContainer: shared.chatThreadOuterContainer,
+  emptyState: shared.chatThreadEmptyState,
+  emptyTitle: shared.chatThreadEmptyTitle,
+  emptySubtitle: shared.chatThreadEmptySubtitle,
+  container: shared.chatThreadContainer,
+  chatWrapper: shared.chatThreadWrapper,
+  keyboardScrollable: shared.chatThreadKeyboardScrollable,
+  keyboardAccessory: shared.chatThreadKeyboardAccessory,
+  keyboardAccessoryContent: shared.chatThreadKeyboardAccessoryContent,
+  messageItem: shared.chatThreadMessageItem,
+  messageItemIncoming: shared.chatThreadMessageItemIncoming,
+  messageItemOutgoing: shared.chatThreadMessageItemOutgoing,
+  messageItemGrouped: shared.chatThreadMessageItemGrouped,
+  messageItemUngrouped: shared.chatThreadMessageItemUngrouped,
+  messageShell: shared.chatThreadMessageShell,
+  messageShellHighlighted: shared.chatThreadMessageShellHighlighted,
+  messageShellIncoming: shared.chatThreadMessageShellIncoming,
+  messageShellOutgoing: shared.chatThreadMessageShellOutgoing,
+  messageSurface: shared.chatThreadMessageSurface,
+  messageSurfaceIncoming: shared.chatThreadMessageSurfaceIncoming,
+  messageSurfaceOutgoing: shared.chatThreadMessageSurfaceOutgoing,
+  replyQuote: shared.chatThreadReplyQuote,
+  replyQuoteBar: shared.chatThreadReplyQuoteBar,
+  replyQuoteBody: shared.chatThreadReplyQuoteBody,
+  replyQuoteAuthor: shared.chatThreadReplyQuoteAuthor,
+  replyQuoteText: shared.chatThreadReplyQuoteText,
+  metaRow: shared.chatThreadMetaRow,
+  authorLabel: shared.chatThreadAuthorLabel,
+  messageText: shared.chatThreadMessageText,
+  messageTextIncoming: {
+    color: colors.text,
+  },
+  messageTextOutgoing: {
+    color: colors.text,
+  },
+  timeText: shared.chatThreadTimeText,
+  timeTextIncoming: {
+    color: colors.muted,
+  },
+  timeTextOutgoing: {
+    color: colors.muted,
+    alignSelf: 'flex-end',
+  },
+  imageContainer: shared.chatThreadImageContainer,
+  imageCaption: shared.chatThreadImageCaption,
+  imageCaptionIncoming: {
+    color: colors.text,
+  },
+  imageCaptionOutgoing: {
+    color: colors.text,
+  },
+  imageOverlay: shared.chatThreadImageOverlay,
+  imageOverlayInner: shared.chatThreadImageOverlayInner,
+  imageMetaText: shared.chatThreadImageMetaText,
+  imageMetaTime: shared.chatThreadImageMetaTime,
+  inputBarWrapper: shared.chatThreadInputBarWrapper,
+  typingRow: shared.chatThreadTypingRow,
+  typingText: shared.chatThreadTypingText,
+  loadMoreFooter: shared.chatThreadLoadMoreFooter,
+  loadMoreText: shared.chatThreadLoadMoreText,
+  statusIconWrap: shared.chatThreadStatusIconWrap,
+  statusIconGlyph: {
+    ...shared.chatThreadStatusIconGlyph,
+    marginTop: Platform.OS === 'android' ? -1 : 0,
+  },
+  actionOverlay: shared.chatThreadActionOverlay,
+  actionBackdrop: shared.chatThreadActionBackdrop,
+  actionMenu: shared.chatThreadActionMenu,
+  actionButton: shared.chatThreadActionButton,
+  actionText: shared.chatThreadActionText,
+});

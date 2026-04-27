@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { TouchableOpacity, View, StyleSheet, Animated } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@theme/ThemeProvider';
+import { createNavigationChromeStyles } from '@styles/NavigationChrome';
 
 export type TabName = 'wallet' | 'secureChat' | 'profile';
 
@@ -12,6 +13,7 @@ type BottomNavBarProps = {
 
 export default function BottomNavBar({ activeTab, onTabChange }: BottomNavBarProps) {
   const { colors } = useTheme();
+  const chrome = createNavigationChromeStyles(colors);
   
   const walletScale = useRef(new Animated.Value(activeTab === 'wallet' ? 1 : 0.9)).current;
   const secureChatScale = useRef(new Animated.Value(activeTab === 'secureChat' ? 1 : 0.9)).current;
@@ -71,25 +73,21 @@ export default function BottomNavBar({ activeTab, onTabChange }: BottomNavBarPro
     <View
       style={[
         styles.bottomNav,
+        chrome.shell,
         {
-          backgroundColor: colors.nav,
-          borderColor: `${colors.accent}44`,
-          shadowColor: colors.accent,
         },
       ]}
     >
       <TouchableOpacity
-        style={styles.navItem}
+        style={[styles.navItem, chrome.item]}
         onPress={() => onTabChange('wallet')}
         activeOpacity={0.8}
       >
         <Animated.View
           style={[
             styles.navItemBackground,
-            {
-              backgroundColor: `${colors.accent}22`,
-              opacity: walletBgOpacity,
-            },
+            chrome.itemBackground,
+            { opacity: walletBgOpacity },
           ]}
         />
         <Animated.View
@@ -105,17 +103,15 @@ export default function BottomNavBar({ activeTab, onTabChange }: BottomNavBarPro
         </Animated.View>
       </TouchableOpacity>
       <TouchableOpacity
-        style={styles.navItem}
+        style={[styles.navItem, chrome.item]}
         onPress={() => onTabChange('secureChat')}
         activeOpacity={0.8}
       >
         <Animated.View
           style={[
             styles.navItemBackground,
-            {
-              backgroundColor: `${colors.accent}22`,
-              opacity: secureChatBgOpacity,
-            },
+            chrome.itemBackground,
+            { opacity: secureChatBgOpacity },
           ]}
         />
         <Animated.View
@@ -131,17 +127,15 @@ export default function BottomNavBar({ activeTab, onTabChange }: BottomNavBarPro
         </Animated.View>
       </TouchableOpacity>
       <TouchableOpacity
-        style={styles.navItem}
+        style={[styles.navItem, chrome.item]}
         onPress={() => onTabChange('profile')}
         activeOpacity={0.8}
       >
         <Animated.View
           style={[
             styles.navItemBackground,
-            {
-              backgroundColor: `${colors.accent}22`,
-              opacity: profileBgOpacity,
-            },
+            chrome.itemBackground,
+            { opacity: profileBgOpacity },
           ]}
         />
         <Animated.View
@@ -165,7 +159,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     right: 16,
-    bottom: 18,
+    bottom: 12,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
@@ -179,17 +173,11 @@ const styles = StyleSheet.create({
   },
   navItem: {
     padding: 12,
-    borderRadius: 20,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
   },
   navItemBackground: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 20,
   },
 });

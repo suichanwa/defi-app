@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@theme/ThemeProvider';
 import ChatAvatar from '@components/secureChat/ChatAvatar';
 import type { ChatAvatarSource } from '@app-types/securechat-types/secureChat';
+import { createSecureChatStyles } from '@styles/SecureChat';
 
 type ViewProfileScreenProps = {
   name: string;
@@ -13,7 +14,8 @@ type ViewProfileScreenProps = {
 
 export default function ViewProfileScreen({ name, avatarSource, onBack }: ViewProfileScreenProps) {
   const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const shared = useMemo(() => createSecureChatStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colors, shared), [colors, shared]);
 
   return (
     <View style={styles.screen}>
@@ -21,7 +23,7 @@ export default function ViewProfileScreen({ name, avatarSource, onBack }: ViewPr
         <TouchableOpacity onPress={onBack} style={styles.backButton} accessibilityLabel="Back to chat">
           <MaterialCommunityIcons name="arrow-left" size={18} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.topTitle}>Profile</Text>
+        <Text style={shared.pageTitle}>Profile</Text>
         <View style={styles.topSpacer} />
       </View>
 
@@ -30,7 +32,7 @@ export default function ViewProfileScreen({ name, avatarSource, onBack }: ViewPr
           <ChatAvatar source={avatarSource} variant="incoming" size={168} style={styles.avatar} />
         </View>
 
-        <Text style={styles.name} numberOfLines={2}>
+        <Text style={shared.pageTitle} numberOfLines={2}>
           {name}
         </Text>
       </View>
@@ -38,7 +40,7 @@ export default function ViewProfileScreen({ name, avatarSource, onBack }: ViewPr
   );
 }
 
-const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
+const createStyles = (colors: ReturnType<typeof useTheme>['colors'], shared: ReturnType<typeof createSecureChatStyles>) =>
   StyleSheet.create({
     screen: {
       flex: 1,
@@ -54,17 +56,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       justifyContent: 'space-between',
     },
     backButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.border,
-    },
-    topTitle: {
-      fontSize: 16,
-      fontWeight: '700',
-      color: colors.text,
+      ...shared.iconButton,
     },
     topSpacer: {
       width: 40,
@@ -77,23 +69,11 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       gap: 20,
     },
     avatarWrap: {
-      padding: 10,
-      borderRadius: 999,
-      backgroundColor: colors.card,
-      borderWidth: 1,
-      borderColor: colors.border,
+      ...shared.avatarShell,
     },
     avatar: {
       width: 168,
       height: 168,
       borderRadius: 84,
-    },
-    name: {
-      fontSize: 28,
-      lineHeight: 34,
-      fontWeight: '800',
-      color: colors.text,
-      textAlign: 'center',
-      paddingHorizontal: 12,
     },
   });

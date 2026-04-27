@@ -10,6 +10,7 @@ import {
 import { Button, Divider, IconButton, Switch } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@theme/ThemeProvider';
+import { createSecureChatStyles } from '@styles/SecureChat';
 
 type PrivateChatSettingsMenuProps = {
   visible: boolean;
@@ -77,9 +78,13 @@ export default function PrivateChatSettingsMenu({
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const isCompactPhone = width < 380 || height < 760;
-  const styles = useMemo(
-    () => createStyles(colors, insets.bottom, isCompactPhone),
+  const shared = useMemo(
+    () => createSecureChatStyles(colors, { compact: isCompactPhone, bottomInset: insets.bottom }),
     [colors, insets.bottom, isCompactPhone],
+  );
+  const styles = useMemo(
+    () => createStyles(colors, insets.bottom, isCompactPhone, shared),
+    [colors, insets.bottom, isCompactPhone, shared],
   );
   const isDarkTheme = resolved === 'dark';
   const surfaceIconColor = isDarkTheme ? '#f8fafc' : colors.accentText;
@@ -301,180 +306,117 @@ export default function PrivateChatSettingsMenu({
   );
 }
 
-const createStyles = (colors: ReturnType<typeof useTheme>['colors'], bottomInset: number, isCompactPhone: boolean) =>
+const createStyles = (
+  colors: ReturnType<typeof useTheme>['colors'],
+  bottomInset: number,
+  isCompactPhone: boolean,
+  shared: ReturnType<typeof createSecureChatStyles>,
+) =>
   StyleSheet.create({
     sheetContent: {
-      flex: 1,
+      ...shared.sheetContent,
     },
     sheetBackground: {
-      backgroundColor: colors.card,
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
+      ...shared.sheetBackground,
     },
     handle: {
-      paddingTop: 8,
-      paddingBottom: 4,
+      ...shared.sheetHandle,
     },
     handleIndicator: {
-      width: 46,
-      height: 4,
-      borderRadius: 999,
-      backgroundColor: colors.border,
+      ...shared.sheetHandleIndicator,
     },
     content: {
-      paddingHorizontal: isCompactPhone ? 14 : 16,
-      paddingTop: isCompactPhone ? 6 : 8,
-      paddingBottom: isCompactPhone ? 14 : 10,
-      gap: isCompactPhone ? 12 : 14,
+      ...shared.sheetContentPadding,
     },
     scroll: {
-      flex: 1,
+      ...shared.sheetScroll,
     },
     header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: isCompactPhone ? 10 : 12,
+      ...shared.headerRow,
+      justifyContent: 'flex-start',
     },
     headerIconWrap: {
-      width: isCompactPhone ? 40 : 44,
-      height: isCompactPhone ? 40 : 44,
-      borderRadius: isCompactPhone ? 20 : 22,
+      ...shared.headerIconWrap,
       backgroundColor: colors.accent,
-      alignItems: 'center',
-      justifyContent: 'center',
     },
     headerText: {
       flex: 1,
       minWidth: 0,
     },
     title: {
-      fontSize: isCompactPhone ? 17 : 18,
-      fontWeight: '700',
-      color: colors.text,
+      ...shared.headerTitle,
     },
     subtitle: {
+      ...shared.headerSubtitle,
       marginTop: 2,
-      fontSize: isCompactPhone ? 11 : 12,
-      color: colors.muted,
     },
     closeButton: {
-      margin: 0,
-      width: isCompactPhone ? 36 : 38,
-      height: isCompactPhone ? 36 : 38,
-      borderRadius: isCompactPhone ? 18 : 19,
+      ...shared.closeButton,
     },
     list: {
       gap: 0,
     },
     row: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      minHeight: isCompactPhone ? 60 : 68,
-      paddingHorizontal: isCompactPhone ? 10 : 12,
-      paddingVertical: isCompactPhone ? 9 : 11,
-      gap: isCompactPhone ? 10 : 12,
+      ...shared.row,
     },
     rowPressed: {
-      opacity: 0.9,
+      ...shared.rowPressed,
     },
     iconWrap: {
-      width: isCompactPhone ? 40 : 44,
-      height: isCompactPhone ? 40 : 44,
-      borderRadius: isCompactPhone ? 20 : 22,
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexShrink: 0,
+      ...shared.iconCircle,
     },
     textBlock: {
       flex: 1,
       minWidth: 0,
     },
     rowTitle: {
-      fontSize: isCompactPhone ? 14 : 15,
-      fontWeight: '700',
-      color: colors.text,
+      ...shared.rowTitle,
     },
     rowSubtitle: {
-      marginTop: 2,
-      fontSize: isCompactPhone ? 11 : 12,
-      lineHeight: isCompactPhone ? 15 : 16,
-      color: colors.muted,
+      ...shared.rowSubtitle,
     },
     rowTrailing: {
-      marginLeft: isCompactPhone ? 4 : 6,
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexShrink: 0,
+      ...shared.rowTrailing,
     },
     divider: {
       marginLeft: isCompactPhone ? 60 : 68,
-      backgroundColor: colors.border,
-      height: StyleSheet.hairlineWidth,
+      ...shared.divider,
     },
     helperRow: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: 8,
       paddingLeft: isCompactPhone ? 60 : 68,
       paddingRight: isCompactPhone ? 10 : 12,
-      paddingTop: isCompactPhone ? 6 : 8,
-      paddingBottom: 4,
+      ...shared.helperRow,
     },
     helperText: {
-      flex: 1,
-      fontSize: isCompactPhone ? 11 : 12,
-      lineHeight: isCompactPhone ? 15 : 16,
-      color: colors.muted,
-      opacity: 0.9,
+      ...shared.helperText,
     },
     confirmBackdrop: {
-      flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.55)',
-      justifyContent: 'center',
-      padding: isCompactPhone ? 16 : 24,
+      ...shared.modalBackdrop,
     },
     confirmCard: {
-      borderRadius: 20,
-      backgroundColor: colors.card,
-      borderWidth: 1,
-      borderColor: colors.border,
-      padding: isCompactPhone ? 16 : 18,
-      gap: isCompactPhone ? 10 : 12,
+      ...shared.modalCard,
     },
     confirmIconWrap: {
-      width: isCompactPhone ? 40 : 44,
-      height: isCompactPhone ? 40 : 44,
-      borderRadius: isCompactPhone ? 20 : 22,
-      alignItems: 'center',
-      justifyContent: 'center',
+      ...shared.modalIconWrap,
       backgroundColor: withAlpha('#ef4444', '16'),
     },
     confirmTitle: {
-      fontSize: isCompactPhone ? 16 : 17,
-      fontWeight: '700',
-      color: colors.text,
+      ...shared.modalTitle,
     },
     confirmText: {
-      fontSize: isCompactPhone ? 12 : 13,
-      lineHeight: isCompactPhone ? 17 : 18,
-      color: colors.muted,
+      ...shared.modalText,
     },
     confirmActions: {
-      flexDirection: isCompactPhone ? 'column' : 'row',
-      gap: 10,
-      justifyContent: 'flex-end',
-      marginTop: 4,
+      ...shared.modalActions,
     },
     confirmButton: {
-      width: isCompactPhone ? '100%' : 96,
+      ...shared.modalButton,
     },
     confirmButtonContent: {
-      height: 44,
+      ...shared.modalButtonContent,
     },
     footer: {
-      paddingHorizontal: isCompactPhone ? 14 : 16,
-      paddingTop: 8,
-      paddingBottom: bottomInset + (isCompactPhone ? 16 : 12),
+      ...shared.footer,
     },
     doneButton: {
       borderRadius: 14,

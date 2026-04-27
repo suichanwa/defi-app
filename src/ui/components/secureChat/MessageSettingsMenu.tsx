@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@theme/ThemeProvider';
+import { createSecureChatStyles } from '@styles/SecureChat';
 
 type MessageSettingsMenuProps = {
   canManage: boolean;
@@ -23,7 +24,8 @@ export default function MessageSettingsMenu({
   onDelete,
 }: MessageSettingsMenuProps) {
   const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const shared = useMemo(() => createSecureChatStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colors, shared), [colors, shared]);
   const deleteColor = '#ef4444';
   const [visible, setVisible] = useState(false);
 
@@ -78,7 +80,7 @@ export default function MessageSettingsMenu({
   );
 }
 
-const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
+const createStyles = (colors: ReturnType<typeof useTheme>['colors'], shared: ReturnType<typeof createSecureChatStyles>) =>
   StyleSheet.create({
     iconButton: {
       paddingHorizontal: 4,
@@ -87,36 +89,16 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       justifyContent: 'center',
     },
     backdrop: {
-      flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.45)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 20,
+      ...shared.overlay,
     },
     card: {
-      width: '80%',
-      borderRadius: 16,
-      backgroundColor: colors.card,
-      borderWidth: 1,
-      borderColor: colors.border,
-      paddingVertical: 8,
-      shadowColor: '#000000',
-      shadowOpacity: 0.12,
-      shadowRadius: 16,
-      shadowOffset: { width: 0, height: 6 },
-      elevation: 6,
+      ...shared.menuCard,
     },
     menuItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 10,
-      paddingHorizontal: 14,
+      ...shared.menuItem,
     },
     menuText: {
-      marginLeft: 10,
-      fontSize: 14,
-      fontWeight: '600',
-      color: colors.text,
+      ...shared.menuItemText,
     },
     deleteText: {
       color: '#ef4444',

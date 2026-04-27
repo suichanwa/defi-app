@@ -8,6 +8,7 @@ import { useTheme } from '@theme/ThemeProvider';
 import GlobalChatAvatar from './GlobalChatAvatar';
 import ChatAvatar from './ChatAvatar';
 import { getPrivateChatPresenceIndicator } from '@utils/secureChatUtils';
+import { createSecureChatStyles } from '@styles/SecureChat';
 
 type Props = {
   chats: ChatThread[];
@@ -25,7 +26,8 @@ export default function ChatListScreen({
   onOpenSelected,
 }: Props) {
   const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const shared = useMemo(() => createSecureChatStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colors, shared), [colors, shared]);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
   
@@ -94,8 +96,8 @@ export default function ChatListScreen({
     >
       <View style={styles.headerRow}>
         <View>
-          <Text style={styles.title}>Chats</Text>
-          <Text style={styles.subtitle}>Borrowed from secureChat flow</Text>
+          <Text style={shared.pageTitle}>Chats</Text>
+          <Text style={shared.pageSubtitle}>Borrowed from secureChat flow</Text>
         </View>
       </View>
 
@@ -139,8 +141,8 @@ export default function ChatListScreen({
                 </View>
                 <View style={styles.chatStatus}>
                   {presence.showBadge ? (
-                    <View style={styles.chatBadge}>
-                      <Text style={styles.chatBadgeText}>{presence.badgeLabel}</Text>
+                    <View style={shared.badge}>
+                      <Text style={shared.badgeText}>{presence.badgeLabel}</Text>
                     </View>
                   ) : (
                     <PulseBadge size={9} color={presence.statusColor} />
@@ -159,7 +161,7 @@ export default function ChatListScreen({
   );
 }
 
-const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
+const createStyles = (colors: ReturnType<typeof useTheme>['colors'], shared: ReturnType<typeof createSecureChatStyles>) =>
   StyleSheet.create({
     container: {
       marginTop: 16,
@@ -171,26 +173,14 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       alignItems: 'center',
       justifyContent: 'space-between',
     },
-    title: {
-      fontSize: 24,
-      fontWeight: '700',
-      color: colors.text,
-    },
-    subtitle: {
-      marginTop: 4,
-      color: colors.muted,
-    },
     listContent: {
       paddingTop: 16,
       paddingBottom: 120,
     },
     chatCard: {
+      ...shared.surfaceCard,
       marginBottom: 12,
       padding: 12,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.card,
     },
     chatCardActive: {
       borderColor: colors.accent,
@@ -222,21 +212,6 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     chatStatus: {
       flexDirection: 'row',
       alignItems: 'center',
-    },
-    chatBadge: {
-      minWidth: 18,
-      height: 18,
-      paddingHorizontal: 4,
-      borderRadius: 9,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.accent,
-      marginRight: 6,
-    },
-    chatBadgeText: {
-      fontSize: 10,
-      fontWeight: '800',
-      color: '#ffffff',
     },
     chatStatusText: {
       marginLeft: 6,

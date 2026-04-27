@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@theme/ThemeProvider';
 import ChatAvatar from '@components/secureChat/ChatAvatar';
 import type { ChatAvatarSource } from '@app-types/securechat-types/secureChat';
+import { createSecureChatStyles } from '@styles/SecureChat';
 
 type ViewProfileCardProps = {
   name: string;
@@ -23,7 +24,8 @@ export default function ViewProfileCard({
   onCopyId,
 }: ViewProfileCardProps) {
   const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const shared = useMemo(() => createSecureChatStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colors, shared), [colors, shared]);
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(1)).current;
   const isAnimating = useRef(false);
@@ -39,12 +41,12 @@ export default function ViewProfileCard({
         <View style={[styles.statusDot, isOnline ? styles.statusOnline : styles.statusOffline]} />
       </View>
 
-      <Text style={styles.name}>{name}</Text>
-      <Text style={styles.statusText}>{isOnline ? 'Online' : 'Offline'}</Text>
+      <Text style={shared.cardTitle}>{name}</Text>
+      <Text style={shared.smallText}>{isOnline ? 'Online' : 'Offline'}</Text>
 
       {userId && (
         <TouchableOpacity style={styles.idRow} onPress={onCopyId} activeOpacity={0.7}>
-          <Text style={styles.idLabel}>User ID</Text>
+          <Text style={shared.labelText}>User ID</Text>
           <View style={styles.idValueRow}>
             <Text style={styles.idValue} numberOfLines={1} ellipsizeMode="middle">
               {userId}
@@ -57,27 +59,22 @@ export default function ViewProfileCard({
       <View style={styles.actionsRow}>
         <TouchableOpacity style={[styles.actionButton, styles.actionSecondary]} activeOpacity={0.8}>
           <MaterialCommunityIcons name="account-plus-outline" size={20} color={colors.text} />
-          <Text style={[styles.actionText, styles.actionTextSecondary]}>Add Friend</Text>
+          <Text style={[shared.buttonSecondaryText, styles.actionTextSecondary]}>Add Friend</Text>
         </TouchableOpacity>
       </View>
     </Animated.View>
   );
 }
 
-const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
+const createStyles = (
+  colors: ReturnType<typeof useTheme>['colors'],
+  shared: ReturnType<typeof createSecureChatStyles>,
+) =>
   StyleSheet.create({
     card: {
-      backgroundColor: colors.card,
-      borderRadius: 20,
+      ...shared.surfaceRaised,
       padding: 24,
       alignItems: 'center',
-      borderWidth: 1,
-      borderColor: colors.border,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 12,
-      elevation: 8,
       minWidth: 280,
       maxWidth: 320,
     },
@@ -113,17 +110,6 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     },
     statusOffline: {
       backgroundColor: '#9ca3af',
-    },
-    name: {
-      fontSize: 20,
-      fontWeight: '700',
-      color: colors.text,
-      marginBottom: 4,
-    },
-    statusText: {
-      fontSize: 13,
-      color: colors.muted,
-      marginBottom: 16,
     },
     idRow: {
       width: '100%',
@@ -171,11 +157,6 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     },
     actionSecondary: {
       backgroundColor: colors.border,
-    },
-    actionText: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: colors.accentText,
     },
     actionTextSecondary: {
       color: colors.text,
