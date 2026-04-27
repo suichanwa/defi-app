@@ -23,6 +23,7 @@ export const createNotifyIncomingMessage = ({
   getChatById,
   showToast,
   notifyNative,
+  showInAppNotification = false,
 }: {
   effectiveUserId: string;
   displayLabel: string;
@@ -33,6 +34,7 @@ export const createNotifyIncomingMessage = ({
   getChatById: HandleMessageTypes.GetChatById;
   showToast: HandleMessageTypes.ToastFn;
   notifyNative?: HandleMessageTypes.NotifyNativeFn;
+  showInAppNotification?: boolean;
 }) => (chatId: string, message: ChatMessage) => {
   if (message.type === 'system') return;
   if (message.outgoing === true) return;
@@ -43,13 +45,15 @@ export const createNotifyIncomingMessage = ({
   if (secureTab === 'chats' && chatView === 'thread' && selectedChatId === chatId) return;
 
   const chatName = getChatById(chatId)?.name ?? message.author ?? 'New message';
-  showToast({
-    type: 'default',
-    text1: chatName,
-    text2: message.content,
-    position: 'top',
-    visibilityTime: 3500,
-  });
+  if (showInAppNotification) {
+    showToast({
+      type: 'default',
+      text1: chatName,
+      text2: message.content,
+      position: 'top',
+      visibilityTime: 3500,
+    });
+  }
   if (notifyNative) {
     void notifyNative({ chatId, chatName, message });
   }

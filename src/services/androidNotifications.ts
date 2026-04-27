@@ -10,7 +10,13 @@ type SecureChatNotificationPayload = {
 
 type AndroidNotificationsModule = {
   ensureChannel: () => Promise<void>;
-  notifyChatMessage: (payload: SecureChatNotificationPayload) => Promise<boolean>;
+  notifyChatMessage: (
+    chatId: string,
+    chatName: string,
+    author: string,
+    message: string,
+    messageType: SecureChatNotificationPayload['messageType'],
+  ) => Promise<boolean>;
 };
 
 const moduleName = 'SecureChatNotifications';
@@ -51,5 +57,16 @@ export async function notifyAndroidSecureChatMessage(payload: SecureChatNotifica
     if (!granted) return false;
   }
 
-  return module.notifyChatMessage(payload);
+  try {
+    return await module.notifyChatMessage(
+      payload.chatId,
+      payload.chatName,
+      payload.author,
+      payload.message,
+      payload.messageType ?? 'text',
+    );
+  } catch (error) {
+    console.warn('Failed to show Android secure chat notification.', error);
+    return false;
+  }
 }

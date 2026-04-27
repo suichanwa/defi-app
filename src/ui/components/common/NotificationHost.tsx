@@ -8,6 +8,7 @@ type NotificationHostProps = {
   scope?: string;
   animation?: 'slide' | 'fade' | 'scale';
   offset?: number;
+  enabled?: boolean;
 };
 
 type NotificationItemProps = {
@@ -114,6 +115,7 @@ export default function NotificationHost({
   scope,
   animation = 'slide',
   offset = 12,
+  enabled = true,
 }: NotificationHostProps) {
   const { notifications, dismiss } = useNotifications();
   const { colors } = useTheme();
@@ -125,6 +127,8 @@ export default function NotificationHost({
       return item.scope === scope;
     });
   }, [notifications, scope]);
+
+  if (!enabled) return null;
 
   return (
     <View pointerEvents="box-none" style={[localStyles.host, { top: insets.top + offset }]}>

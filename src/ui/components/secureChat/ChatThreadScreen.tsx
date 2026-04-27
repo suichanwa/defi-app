@@ -51,7 +51,8 @@ type Props = {
 };
 
 const AVATAR_PALETTE = ['#2563eb', '#0ea5e9', '#14b8a6', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7'];
-const MIN_TEXT_BUBBLE_WIDTH = 132;
+const COMPACT_TEXT_BUBBLE_MIN_WIDTH = 88;
+const COMPACT_TEXT_BUBBLE_MAX_WIDTH = 122;
 
 const withAlpha = (hex: string, alphaHex: string) => {
   if (!hex.startsWith('#')) return hex;
@@ -183,6 +184,16 @@ export default function ChatThreadScreen({
       return new Date(message.metadata.createdAtMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
     return '';
+  }, []);
+
+  const getCompactBubbleWidth = useCallback((text: string) => {
+    const normalized = text.trim().replace(/\s+/g, ' ');
+    if (!normalized || normalized.includes('\n') || normalized.length > 18) return undefined;
+    const estimatedTextWidth = normalized.length * 8.2 + 30;
+    return Math.min(
+      COMPACT_TEXT_BUBBLE_MAX_WIDTH,
+      Math.max(COMPACT_TEXT_BUBBLE_MIN_WIDTH, Math.ceil(estimatedTextWidth)),
+    );
   }, []);
 
   // Handle send
@@ -368,6 +379,7 @@ export default function ChatThreadScreen({
       const avatarColor = getAvatarColor(authorLabel);
       const initials = getInitials(authorLabel);
       const shouldShowAuthor = !isOwn && showName && !isDirectChat;
+      const compactBubbleWidth = getCompactBubbleWidth(message.text);
 
       return (
         <View style={[styles.messageShell, isOwn ? styles.messageShellOutgoing : styles.messageShellIncoming]}>
@@ -379,7 +391,13 @@ export default function ChatThreadScreen({
               <Text style={styles.authorLabel}>{authorLabel}</Text>
             </View>
           ) : null}
-          <View style={[styles.messageSurface, isOwn ? styles.messageSurfaceOutgoing : styles.messageSurfaceIncoming]}>
+          <View
+            style={[
+              styles.messageSurface,
+              isOwn ? styles.messageSurfaceOutgoing : styles.messageSurfaceIncoming,
+              compactBubbleWidth ? { minWidth: compactBubbleWidth } : null,
+            ]}
+          >
             <Text style={[styles.messageText, isOwn ? styles.messageTextOutgoing : styles.messageTextIncoming]}>
               {message.text}
             </Text>
@@ -395,7 +413,7 @@ export default function ChatThreadScreen({
         </View>
       );
     },
-    [flyerUser.id, getAvatarColor, getInitials, getTimeLabel, isDirectChat, styles]
+    [flyerUser.id, getAvatarColor, getCompactBubbleWidth, getInitials, getTimeLabel, isDirectChat, styles]
   );
 
   const renderImageMessage = useCallback(
@@ -669,7 +687,7 @@ const createChatStyles = (colors: {
     },
     messageItem: {
       paddingHorizontal: 4,
-      paddingVertical: 2,
+      paddingVertical: 1,
       backgroundColor: 'transparent',
       borderRadius: 0,
     },
@@ -683,7 +701,7 @@ const createChatStyles = (colors: {
       paddingTop: 1,
     },
     messageItemUngrouped: {
-      paddingTop: 6,
+      paddingTop: 3,
     },
     messageBody: {
       gap: 4,
@@ -691,8 +709,7 @@ const createChatStyles = (colors: {
     },
     messageShell: {
       maxWidth: '86%',
-      gap: 4,
-      minWidth: MIN_TEXT_BUBBLE_WIDTH,
+      gap: 3,
     },
     messageShellIncoming: {
       alignSelf: 'flex-start',
@@ -702,12 +719,11 @@ const createChatStyles = (colors: {
     },
     messageSurface: {
       backgroundColor: 'transparent',
-      minWidth: MIN_TEXT_BUBBLE_WIDTH,
     },
     messageSurfaceIncoming: {
       alignSelf: 'flex-start',
-      paddingHorizontal: 14,
-      paddingVertical: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
       borderRadius: 18,
       borderTopLeftRadius: 8,
       backgroundColor: colors.card,
@@ -721,8 +737,8 @@ const createChatStyles = (colors: {
     },
     messageSurfaceOutgoing: {
       alignSelf: 'flex-end',
-      paddingHorizontal: 14,
-      paddingVertical: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
       borderRadius: 18,
       borderTopRightRadius: 8,
       backgroundColor: withAlpha(colors.accent, '18'),
@@ -760,7 +776,6 @@ const createChatStyles = (colors: {
     messageText: {
       fontSize: 15,
       lineHeight: 20,
-      flexShrink: 1,
     },
     messageTextIncoming: {
       color: colors.text,
@@ -771,8 +786,8 @@ const createChatStyles = (colors: {
     timeText: {
       fontSize: 11,
       letterSpacing: 0.4,
-      marginTop: 2,
-      minWidth: 58,
+      lineHeight: 14,
+      marginTop: 1,
     },
     timeTextIncoming: {
       color: colors.muted,

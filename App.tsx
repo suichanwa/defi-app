@@ -24,6 +24,8 @@ import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { MD3DarkTheme, MD3LightTheme, PaperProvider } from 'react-native-paper';
 import 'react-native-get-random-values';
 
+const ENABLE_IN_APP_CHAT_NOTIFICATIONS = false;
+
 Sentry.init({
   dsn: 'https://005462e44419a10cf92b86000ff8c484@o4510659003940864.ingest.de.sentry.io/4510659569778768',
 
@@ -218,7 +220,13 @@ function AppContent({ activeTab, onTabChange }: { activeTab: TabName; onTabChang
             )}
 
             {activeTab === 'wallet' && <NotificationHost scope="wallet" animation="slide" />}
-            {activeTab === 'secureChat' && <NotificationHost scope="chat" animation="slide" />}
+            {activeTab === 'secureChat' && (
+              <NotificationHost
+                scope="chat"
+                animation="slide"
+                enabled={ENABLE_IN_APP_CHAT_NOTIFICATIONS}
+              />
+            )}
 
             <ToastManager
               config={toastConfig}

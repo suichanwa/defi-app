@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  AppState,
   BackHandler,
   Keyboard,
   Platform,
@@ -119,7 +118,6 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     (chatId: string, message: ChatMessage) => notifyIncomingRef.current(chatId, message),
     [],
   );
-  const appStateRef = useRef(AppState.currentState);
   const sendingImageUriRef = useRef<string | null>(null);
   const sendingFileUriRef = useRef<string | null>(null);
   const typingTimersRef = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({});
@@ -271,15 +269,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     [chats, dmChannels],
   );
 
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextState) => {
-      appStateRef.current = nextState;
-    });
-    return () => subscription.remove();
-  }, []);
-
   const notifyNative = useCallback(async (payload: { chatId: string; chatName: string; message: ChatMessage }) => {
-    if (appStateRef.current === 'active') return;
     await notifyAndroidSecureChatMessage({
       chatId: payload.chatId,
       chatName: payload.chatName,
@@ -323,6 +313,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
         getChatById,
         showToast: scopedShowToast,
         notifyNative,
+        showInAppNotification: false,
       }),
     [chatView, displayLabel, effectiveUserId, getChatById, mutedChatIds, notifyNative, scopedShowToast, secureTab, selectedChatId],
   );
