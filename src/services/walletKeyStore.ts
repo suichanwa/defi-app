@@ -96,6 +96,15 @@ export async function loadEncryptedWalletKeyById(
   return records.find((r: EncryptedWalletKey) => r.id === walletId) ?? null;
 }
 
+export async function loadWalletRecordById(walletId: string): Promise<EncryptedWalletKey | null> {
+  const activeType = await getActiveWalletType();
+  const preferred = await loadEncryptedWalletKeyById(walletId, activeType);
+  if (preferred) return preferred;
+
+  const fallbackType: WalletKind = activeType === 'ethereum' ? 'solana' : 'ethereum';
+  return loadEncryptedWalletKeyById(walletId, fallbackType);
+}
+
 export async function loadEncryptedWalletKey(
   walletType?: WalletKind,
 ): Promise<EncryptedWalletKey | null> {

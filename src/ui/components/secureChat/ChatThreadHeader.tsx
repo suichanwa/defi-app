@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { DEFAULT_GLOBAL_CHAT_ID, DEFAULT_GLOBAL_CHAT_PEER } from '@constants/secureChat.constants';
 import { useTheme } from '@theme/ThemeProvider';
 import ChatAvatar from '@components/secureChat/ChatAvatar';
+import GlobalChatAvatar from '@components/secureChat/GlobalChatAvatar';
 import PrivateChatSettingsMenu from '@components/secureChat/PrivateChatSettingsMenu';
 import type { ChatAvatarSource, ChatThread } from '@app-types/securechat-types/secureChat';
 
@@ -32,8 +34,21 @@ export default function ChatThreadHeader({
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [settingsVisible, setSettingsVisible] = useState(false);
-  const isGlobalChat = !chat.isDM;
+  const isGlobalChat = chat.id === DEFAULT_GLOBAL_CHAT_ID || chat.peerAddress === DEFAULT_GLOBAL_CHAT_PEER;
   const subtitle = isGlobalChat ? `${participantCount} participants` : '';
+  const avatarNode = isGlobalChat ? (
+    <GlobalChatAvatar size={34} />
+  ) : avatarSource && onAvatarPress ? (
+    <TouchableOpacity
+      onPress={onAvatarPress}
+      style={styles.avatarButton}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${chat.name} profile`}
+      hitSlop={8}
+    >
+      <ChatAvatar source={avatarSource} variant="incoming" size={34} />
+    </TouchableOpacity>
+  ) : null;
 
   return (
     <View>
@@ -42,17 +57,7 @@ export default function ChatThreadHeader({
           <MaterialCommunityIcons name="arrow-left" size={18} color={colors.text} />
         </TouchableOpacity>
 
-        {avatarSource && onAvatarPress ? (
-          <TouchableOpacity
-            onPress={onAvatarPress}
-            style={styles.avatarButton}
-            accessibilityRole="button"
-            accessibilityLabel={`Open ${chat.name} profile`}
-            hitSlop={8}
-          >
-            <ChatAvatar source={avatarSource} variant="incoming" size={34} />
-          </TouchableOpacity>
-        ) : null}
+        {avatarNode}
 
         <View style={styles.titleBlock}>
           <Text style={styles.title} numberOfLines={1}>
@@ -73,16 +78,16 @@ export default function ChatThreadHeader({
 
       <View style={styles.divider} />
 
-        <PrivateChatSettingsMenu
-          visible={settingsVisible}
-          chatName={chat.name}
-          canDeleteChat={chat.isDM === true}
-          isMuted={isMuted}
-          onToggleMute={onToggleMute}
-          onViewProfile={onViewProfile}
-          onDeleteChat={onDeleteChat}
-          onClose={() => setSettingsVisible(false)}
-        />
+      <PrivateChatSettingsMenu
+        visible={settingsVisible}
+        chatName={chat.name}
+        canDeleteChat={chat.isDM === true}
+        isMuted={isMuted}
+        onToggleMute={onToggleMute}
+        onViewProfile={onViewProfile}
+        onDeleteChat={onDeleteChat}
+        onClose={() => setSettingsVisible(false)}
+      />
     </View>
   );
 }

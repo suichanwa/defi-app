@@ -73,9 +73,14 @@ export default function PrivateChatSettingsMenu({
   onDeleteChat,
   onClose,
 }: PrivateChatSettingsMenuProps) {
-  const { colors } = useTheme();
+  const { colors, resolved } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, insets.bottom), [colors, insets.bottom]);
+  const isDarkTheme = resolved === 'dark';
+  const surfaceIconColor = isDarkTheme ? '#f8fafc' : colors.accentText;
+  const accentSurface = isDarkTheme ? withAlpha(colors.accent, '1A') : withAlpha(colors.accent, '22');
+  const greenSurface = isDarkTheme ? withAlpha('#22c55e', '1A') : withAlpha('#22c55e', '18');
+  const destructiveSurface = isDarkTheme ? withAlpha('#ef4444', '20') : withAlpha('#ef4444', '1A');
   const sheetRef = useRef<React.ElementRef<typeof BottomSheetModal>>(null);
   const closingFromPropRef = useRef(false);
   const [localMuted, setLocalMuted] = useState(false);
@@ -153,7 +158,7 @@ export default function PrivateChatSettingsMenu({
         <BottomSheetScrollView style={styles.scroll} contentContainerStyle={styles.content}>
           <View style={styles.header}>
             <View style={styles.headerIconWrap}>
-              <MaterialCommunityIcons name="cog-outline" size={24} color={colors.accentText} />
+              <MaterialCommunityIcons name="cog-outline" size={24} color={surfaceIconColor} />
             </View>
 
             <View style={styles.headerText}>
@@ -177,10 +182,10 @@ export default function PrivateChatSettingsMenu({
           <View style={styles.list}>
             {onViewProfile ? (
               <>
-                <SettingsMenuRow
+              <SettingsMenuRow
                   icon="account-circle-outline"
-                  iconBackground={withAlpha(colors.accent, '22')}
-                  iconColor={colors.accentText}
+                  iconBackground={accentSurface}
+                  iconColor={surfaceIconColor}
                   title="View profile"
                   description="Open name and avatar on full screen."
                   onPress={handleViewProfile}
@@ -193,8 +198,8 @@ export default function PrivateChatSettingsMenu({
 
             <SettingsMenuRow
               icon="bell-off-outline"
-              iconBackground={muted ? withAlpha('#22c55e', '18') : withAlpha(colors.accent, '16')}
-              iconColor={muted ? '#16a34a' : colors.accentText}
+              iconBackground={muted ? greenSurface : accentSurface}
+              iconColor={muted ? '#4ade80' : surfaceIconColor}
               title={muted ? 'Unmute notifications' : 'Mute notifications'}
               description="Silence this chat without leaving the thread."
               onPress={toggleMute}
@@ -220,8 +225,8 @@ export default function PrivateChatSettingsMenu({
                 <Divider style={styles.divider} />
                 <SettingsMenuRow
                   icon="trash-can-outline"
-                  iconBackground={withAlpha('#ef4444', '1A')}
-                  iconColor="#ef4444"
+                  iconBackground={destructiveSurface}
+                  iconColor={isDarkTheme ? '#fecaca' : '#ef4444'}
                   title="Delete chat"
                   description="Remove this conversation from this device."
                   onPress={() => setDeleteConfirmVisible(true)}
@@ -255,7 +260,11 @@ export default function PrivateChatSettingsMenu({
         <Pressable style={styles.confirmBackdrop} onPress={() => setDeleteConfirmVisible(false)}>
           <Pressable style={styles.confirmCard} onPress={(event) => event.stopPropagation()}>
             <View style={styles.confirmIconWrap}>
-              <MaterialCommunityIcons name="alert-circle-outline" size={22} color="#ef4444" />
+              <MaterialCommunityIcons
+                name="alert-circle-outline"
+                size={22}
+                color={isDarkTheme ? '#fecaca' : '#ef4444'}
+              />
             </View>
             <Text style={styles.confirmTitle}>Delete chat?</Text>
             <Text style={styles.confirmText}>

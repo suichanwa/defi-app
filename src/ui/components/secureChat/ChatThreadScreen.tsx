@@ -112,6 +112,7 @@ export default function ChatThreadScreen({
 }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createChatStyles(colors), [colors]);
+  const statusIconSize = 12;
 
   const [selectedProfile, setSelectedProfile] = useState<SelectedProfile>(null);
   const [selectedMessage, setSelectedMessage] = useState<ChatMessage | null>(null);
@@ -368,12 +369,30 @@ export default function ChatThreadScreen({
         attachmentButtonIcon: () => (
           <MaterialCommunityIcons name="image-outline" size={20} color={colors.text} />
         ),
-        deliveredIcon: () => <MaterialCommunityIcons name="check" size={18} color={colors.accent} />,
-        seenIcon: () => <MaterialCommunityIcons name="check-all" size={18} color={colors.accent} />,
+        deliveredIcon: () => (
+          <View style={styles.statusIconWrap}>
+            <MaterialCommunityIcons
+              name="check"
+              size={statusIconSize}
+              color={colors.accent}
+              style={styles.statusIconGlyph}
+            />
+          </View>
+        ),
+        seenIcon: () => (
+          <View style={styles.statusIconWrap}>
+            <MaterialCommunityIcons
+              name="check-all"
+              size={statusIconSize}
+              color={colors.accent}
+              style={styles.statusIconGlyph}
+            />
+          </View>
+        ),
         sendButtonIcon: () => <MaterialCommunityIcons name="send" size={20} color={colors.text} />,
       },
     }),
-    [colors]
+    [colors, statusIconSize, styles.statusIconGlyph, styles.statusIconWrap]
   );
 
   const renderBubble = useCallback(
@@ -987,6 +1006,18 @@ const createChatStyles = (colors: {
       fontSize: 12,
       color: colors.muted,
       fontWeight: '500',
+    },
+    statusIconWrap: {
+      width: 16,
+      height: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    statusIconGlyph: {
+      textAlign: 'center',
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+      marginTop: Platform.OS === 'android' ? -1 : 0,
     },
     actionOverlay: {
       position: 'absolute',

@@ -1,15 +1,12 @@
 import type { ChatMessage, ChatThread } from '@app-types/securechat-types/secureChat';
 import type { DecodedMessageUnion, Dm } from '@xmtp/react-native-sdk';
 import { XMTP_DM_CHAT_ID_PREFIX } from './constants';
-import {
-  buildReplyAttachmentLabel,
-  buildReplyReferenceFromMessage,
-  hydrateSecureChatMessageContent,
-  parseSecureChatMessageContent,
-} from '@utils/secureChatMessageEnvelope';
+import { parseSecureChatMessageContent } from '@utils/secureChatMessageEnvelope';
 
 const shortPeerLabel = (value: string) =>
   value.length > 16 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value;
+
+const UNSUPPORTED_XMTP_CONTENT_PLACEHOLDER = '[Unsupported XMTP content]';
 
 const nsToDate = (sentNs: number): Date => {
   const millis = Math.floor(sentNs / 1_000_000);
@@ -42,33 +39,15 @@ export const mapXmtpMessageToChatMessage = (
   chatId: string,
   senderLabel: string,
   currentInboxId: string,
-): ChatMessage => {
+): ChatMessage | null => {
   const sentAt = nsToDate(message.sentNs);
   const outgoing = message.senderInboxId === currentInboxId;
   const rawContent = readMessageContent(message);
+  const normalizedRawContent = rawContent.trim();
+  if (!normalizedRawContent || normalizedRawContent === UNSUPPORTED_XMTP_CONTENT_PLACEHOLDER) {
+    return null;
+  }
   const parsed = parseSecureChatMessageContent(rawContent);
-  const replyTo =
-    parsed.replyTo ??
-    (outgoing
-      ? undefined
-      : {
-          messageId: message.id as string,
-          authorId: message.senderInboxId,
-          author: shortPeerLabel(message.senderInboxId),
-          content: parsed.text || rawContent,
-          attachment: buildReplyAttachmentLabel({
-            id: message.id as string,
-            chatId,
-            authorId: message.senderInboxId,
-            author: shortPeerLabel(message.senderInboxId),
-            content: parsed.text || rawContent,
-            timestamp: sentAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            createdAt: sentAt.toISOString(),
-            outgoing,
-            type: 'text',
-          }),
-          source: 'xmtp' as const,
-        });
   return {
     id: message.id as string,
     chatId,
@@ -79,7 +58,7 @@ export const mapXmtpMessageToChatMessage = (
     createdAt: sentAt.toISOString(),
     outgoing,
     type: 'text',
-    replyTo,
+    replyTo: parsed.replyTo,
   };
 };
 
@@ -96,9 +75,7 @@ export const mapXmtpDmToChatThread = async (
   const peerInboxId = await dm.peerInboxId();
   const label = preferredName?.trim() || shortPeerLabel(peerInboxId);
   const chatId = xmtpConversationIdToChatId(dm.id as string);
-  const lastMessage = dm.lastMessage
-    ? mapXmtpMessageToChatMessage(dm.lastMessage, chatId, displayLabel, currentInboxId)
-    : null;
+  const lastMessage = dm.lastMessage ? mapXmtpMessageToChatMessage(dm.lastMessage, chatId, displayLabel, currentInboxId) : null;
 
   return {
     id: chatId,

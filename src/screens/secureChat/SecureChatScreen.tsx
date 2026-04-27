@@ -805,6 +805,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
             connectionLog,
             devicePublicKey,
             serverInfo,
+            xmtpStatus,
             onConnectAddressChange: setConnectAddress,
             onConnectNameChange: setConnectName,
             onConnectPress: handleConnectPeer,

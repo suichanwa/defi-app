@@ -10,6 +10,7 @@ type Props = {
   connectionLog: string[];
   devicePublicKey: string;
   serverInfo: ServerInfo | null;
+  xmtpStatus: 'idle' | 'unsupported' | 'initializing' | 'ready' | 'error';
   onConnectAddressChange: (value: string) => void;
   onConnectNameChange: (value: string) => void;
   onConnectPress: () => void;
@@ -21,12 +22,43 @@ export default function ConnectScreen({
   connectName,
   connectionLog,
   devicePublicKey,
+  xmtpStatus,
   onConnectAddressChange,
   onConnectNameChange,
   onConnectPress,
 }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const connectCopy = useMemo(() => {
+    switch (xmtpStatus) {
+      case 'initializing':
+        return {
+          title: 'Switching to Ethereum wallet...',
+          description: 'XMTP is preparing the Ethereum wallet needed for direct messages.',
+          disabled: true,
+        };
+      case 'unsupported':
+        return {
+          title: 'XMTP unavailable in this build',
+          description: 'Use a native Android build with XMTP support and an unlocked Ethereum wallet.',
+          disabled: true,
+        };
+      case 'error':
+      case 'idle':
+        return {
+          title: 'Unlock Ethereum wallet to open XMTP DM',
+          description: 'XMTP starts once your Ethereum wallet is unlocked and ready.',
+          disabled: true,
+        };
+      case 'ready':
+      default:
+        return {
+          title: 'Open XMTP DM',
+          description: 'Start a private chat using a peer Ethereum or Solana address.',
+          disabled: false,
+        };
+    }
+  }, [xmtpStatus]);
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -52,10 +84,26 @@ export default function ConnectScreen({
           value={connectName}
           onChangeText={onConnectNameChange}
         />
-        <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={onConnectPress} activeOpacity={0.9}>
-          <MaterialCommunityIcons name="send" size={18} color={colors.accentText} />
-          <Text style={styles.primaryButtonText}>Open XMTP DM</Text>
+        <TouchableOpacity
+          style={[
+            styles.button,
+            styles.primaryButton,
+            connectCopy.disabled ? styles.disabledButton : null,
+          ]}
+          onPress={connectCopy.disabled ? undefined : onConnectPress}
+          disabled={connectCopy.disabled}
+          activeOpacity={0.9}
+        >
+          <MaterialCommunityIcons
+            name={connectCopy.disabled ? 'lock-outline' : 'send'}
+            size={18}
+            color={connectCopy.disabled ? colors.muted : colors.accentText}
+          />
+          <Text style={[styles.primaryButtonText, connectCopy.disabled ? styles.disabledButtonText : null]}>
+            {connectCopy.title}
+          </Text>
         </TouchableOpacity>
+        <Text style={styles.statusCopy}>{connectCopy.description}</Text>
       </View>
 
       <View style={styles.card}>
@@ -128,6 +176,7 @@ export default function ConnectScreen({
     justifyContent: 'center',
     borderRadius: 12,
     paddingVertical: 12,
+    paddingHorizontal: 16,
   },
   primaryButton: {
     backgroundColor: colors.accent,
@@ -137,11 +186,23 @@ export default function ConnectScreen({
   },
   primaryButtonText: {
     marginLeft: 8,
+    flexShrink: 1,
+    textAlign: 'center',
     fontWeight: '600',
     color: colors.accentText,
   },
   disabledButton: {
     backgroundColor: colors.border,
+    opacity: 0.9,
+  },
+  disabledButtonText: {
+    color: colors.muted,
+  },
+  statusCopy: {
+    marginTop: 10,
+    fontSize: 12,
+    lineHeight: 16,
+    color: colors.muted,
   },
   logList: {
     marginTop: 8,

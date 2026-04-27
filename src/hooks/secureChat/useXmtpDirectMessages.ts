@@ -241,11 +241,13 @@ export function useXmtpDirectMessages({
           .filter((message) => !isReadReceiptMessage(message))
           .map((message) => {
             const mappedMessage = mapXmtpMessageToChatMessage(message, chatId, displayLabel, client.inboxId);
+            if (!mappedMessage) return null;
             if (mappedMessage.outgoing && parseSentNs(message.sentNs) <= readReceiptNs) {
               return { ...mappedMessage, deliveryStatus: 'seen' as const };
             }
             return mappedMessage;
-          });
+          })
+          .filter((message): message is NonNullable<typeof message> => Boolean(message));
         setThreadMessages(
           chatId,
           isMessageHidden ? mapped.filter((message) => !isMessageHidden(chatId, message.id)) : mapped,
@@ -367,6 +369,7 @@ export function useXmtpDirectMessages({
       }
 
       const mapped = mapXmtpMessageToChatMessage(message, chatId, displayLabel, client.inboxId);
+      if (!mapped) return;
       if (isMessageHidden?.(chatId, mapped.id)) {
         return;
       }

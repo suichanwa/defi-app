@@ -9,6 +9,21 @@ export type ChangelogEntry = {
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    id: '0.23-2026-04-27',
+    version: '0.23',
+    date: '2026-04-27',
+    title: 'Secure chat delete, reply, and avatar polish',
+    summary: 'Added local chat deletion, message replies, and cleaner avatar rendering across private and global chat.',
+    changes: [
+      'Added local delete chat support for private XMTP conversations with confirmation.',
+      'Added local delete-for-me support for individual XMTP messages.',
+      'Added reply previews in the composer and quoted reply blocks in chat bubbles.',
+      'Fixed avatar rendering for private XMTP chats and global chat with stronger fallbacks.',
+      'Improved secure chat settings, message actions, and bottom sheet polish.',
+      'Added a release build wrapper for the production Android build flow.',
+    ],
+  },
+  {
     id: '0.22-2026-04-27',
     version: '0.22',
     date: '2026-04-27',

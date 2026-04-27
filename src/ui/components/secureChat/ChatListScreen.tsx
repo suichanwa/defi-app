@@ -5,6 +5,7 @@ import PulseBadge from '@components/PulseBadge';
 import type { ChatAvatarSource, ChatThread } from '@app-types/securechat-types/secureChat';
 import { DEFAULT_GLOBAL_CHAT_ID } from '@constants/secureChat.constants';
 import { useTheme } from '@theme/ThemeProvider';
+import GlobalChatAvatar from './GlobalChatAvatar';
 import ChatAvatar from './ChatAvatar';
 
 type Props = {
@@ -106,11 +107,15 @@ export default function ChatListScreen({ chats, selectedChatId, onSelectChat, on
               activeOpacity={0.85}
             >
               <View style={styles.chatRow}>
-                <ChatAvatar
-                  source={chat.avatarSource ?? deriveChatAvatarSource(chat)}
-                  variant="incoming"
-                  size={42}
-                />
+                {isPinned ? (
+                  <GlobalChatAvatar size={42} />
+                ) : (
+                  <ChatAvatar
+                    source={chat.avatarSource ?? deriveChatAvatarSource(chat)}
+                    variant="incoming"
+                    size={42}
+                  />
+                )}
                 <View style={styles.chatMeta}>
                   <View style={styles.chatNameRow}>
                     <Text style={styles.chatName}>{chat.name}</Text>

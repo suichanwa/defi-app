@@ -9,7 +9,7 @@ import {
   loadWalletRecords,
   getActiveWalletId,
   setActiveWalletId,
-  loadEncryptedWalletKeyById,
+  loadWalletRecordById,
   markBackupCompleted,
   clearWallet,
   createSolanaWalletRecord,
@@ -21,6 +21,7 @@ import {
   decryptWalletKey,
 } from '../services/walletKeyStore';
 import { getActiveChain } from '../config/chain';
+import { setActiveWalletType } from '../services/activeWalletType';
 import { clearBiometricPassword } from '../services/biometricAuth';
 
 type Status = 'loading' | 'missing' | 'locked' | 'unlocked';
@@ -101,8 +102,13 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
   }, []);
 
   const hydrateUnlockedWallet = useCallback(
-    async (record: { id: string; encryptedJson: string; backupCompleted?: boolean }, password: string) => {
-      if (getActiveChain().kind === 'solana') {
+    async (
+      record: { id: string; encryptedJson: string; backupCompleted?: boolean; walletType?: WalletKind },
+      password: string,
+    ) => {
+      const walletType = record.walletType ?? getActiveChain().kind;
+
+      if (walletType === 'solana') {
         const { keypair } = await unlockSolanaWallet(record.encryptedJson, password);
         setWallet(keypair);
         setAddress(keypair.publicKey.toBase58());
@@ -176,8 +182,9 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
       throw new Error('No wallet found');
     }
     setActiveWalletIdState(existing.id);
+    await setActiveWalletType(existing.walletType ?? getActiveChain().kind);
     lastPasswordRef.current = password;
-    if (getActiveChain().kind === 'solana') {
+    if ((existing.walletType ?? getActiveChain().kind) === 'solana') {
       const { keypair } = await unlockSolanaWallet(existing.encryptedJson, password);
       setWallet(keypair);
       setAddress(keypair.publicKey.toBase58());
@@ -245,6 +252,7 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
     
     if (getActiveChain().kind === 'solana') {
       const { record, keypair, mnemonic } = await createSolanaWalletRecord(password);
+      await setActiveWalletType(record.walletType ?? 'solana');
       setAddress(record.id);
       setBackupCompletedState(false);
       setWallet(keypair);
@@ -274,6 +282,7 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
       walletType: 'ethereum',
     };
     await saveEncryptedWalletKey(record);
+    await setActiveWalletType('ethereum');
     setAddress(record.id);
     setBackupCompletedState(false);
     setWallet(walletInstance);
@@ -298,6 +307,7 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
     const { password, options } = resolveWalletCreateArgs(passwordOrOptions);
     if (getActiveChain().kind === 'solana') {
       const { record, keypair } = await importSolanaWalletRecord(mnemonic.trim(), password);
+      await setActiveWalletType(record.walletType ?? 'solana');
       setAddress(record.id);
       setBackupCompletedState(false);
       setWallet(keypair);
@@ -327,6 +337,7 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
       walletType: 'ethereum',
     };
     await saveEncryptedWalletKey(record);
+    await setActiveWalletType('ethereum');
     setAddress(record.id);
     setBackupCompletedState(false);
     setWallet(walletInstance);
@@ -369,7 +380,7 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
       return;
     }
     if (walletId === activeWalletId && lastPasswordRef.current) {
-      const newActive = await loadEncryptedWalletKeyById(activeId);
+      const newActive = await loadWalletRecordById(activeId);
       if (newActive) {
         await hydrateUnlockedWallet(newActive, lastPasswordRef.current);
       }
@@ -380,7 +391,7 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
     await withTimeout(
       (async () => {
         if (status === 'unlocked') {
-          const record = await loadEncryptedWalletKeyById(walletId);
+          const record = await loadWalletRecordById(walletId);
           if (!record) {
             throw new Error('Wallet record not found.');
           }
@@ -388,6 +399,7 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
           if (lastPasswordRef.current) {
             try {
               await hydrateUnlockedWallet(record, lastPasswordRef.current);
+              await setActiveWalletType(record.walletType ?? getActiveChain().kind);
               await setActiveWalletId(walletId);
               setActiveWalletIdState(walletId);
               await refreshWallets();
@@ -399,6 +411,7 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
 
           await setActiveWalletId(walletId);
           setActiveWalletIdState(walletId);
+          await setActiveWalletType(record.walletType ?? getActiveChain().kind);
           clearLockTimer();
           setWallet(null);
           setAddress(null);
@@ -412,6 +425,10 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
 
         await setActiveWalletId(walletId);
         setActiveWalletIdState(walletId);
+        const record = await loadWalletRecordById(walletId);
+        if (record?.walletType) {
+          await setActiveWalletType(record.walletType);
+        }
         await refreshWallets();
       })(),
       WALLET_SWITCH_TIMEOUT_MS,
