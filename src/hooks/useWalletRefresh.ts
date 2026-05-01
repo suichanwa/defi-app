@@ -50,6 +50,8 @@ const buildDefaultTokens = (chain: ChainConfig): TokenBalance[] => [
     : []),
 ];
 
+const isLikelyEthereumAddress = (value: string) => /^0x[a-fA-F0-9]{40}$/.test(value);
+
 export default function useWalletRefresh(
   chain: ChainConfig,
   status: 'loading' | 'missing' | 'locked' | 'unlocked',
@@ -104,6 +106,14 @@ export default function useWalletRefresh(
 
   const loadOnChain = useCallback(async () => {
     if (status !== 'unlocked' || !address) return;
+    if (chain.kind === 'solana' && isLikelyEthereumAddress(address)) {
+      setRpcError('Switch to a Solana wallet for this chain, then relaunch the app.');
+      return;
+    }
+    if (chain.kind === 'ethereum' && !isLikelyEthereumAddress(address)) {
+      setRpcError('Switch to an Ethereum wallet for this chain, then relaunch the app.');
+      return;
+    }
     if (isChainFetchingRef.current) return;
     isChainFetchingRef.current = true;
     setFetchingChain(true);

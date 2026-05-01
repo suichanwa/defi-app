@@ -122,7 +122,7 @@ export default function ChatListScreen({
             >
               <View style={styles.chatRow}>
                 {isPinned ? (
-                  <GlobalChatAvatar size={42} />
+                  <GlobalChatAvatar size={42} showContainer={false} />
                 ) : (
                   <ChatAvatar
                     source={chat.avatarSource ?? deriveChatAvatarSource(chat)}

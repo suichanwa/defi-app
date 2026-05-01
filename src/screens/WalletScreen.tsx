@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Animated, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { createStackNavigator, StackNavigationProp } from '@react-navigation/stack';
 import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createWalletStyles } from '@styles/WalletStyles';
@@ -92,18 +92,8 @@ const promptChainChange = ({
   const nextChain = CHAINS[nextKey];
   const nextChainName = nextChain?.name ?? nextKey;
 
-  Alert.alert('Reload app required', `You have to reload the app before switching to ${nextChainName}.`, [
-    {
-      text: 'Stay on current chain',
-      style: 'cancel',
-    },
-    {
-      text: `Move to ${nextChainName}`,
-      onPress: () => {
-        setChainKey(nextKey);
-      },
-    },
-  ]);
+  setChainKey(nextKey);
+  Alert.alert('Relaunch required', `Switched to ${nextChainName}. You have to relaunch the app.`);
 };
 
 export function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<WalletStackParamList, 'WalletHome'> }) {
@@ -214,28 +204,6 @@ export function WalletHomeScreen({ navigation }: { navigation: StackNavigationPr
     React.useCallback(() => {
       setNavHidden(false);
     }, [setNavHidden]),
-  );
-
-  useFocusEffect(
-    React.useCallback(() => {
-      let cancelled = false;
-      loadProfileSettings()
-        .then((settings) => {
-          if (cancelled) return;
-          const enabled = settings.walletBiometricUnlockEnabled ?? true;
-          setBiometricUnlockEnabled(enabled);
-          if (!enabled) {
-            void clearBiometricPassword();
-          }
-        })
-        .catch(() => {
-          if (cancelled) return;
-          setBiometricUnlockEnabled(true);
-        });
-      return () => {
-        cancelled = true;
-      };
-    }, []),
   );
 
   const totalValueAnimated = useRef(new Animated.Value(0)).current;
@@ -456,6 +424,7 @@ export default function WalletScreen() {
   const [biometricsAvailable, setBiometricsAvailable] = useState(false);
   const [biometricUnlockEnabled, setBiometricUnlockEnabled] = useState(true);
   const [hasMasterPasscode, setHasMasterPasscode] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   const setupNetworkLabel = useMemo(
     () => (chain.kind === 'solana' ? getSolanaClusterLabel(chain.cluster) : 'Ethereum'),
@@ -878,8 +847,10 @@ export default function WalletScreen() {
   }, []);
 
   const executeStartFresh = async () => {
-    if (isSubmitting) return;
+    if (isResetting) return;
     resetInFlightRef.current = true;
+    biometricInFlightRef.current = false;
+    setIsResetting(true);
     setIsSubmitting(true);
     clearSlowMessage();
     resetFlowMessages();
@@ -904,14 +875,27 @@ export default function WalletScreen() {
       setShowErrorDialog(true);
     } finally {
       resetInFlightRef.current = false;
+      setIsResetting(false);
       setIsSubmitting(false);
     }
   };
 
   const handleStartFresh = () => {
+    const title = 'Delete local data?';
+    const message = 'This will remove all wallets and local account data from this device. This action cannot be undone.';
+
+    if (Platform.OS === 'web') {
+      const confirmFn = (globalThis as { confirm?: (text?: string) => boolean }).confirm;
+      const confirmed = confirmFn ? confirmFn(`${title}\n\n${message}`) : false;
+      if (confirmed) {
+        void executeStartFresh();
+      }
+      return;
+    }
+
     Alert.alert(
-      'Delete local data?',
-      'This will remove all wallets and local account data from this device. This action cannot be undone.',
+      title,
+      message,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Delete', style: 'destructive', onPress: () => void executeStartFresh() },
@@ -958,6 +942,7 @@ export default function WalletScreen() {
           onImport={handleImport}
           onUnlock={handleUnlock}
           onStartFresh={handleStartFresh}
+          startFreshDisabled={isResetting}
           showStartFresh={appFeatures.showStartFreshOnLockScreen}
           onConfirmBackup={handleConfirmBackup}
           onBackToMenu={() => {

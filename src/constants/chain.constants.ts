@@ -3,7 +3,9 @@ import type { ChainConfig, SolanaChain } from '@app-types/chain';
 
 export const defaultSolanaRpcByCluster: Record<SolanaChain['cluster'], string> = {
   devnet: 'https://api.devnet.solana.com',
-  'mainnet-beta': 'https://api.mainnet-beta.solana.com',
+  // `api.mainnet-beta.solana.com` can return 403 from some web clients/regions.
+  // Keep a public fallback endpoint that is friendlier for browser-based requests.
+  'mainnet-beta': 'https://solana-rpc.publicnode.com',
 };
 
 export const CHAINS: Record<string, ChainConfig> = {

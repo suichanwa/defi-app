@@ -7,37 +7,70 @@ export type AlchemySolanaNft = {
   imageUrl: string | null;
 };
 
-type AlchemySolanaResponse = {
-  nfts?: any[];
-  ownedNfts?: any[];
+type DasAsset = {
+  id?: string;
+  grouping?: Array<{ group_key?: string; group_value?: string }>;
+  content?: {
+    metadata?: {
+      name?: string;
+      symbol?: string;
+      collection?: { name?: string };
+    };
+    links?: { image?: string };
+    files?: Array<{ uri?: string; cdn_uri?: string }>;
+  };
 };
 
-type AlchemyEndpointResult = {
-  items: any[];
-  status: number;
+type DasResponse = {
+  error?: { code?: number; message?: string };
+  result?: {
+    items?: DasAsset[];
+  };
 };
 
-const getAlchemyBaseUrl = (cluster: 'devnet' | 'mainnet-beta') => {
-  const network = cluster === 'devnet' ? 'solana-devnet' : 'solana-mainnet';
-  return `https://${network}.g.alchemy.com/nft/v2/${ALCHEMY_API_KEY}`;
-};
+const TRANSIENT_DAS_ERROR_CODE = -32001;
+const DAS_RETRY_DELAYS_MS = [250, 600, 1200] as const;
+
+const getAlchemyNetwork = (cluster: 'devnet' | 'mainnet-beta') =>
+  cluster === 'devnet' ? 'solana-devnet' : 'solana-mainnet';
+
+const getAlchemyRpcUrl = (cluster: 'devnet' | 'mainnet-beta') =>
+  `https://${getAlchemyNetwork(cluster)}.g.alchemy.com/v2/${ALCHEMY_API_KEY}`;
 
 const normalizeText = (value: unknown, fallback: string) => {
   if (typeof value === 'string' && value.trim()) return value.trim();
   return fallback;
 };
 
-const extractImageUrl = (item: any): string | null => {
+const extractCollection = (asset: DasAsset): string => {
+  const groupedCollection = asset.grouping?.find((entry) => entry.group_key === 'collection')?.group_value;
+  return normalizeText(
+    asset.content?.metadata?.collection?.name ?? groupedCollection ?? asset.content?.metadata?.symbol,
+    'Collection',
+  );
+};
+
+const extractImageUrl = (asset: DasAsset): string | null => {
   return (
-    item?.image?.cachedUrl ||
-    item?.image?.originalUrl ||
-    item?.image?.pngUrl ||
-    item?.media?.[0]?.gateway ||
-    item?.media?.[0]?.raw ||
-    item?.metadata?.image ||
+    asset.content?.links?.image ??
+    asset.content?.files?.[0]?.cdn_uri ??
+    asset.content?.files?.[0]?.uri ??
     null
   );
 };
+
+const parseStatusMessage = async (response: Response): Promise<string> => {
+  try {
+    const payload = (await response.json()) as DasResponse;
+    const details = payload.error?.message;
+    if (details) return details;
+  } catch {
+    // Ignore body parsing errors and return generic status text.
+  }
+  return `status ${response.status}`;
+};
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function fetchAlchemySolanaNfts(
   owner: string,
@@ -46,33 +79,63 @@ export async function fetchAlchemySolanaNfts(
   if (!ALCHEMY_API_KEY) {
     throw new Error('Alchemy API key is missing.');
   }
-  const baseUrl = getAlchemyBaseUrl(cluster);
-  const requestEndpoint = async (endpoint: string): Promise<AlchemyEndpointResult> => {
-    const response = await fetch(endpoint);
+
+  let payload: DasResponse | null = null;
+  for (let attempt = 0; attempt <= DAS_RETRY_DELAYS_MS.length; attempt += 1) {
+    const response = await fetch(getAlchemyRpcUrl(cluster), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'getAssetsByOwner',
+        params: {
+          ownerAddress: owner,
+          page: 1,
+          // Slightly smaller page can reduce backend load failures for hot wallets.
+          limit: 50,
+        },
+      }),
+    });
+
     if (!response.ok) {
-      return { items: [], status: response.status };
+      if (response.status === 401 || response.status === 403) {
+        throw new Error('Alchemy NFT API access denied (403). Use a valid NFT-enabled ALCHEMY_API_KEY.');
+      }
+      const details = await parseStatusMessage(response);
+      throw new Error(`Alchemy Solana NFT request failed (${response.status}): ${details}`);
     }
-    const data = (await response.json()) as AlchemySolanaResponse;
-    return { items: data.nfts ?? data.ownedNfts ?? [], status: response.status };
-  };
 
-  const ownerQuery = encodeURIComponent(owner);
-  const preferred = await requestEndpoint(
-    `${baseUrl}/getNFTsForOwner?owner=${ownerQuery}&withMetadata=true`,
-  );
-  const fallback = preferred.items.length
-    ? preferred
-    : await requestEndpoint(`${baseUrl}/getNFTs?owner=${ownerQuery}&withMetadata=true`);
+    payload = (await response.json()) as DasResponse;
+    if (!payload.error) {
+      break;
+    }
 
-  if (!preferred.items.length && !fallback.items.length && fallback.status >= 400) {
-    throw new Error(`Alchemy NFT API failed with status ${fallback.status}.`);
+    if (
+      payload.error.code === TRANSIENT_DAS_ERROR_CODE &&
+      attempt < DAS_RETRY_DELAYS_MS.length
+    ) {
+      await wait(DAS_RETRY_DELAYS_MS[attempt]);
+      continue;
+    }
+
+    if (payload.error.code === TRANSIENT_DAS_ERROR_CODE) {
+      throw new Error('Alchemy NFT API is temporarily unavailable. Please try again in a moment.');
+    }
+
+    const message = payload.error.message ?? 'Unknown DAS API error.';
+    throw new Error(`Alchemy Solana NFT request failed: ${message}`);
   }
 
-  const items = preferred.items.length ? preferred.items : fallback.items;
-  return items.map((item, index) => ({
-    id: item?.id?.tokenId || item?.mint?.address || item?.mint || item?.id || `${index}`,
-    name: normalizeText(item?.name ?? item?.title ?? item?.metadata?.name, 'Untitled NFT'),
-    collection: normalizeText(item?.collection?.name ?? item?.collectionName ?? item?.symbol, 'Collection'),
-    imageUrl: extractImageUrl(item),
+  if (!payload) {
+    throw new Error('Alchemy Solana NFT API returned no payload.');
+  }
+
+  const items = payload.result?.items ?? [];
+  return items.map((asset, index) => ({
+    id: asset.id ?? `${index}`,
+    name: normalizeText(asset.content?.metadata?.name, 'Untitled NFT'),
+    collection: extractCollection(asset),
+    imageUrl: extractImageUrl(asset),
   }));
 }

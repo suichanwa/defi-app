@@ -34,29 +34,67 @@ export default function WalletNFTsTab({ ownerAddress }: WalletNFTsTabProps) {
     const load = async () => {
       if (chain.kind !== 'solana') {
         setNfts([]);
+        setUseLocalFallback(false);
         setError('NFT view is available for Solana wallets only.');
         return;
       }
+
       const fallbackOwner = ALCHEMY_NFT_FALLBACK_OWNER?.trim() || '';
-      const shouldUseFallback = chain.cluster !== 'mainnet-beta' || !ownerAddress;
-      const targetOwner = shouldUseFallback ? fallbackOwner : ownerAddress;
-      if (!targetOwner) {
-        setNfts([]);
-        setError('Set a fallback Solana mainnet owner to preview NFTs.');
-        return;
-      }
+      const normalizedOwner = ownerAddress?.trim() || '';
+      const currentCluster = chain.cluster === 'mainnet-beta' ? 'mainnet-beta' : 'devnet';
+
       setLoading(true);
       setError(null);
+      setUseLocalFallback(false);
+
       try {
-        const items = await fetchAlchemySolanaNfts(targetOwner, 'mainnet-beta');
-        if (!cancelled) {
-          setNfts(items);
-          setUseLocalFallback(shouldUseFallback && items.length === 0);
+        let items: NftItem[] = [];
+        let ownerFetchFailed = false;
+        let ownerFetchError: unknown = null;
+
+        if (normalizedOwner) {
+          try {
+            items = await fetchAlchemySolanaNfts(normalizedOwner, currentCluster);
+          } catch (ownerError) {
+            ownerFetchFailed = true;
+            ownerFetchError = ownerError;
+          }
+        }
+
+        if (!items.length && fallbackOwner && fallbackOwner !== normalizedOwner) {
+          try {
+            items = await fetchAlchemySolanaNfts(fallbackOwner, 'mainnet-beta');
+          } catch {
+            // Keep local preview fallback below.
+          }
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        setNfts(items);
+        if (!items.length) {
+          setUseLocalFallback(true);
+          if (ownerFetchFailed) {
+            const ownerErrorMessage =
+              ownerFetchError instanceof Error ? ownerFetchError.message : 'Unable to load NFTs from the wallet owner.';
+            if (ownerErrorMessage.includes('NFT API access denied (403)')) {
+              setError('NFT API is blocked for this key (403). Showing local preview.');
+            } else {
+              setError(ownerErrorMessage);
+            }
+          } else if (!normalizedOwner && !fallbackOwner) {
+            setError('No wallet owner or fallback owner is configured. Showing local preview.');
+          } else {
+            setError(null);
+          }
         }
       } catch (err) {
         if (!cancelled) {
+          setNfts([]);
           setError(err instanceof Error ? err.message : 'Unable to load NFTs.');
-          setUseLocalFallback(shouldUseFallback);
+          setUseLocalFallback(true);
         }
       } finally {
         if (!cancelled) {

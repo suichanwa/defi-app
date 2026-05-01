@@ -33,7 +33,8 @@ async function dropXmtpClient(client: Client | null): Promise<void> {
 
 export function XmtpProvider({ children }: { children: React.ReactNode }) {
   const { chainKey, setChainKey } = useChain();
-  const { status: walletStatus, wallet, address, switchWallet } = useWalletSession();
+  const walletSession = useWalletSession();
+  const { status: walletStatus, wallet, address } = walletSession;
   const [client, setClient] = useState<Client | null>(null);
   const [status, setStatus] = useState<XmtpStatus>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +74,19 @@ export function XmtpProvider({ children }: { children: React.ReactNode }) {
       return 'switched';
     }
 
+    let sessionSwitchWallet: typeof walletSession.switchWallet | null = null;
+    try {
+      sessionSwitchWallet = walletSession.switchWallet;
+    } catch (switchWalletReadError) {
+      console.warn('Wallet session switchWallet is unavailable for XMTP auto-switch.', switchWalletReadError);
+      return 'failed';
+    }
+
+    if (typeof sessionSwitchWallet !== 'function') {
+      console.warn('Wallet session does not expose switchWallet for XMTP auto-switch.');
+      return 'failed';
+    }
+
     const ethereumWalletId = await resolveEthereumWalletId();
     if (!ethereumWalletId) {
       return 'missing';
@@ -84,7 +98,7 @@ export function XmtpProvider({ children }: { children: React.ReactNode }) {
       if (previousChainKey !== 'ethereumMainnet') {
         await setChainKey('ethereumMainnet');
       }
-      await switchWallet(ethereumWalletId);
+      await sessionSwitchWallet(ethereumWalletId);
       return 'switched';
     } catch (switchError) {
       if (previousChainKey !== 'ethereumMainnet') {
@@ -95,7 +109,7 @@ export function XmtpProvider({ children }: { children: React.ReactNode }) {
     } finally {
       ethereumWalletSwitchInFlightRef.current = false;
     }
-  }, [chainKey, resolveEthereumWalletId, setChainKey, switchWallet]);
+  }, [chainKey, resolveEthereumWalletId, setChainKey, walletSession]);
 
   const initClient = useCallback(async () => {
     if (!isXmtpNativeModuleAvailable() || !XmtpClient) {
@@ -113,6 +127,13 @@ export function XmtpProvider({ children }: { children: React.ReactNode }) {
       Boolean(address) &&
       isEvmAddress(address ?? '') &&
       isEvmMessageSigner(wallet);
+
+    if (walletStatus === 'loading') {
+      await disconnectCurrentClient();
+      setStatus('idle');
+      setError(null);
+      return;
+    }
 
     if (!canUseWallet) {
       await disconnectCurrentClient();
