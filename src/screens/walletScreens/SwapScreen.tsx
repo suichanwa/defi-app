@@ -1,11 +1,12 @@
 import React, { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { useTheme } from '@theme/ThemeProvider';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useNavVisibility } from '@context/NavVisibilityProvider';
+import { useWalletCardAnimation } from '../../animations/walletAnimations';
 
 type WalletStackParamList = {
   WalletHome: undefined;
@@ -25,6 +26,7 @@ export default function SwapScreen() {
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const navigation = useNavigation<StackNavigationProp<WalletStackParamList, 'Swap'>>();
   const { setNavHidden } = useNavVisibility();
+  const { animatedStyle } = useWalletCardAnimation([]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -34,7 +36,7 @@ export default function SwapScreen() {
   );
 
   return (
-    <View style={[localStyles.container, { backgroundColor: colors.background }]}>
+    <Animated.View style={[localStyles.container, { backgroundColor: colors.background }, animatedStyle]}>
       <ScrollView contentContainerStyle={[styles.scrollContent, localStyles.scrollContent]}>
         <View style={localStyles.header}>
           <TouchableOpacity
@@ -81,7 +83,7 @@ export default function SwapScreen() {
           </View>
         </View>
       </ScrollView>
-    </View>
+    </Animated.View>
   );
 }
 

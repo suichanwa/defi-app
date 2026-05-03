@@ -3,7 +3,7 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '@theme/ThemeProvider';
 
-export type WalletTab = 'tokens' | 'nfts' | 'activity';
+export type WalletTab = 'tokens' | 'nfts';
 
 type WalletTabSelectorProps = {
   activeTab: WalletTab;
@@ -13,7 +13,6 @@ type WalletTabSelectorProps = {
 const tabs: { id: WalletTab; label: string }[] = [
   { id: 'tokens', label: 'Tokens' },
   { id: 'nfts', label: 'NFTs' },
-  { id: 'activity', label: 'Activity' },
 ];
 
 export default function WalletTabSelector({ activeTab, onChangeTab }: WalletTabSelectorProps) {

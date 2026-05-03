@@ -5,6 +5,7 @@ import { createWalletStyles } from '@styles/WalletStyles';
 import FlowMessage from './FlowMessage';
 import PasscodeField from './PasscodeField';
 import NumericKeyboard from './NumericKeyboard';
+import { buildMnemonicWords, getMnemonicWordCount, normalizeMnemonicInput } from '@utils/solanaMnemonic';
 
 type WalletImportModalProps = {
   visible: boolean;
@@ -55,29 +56,49 @@ export default function WalletImportModal({
   onActivatePrimary,
   onActivateConfirm,
 }: WalletImportModalProps) {
+  const [wordCount, setWordCount] = useState<12 | 24>(12);
   const [words, setWords] = useState<string[]>(Array(12).fill(''));
   const [activeWordIndex, setActiveWordIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!visible) {
+      setWordCount(12);
       setWords(Array(12).fill(''));
     } else if (mnemonicInput) {
-      const parentWords = mnemonicInput.split(' ').filter(Boolean);
-      if (parentWords.join(' ') !== words.filter(Boolean).join(' ')) {
-        const newWords = Array(12).fill('');
-        parentWords.forEach((w, i) => { if (i < 12) newWords[i] = w; });
-        setWords(newWords);
+      const parentWordCount = getMnemonicWordCount(mnemonicInput);
+      const parentWords = normalizeMnemonicInput(mnemonicInput).split(' ').filter(Boolean);
+      const nextCount = parentWordCount === 24 ? 24 : wordCount;
+      if (parentWords.join(' ') !== words.filter(Boolean).join(' ') || words.length !== nextCount) {
+        setWordCount(nextCount);
+        setWords(buildMnemonicWords(mnemonicInput, nextCount));
       }
     }
-  }, [visible, mnemonicInput]);
+  }, [visible, mnemonicInput, wordCount, words]);
+
+  const handleWordCountChange = (nextCount: 12 | 24) => {
+    setWordCount(nextCount);
+    setWords((currentWords) => {
+      const nextWords = Array(nextCount).fill('');
+      currentWords.slice(0, nextCount).forEach((word, index) => {
+        nextWords[index] = word;
+      });
+      onChangeMnemonic(nextWords.filter(Boolean).join(' '));
+      return nextWords;
+    });
+  };
 
   const handleWordChange = (text: string, index: number) => {
     const pasted = text.trim().split(/\s+/);
     if (pasted.length > 1) {
-      const newWords = [...words];
-      pasted.forEach((w, i) => {
-        if (index + i < 12) newWords[index + i] = w.replace(/[^a-zA-Z]/g, '').toLowerCase();
+      const nextCount = pasted.length > 12 ? 24 : wordCount;
+      const newWords = Array(nextCount).fill('');
+      words.slice(0, nextCount).forEach((word, wordIndex) => {
+        newWords[wordIndex] = word;
       });
+      pasted.forEach((w, i) => {
+        if (index + i < nextCount) newWords[index + i] = w.replace(/[^a-zA-Z]/g, '').toLowerCase();
+      });
+      setWordCount(nextCount);
       setWords(newWords);
       onChangeMnemonic(newWords.filter(Boolean).join(' '));
       return;
@@ -98,7 +119,37 @@ export default function WalletImportModal({
               <Ionicons name="close" size={20} color={colors.text} />
             </TouchableOpacity>
           </View>
-          <Text style={styles.modalSubtitle}>Enter or paste your 12 word recovery phrase.</Text>
+          <Text style={styles.modalSubtitle}>Enter or paste your 12 or 24 word recovery phrase.</Text>
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+            <TouchableOpacity
+              onPress={() => handleWordCountChange(12)}
+              activeOpacity={0.9}
+              style={{
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: wordCount === 12 ? colors.text : colors.text + '33',
+                backgroundColor: wordCount === 12 ? colors.text + '14' : 'transparent',
+              }}
+            >
+              <Text style={{ color: colors.text, fontWeight: '600' }}>12 words</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => handleWordCountChange(24)}
+              activeOpacity={0.9}
+              style={{
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: wordCount === 24 ? colors.text : colors.text + '33',
+                backgroundColor: wordCount === 24 ? colors.text + '14' : 'transparent',
+              }}
+            >
+              <Text style={{ color: colors.text, fontWeight: '600' }}>24 words</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.mnemonicGrid}>
             {words.map((word, index) => (
               <View
@@ -118,7 +169,7 @@ export default function WalletImportModal({
                   autoCapitalize="none"
                   autoCorrect={false}
                   placeholderTextColor={colors.text + '40'}
-                  returnKeyType={index === 11 ? 'done' : 'next'}
+                  returnKeyType={index === words.length - 1 ? 'done' : 'next'}
                 />
               </View>
             ))}

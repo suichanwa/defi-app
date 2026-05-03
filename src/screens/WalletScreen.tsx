@@ -1,6 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { createStackNavigator, StackNavigationProp } from '@react-navigation/stack';
+import {
+  CardStyleInterpolators,
+  TransitionSpecs,
+  createStackNavigator,
+  StackNavigationProp,
+} from '@react-navigation/stack';
 import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '../theme/ThemeProvider';
@@ -77,6 +82,24 @@ const walletActions: WalletAction[] = [
 ];
 
 const Stack = createStackNavigator<WalletStackParamList>();
+const walletStackScreenOptions = Platform.select({
+  ios: {
+    gestureEnabled: false,
+    cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+    transitionSpec: {
+      open: TransitionSpecs.TransitionIOSSpec,
+      close: TransitionSpecs.TransitionIOSSpec,
+    },
+  },
+  default: {
+    gestureEnabled: false,
+    cardStyleInterpolator: CardStyleInterpolators.forFadeFromBottomAndroid,
+    transitionSpec: {
+      open: TransitionSpecs.FadeInFromBottomAndroidSpec,
+      close: TransitionSpecs.FadeOutToBottomAndroidSpec,
+    },
+  },
+});
 
 const promptChainChange = ({
   currentKey,
@@ -110,6 +133,8 @@ export function WalletHomeScreen({ navigation }: { navigation: StackNavigationPr
   const [activatingWalletId, setActivatingWalletId] = useState<string | null>(null);
   const [viewedIndex, setViewedIndex] = useState(0);
   const hasInitializedViewedIndex = useRef(false);
+  const previousActiveWalletIdRef = useRef<string | null>(null);
+  const actionNavigationLockedRef = useRef(false);
   const { errorMessage, errorTitle, errorVariant, isErrorVisible, handleError, clearError } = useApiError();
   const handleActivateWallet = async (walletId: string) => {
     if (!walletId || walletId === activeWalletId || walletId === activatingWalletId) {
@@ -183,6 +208,18 @@ export function WalletHomeScreen({ navigation }: { navigation: StackNavigationPr
       hasInitializedViewedIndex.current = true;
     }
   }, [walletList.length, activeIndex]);
+
+  useEffect(() => {
+    if (!walletList.length) return;
+    if (activeWalletId && previousActiveWalletIdRef.current !== activeWalletId) {
+      setViewedIndex(activeIndex);
+      previousActiveWalletIdRef.current = activeWalletId;
+      return;
+    }
+    if (!activeWalletId) {
+      previousActiveWalletIdRef.current = null;
+    }
+  }, [activeWalletId, activeIndex, walletList.length]);
 
   const {
     prices,
@@ -288,6 +325,26 @@ export function WalletHomeScreen({ navigation }: { navigation: StackNavigationPr
     }
   };
 
+  const handleWalletActionPress = useCallback(
+    (action: WalletAction) => {
+      if (actionNavigationLockedRef.current) return;
+      actionNavigationLockedRef.current = true;
+
+      requestAnimationFrame(() => {
+        if (action.screen === 'Receive' && address) {
+          navigation.navigate('Receive', { address });
+        } else {
+          navigation.navigate(action.screen as any);
+        }
+      });
+
+      setTimeout(() => {
+        actionNavigationLockedRef.current = false;
+      }, 220);
+    },
+    [address, navigation],
+  );
+
   const handleAirdrop = async () => {
     if (!address || chain.kind !== 'solana' || chain.cluster !== 'devnet') return;
     if (airdropCooldownMsRemaining > 0) return;
@@ -346,13 +403,7 @@ export function WalletHomeScreen({ navigation }: { navigation: StackNavigationPr
         displayTotal={displayTotal}
         formatCurrency={formatCurrency}
         actions={walletActions}
-        onActionPress={(action) => {
-          if (action.screen === 'Receive' && address) {
-            navigation.navigate('Receive', { address });
-          } else {
-            navigation.navigate(action.screen as any);
-          }
-        }}
+        onActionPress={handleWalletActionPress}
         onSettingsWallet={(walletId) => navigation.navigate('WalletSettings', { walletId })}
         onActivateWallet={handleActivateWallet}
         activatingWalletId={activatingWalletId}
@@ -380,11 +431,6 @@ export function WalletHomeScreen({ navigation }: { navigation: StackNavigationPr
         <WalletTokensTab tokens={chainTokens} prices={prices} loading={loadingPrices} formatCurrency={formatCurrency} />
       )}
       {activeTab === 'nfts' && <WalletNFTsTab ownerAddress={address} />}
-      {activeTab === 'activity' && (
-        <View style={styles.listCard}>
-          <Text style={styles.metaText}>No activity yet.</Text>
-        </View>
-      )}
     </ScrollView>
   );
 }
@@ -975,20 +1021,7 @@ export default function WalletScreen() {
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
-          gestureEnabled: true,
-          gestureDirection: 'horizontal',
-          cardStyleInterpolator: ({ current, layouts }) => ({
-            cardStyle: {
-              transform: [
-                {
-                  translateX: current.progress.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [layouts.screen.width, 0],
-                  }),
-                },
-              ],
-            },
-          }),
+          ...walletStackScreenOptions,
         }}
       >
         <Stack.Screen name="WalletHome" component={WalletHomeScreen} />

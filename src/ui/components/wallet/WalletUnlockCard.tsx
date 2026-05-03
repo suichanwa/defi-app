@@ -1,10 +1,11 @@
 import React from 'react';
-import { Text, View, StyleSheet, TouchableOpacity } from 'react-native';
+import { Text, View, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '@theme/ThemeProvider';
 import PasscodeField from './PasscodeField';
 import WalletLoadingOverlay from './WalletLoadingOverlay';
+import FlowMessage from './FlowMessage';
 
 type WalletUnlockCardProps = {
   styles: ReturnType<typeof createWalletStyles>;
@@ -40,44 +41,42 @@ export default function WalletUnlockCard({
   onToggleWalletNetwork,
 }: WalletUnlockCardProps) {
   const { colors } = useTheme();
+  const canSubmitUnlock = unlockPassword.length === 6 && !isSubmitting;
+
+  const handleStartFreshConfirm = () => {
+    Alert.alert(
+      'Start fresh wallet?',
+      'This removes local wallet data from this device. You can recover later only with your recovery phrase.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Start fresh',
+          style: 'destructive',
+          onPress: onStartFresh,
+        },
+      ],
+    );
+  };
 
   return (
     <View style={[localStyles.container, { backgroundColor: colors.background }]}>
-      <View style={localStyles.headerRow}>
-        <View style={localStyles.headerSpacer} />
-        <View style={localStyles.header}>
-          <Text style={[styles.setupTitle, localStyles.title, { color: colors.text }]}>Welcome back</Text>
-          <Text style={[styles.setupSubtitle, localStyles.subtitle, { color: colors.muted }]}>
-            Enter your passcode to unlock
-          </Text>
+      <View style={localStyles.headerStack}>
+        <View style={[localStyles.lockBadge, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <MaterialCommunityIcons name="lock-outline" size={16} color={colors.muted} />
+          <Text style={[localStyles.lockBadgeText, { color: colors.muted }]}>Wallet locked</Text>
         </View>
-        {showStartFresh ? (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={onStartFresh}
-            disabled={isStartFreshDisabled}
-            style={localStyles.startFreshButton}
-          >
-            <Text
-              style={[
-                localStyles.startFreshText,
-                { color: isStartFreshDisabled ? colors.muted : '#ef4444' },
-              ]}
-            >
-              Start fresh
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={localStyles.startFreshButton} />
-        )}
+        <Text style={[styles.setupTitle, localStyles.title, { color: colors.text }]}>Welcome back</Text>
+        <Text style={[styles.setupSubtitle, localStyles.subtitle, { color: colors.muted }]}>
+          Enter 6-digit passcode to unlock your wallet.
+        </Text>
       </View>
 
-      <View style={localStyles.passcodeSection}>
+      <View style={[localStyles.passcodeCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {walletNetworkLabel && onToggleWalletNetwork ? (
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={onToggleWalletNetwork}
-            style={[styles.networkBadge, localStyles.networkBadge]}
+            style={[styles.networkBadge, localStyles.networkBadge, { backgroundColor: colors.background }]}
           >
             <Text style={styles.networkBadgeText}>{walletNetworkLabel}</Text>
           </TouchableOpacity>
@@ -92,14 +91,48 @@ export default function WalletUnlockCard({
           error={flowError}
           styles={styles}
         />
+        <Text style={[localStyles.hintText, { color: colors.muted }]}>Tip: tap circles to refocus input.</Text>
       </View>
 
-      {flowError && (
-        <View style={[localStyles.errorContainer, { backgroundColor: '#ef444410', borderLeftColor: '#ef4444' }]}>
-          <MaterialCommunityIcons name="alert-circle" size={18} color="#ef4444" />
-          <Text style={[localStyles.errorText, { color: '#ef4444' }]}>{flowError}</Text>
-        </View>
-      )}
+      <FlowMessage styles={styles} error={flowError} message={flowMessage} />
+
+      <TouchableOpacity
+        style={[
+          styles.primaryButton,
+          localStyles.unlockButton,
+          (!canSubmitUnlock || isSubmitting) && styles.buttonDisabled,
+        ]}
+        onPress={onUnlock}
+        activeOpacity={0.9}
+        disabled={!canSubmitUnlock || isSubmitting}
+      >
+        <Text style={styles.primaryButtonText}>{isSubmitting ? 'Unlocking...' : 'Unlock wallet'}</Text>
+      </TouchableOpacity>
+
+      {showStartFresh ? (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={handleStartFreshConfirm}
+          disabled={isStartFreshDisabled}
+          style={localStyles.startFreshButton}
+          accessibilityRole="button"
+          accessibilityLabel="Start fresh wallet"
+        >
+          <MaterialCommunityIcons
+            name="restore"
+            size={15}
+            color={isStartFreshDisabled ? colors.muted : '#ef4444'}
+          />
+          <Text
+            style={[
+              localStyles.startFreshText,
+              { color: isStartFreshDisabled ? colors.muted : '#ef4444' },
+            ]}
+          >
+            Start fresh
+          </Text>
+        </TouchableOpacity>
+      ) : null}
 
       {isSubmitting && <WalletLoadingOverlay styles={styles} label="Unlocking..." />}
     </View>
@@ -110,64 +143,73 @@ const localStyles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 40,
     justifyContent: 'flex-start',
   },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 48,
-  },
-  header: {
-    flex: 1,
+  headerStack: {
     alignItems: 'center',
+    marginBottom: 24,
   },
-  headerSpacer: {
-    minWidth: 82,
+  lockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 14,
   },
-  startFreshButton: {
-    minWidth: 82,
-    alignItems: 'flex-end',
-    paddingTop: 10,
-  },
-  startFreshText: {
-    fontSize: 13,
-    fontWeight: '700',
+  lockBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   title: {
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
     fontSize: 32,
-    fontWeight: '800',
-    letterSpacing: -0.5,
+    fontWeight: '700',
+    lineHeight: 38,
   },
   subtitle: {
     textAlign: 'center',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
-    lineHeight: 24,
+    lineHeight: 22,
+    maxWidth: 300,
   },
-  passcodeSection: {
-    marginBottom: 24,
+  passcodeCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
+    marginBottom: 8,
   },
   networkBadge: {
-    alignSelf: 'center',
-    marginBottom: 14,
+    alignSelf: 'flex-start',
+    marginBottom: 12,
   },
-  errorContainer: {
+  hintText: {
+    fontSize: 12,
+    fontWeight: '500',
+    lineHeight: 18,
+    marginTop: -4,
+  },
+  unlockButton: {
+    marginTop: 12,
+    marginBottom: 2,
+  },
+  startFreshButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderLeftWidth: 3,
-    marginBottom: 20,
+    alignSelf: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    marginTop: 10,
   },
-  errorText: {
-    flex: 1,
-    fontSize: 14,
+  startFreshText: {
+    fontSize: 13,
     fontWeight: '600',
-    lineHeight: 20,
   },
 });

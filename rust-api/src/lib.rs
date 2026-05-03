@@ -7,6 +7,8 @@ use pbkdf2::pbkdf2_hmac;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 type Aes256Ctr = ctr::Ctr128BE<Aes256>;
 
@@ -14,6 +16,45 @@ const PBKDF2_ITERATIONS: u32 = 100_000;
 const SALT_LENGTH: usize = 16;
 const IV_LENGTH: usize = 16;
 const KEY_LENGTH: usize = 32;
+
+#[derive(Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredWalletRecord {
+    id: String,
+    encrypted_json: String,
+    created_at: String,
+    updated_at: String,
+    #[serde(default)]
+    backup_completed: Option<bool>,
+    #[serde(default)]
+    wallet_type: Option<String>,
+    #[serde(default)]
+    label: Option<String>,
+    #[serde(default)]
+    color: Option<String>,
+    #[serde(default)]
+    card_name: Option<String>,
+}
+
+#[derive(Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WalletStoreFile {
+    #[serde(default)]
+    records: Vec<StoredWalletRecord>,
+    #[serde(default)]
+    active_wallet_id: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WalletRecordUpdates {
+    #[serde(default)]
+    label: Option<String>,
+    #[serde(default)]
+    color: Option<String>,
+    #[serde(default)]
+    card_name: Option<String>,
+}
 
 #[derive(Serialize, Deserialize)]
 struct EncryptedPayload {
@@ -106,6 +147,130 @@ fn rust_to_jstring(env: &mut JNIEnv, value: &str) -> jstring {
     }
 }
 
+fn normalize_wallet_type(wallet_type: &str) -> String {
+    let trimmed = wallet_type.trim().to_lowercase();
+    if trimmed.is_empty() {
+        "solana".to_string()
+    } else {
+        trimmed
+    }
+}
+
+fn wallet_store_dir(storage_dir: &str) -> PathBuf {
+    Path::new(storage_dir).join("rust_wallet_store")
+}
+
+fn wallet_store_path(storage_dir: &str, wallet_type: &str) -> PathBuf {
+    wallet_store_dir(storage_dir).join(format!("{}.json", normalize_wallet_type(wallet_type)))
+}
+
+fn read_wallet_store(storage_dir: &str, wallet_type: &str) -> Result<WalletStoreFile, String> {
+    let path = wallet_store_path(storage_dir, wallet_type);
+    if !path.exists() {
+        return Ok(WalletStoreFile::default());
+    }
+
+    let contents = fs::read_to_string(&path).map_err(|error| error.to_string())?;
+    if contents.trim().is_empty() {
+        return Ok(WalletStoreFile::default());
+    }
+
+    serde_json::from_str(&contents).map_err(|error| error.to_string())
+}
+
+fn write_wallet_store(storage_dir: &str, wallet_type: &str, store: &WalletStoreFile) -> Result<(), String> {
+    let path = wallet_store_path(storage_dir, wallet_type);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+
+    let serialized = serde_json::to_string_pretty(store).map_err(|error| error.to_string())?;
+    fs::write(&path, serialized).map_err(|error| error.to_string())
+}
+
+fn load_records_json(storage_dir: &str, wallet_type: &str) -> Result<String, String> {
+    let store = read_wallet_store(storage_dir, wallet_type)?;
+    serde_json::to_string(&store.records).map_err(|error| error.to_string())
+}
+
+fn load_record_by_id_json(storage_dir: &str, wallet_type: &str, wallet_id: &str) -> Result<String, String> {
+    let store = read_wallet_store(storage_dir, wallet_type)?;
+    let record = store
+        .records
+        .into_iter()
+        .find(|item| item.id == wallet_id)
+        .ok_or_else(|| "Wallet record not found".to_string())?;
+
+    serde_json::to_string(&record).map_err(|error| error.to_string())
+}
+
+fn load_single_record_json(storage_dir: &str, wallet_type: &str) -> Result<String, String> {
+    let store = read_wallet_store(storage_dir, wallet_type)?;
+    let record = if let Some(active_id) = store.active_wallet_id {
+        store.records.into_iter().find(|item| item.id == active_id)
+    } else {
+        store.records.into_iter().next()
+    };
+
+    match record {
+        Some(record) => serde_json::to_string(&record).map_err(|error| error.to_string()),
+        None => Err("Wallet record not found".to_string()),
+    }
+}
+
+fn upsert_record(storage_dir: &str, wallet_type: &str, record: StoredWalletRecord) -> Result<WalletStoreFile, String> {
+    let mut store = read_wallet_store(storage_dir, wallet_type)?;
+    if let Some(existing) = store.records.iter_mut().find(|item| item.id == record.id) {
+        *existing = record.clone();
+    } else {
+        store.records.push(record.clone());
+    }
+    store.active_wallet_id = Some(record.id);
+    write_wallet_store(storage_dir, wallet_type, &store)?;
+    Ok(store)
+}
+
+fn remove_record(storage_dir: &str, wallet_type: &str, wallet_id: &str) -> Result<WalletStoreFile, String> {
+    let mut store = read_wallet_store(storage_dir, wallet_type)?;
+    store.records.retain(|item| item.id != wallet_id);
+    if store.active_wallet_id.as_deref() == Some(wallet_id) {
+        store.active_wallet_id = store.records.first().map(|item| item.id.clone());
+    }
+    write_wallet_store(storage_dir, wallet_type, &store)?;
+    Ok(store)
+}
+
+fn update_record_meta(storage_dir: &str, wallet_type: &str, wallet_id: &str, updates: WalletRecordUpdates) -> Result<WalletStoreFile, String> {
+    let mut store = read_wallet_store(storage_dir, wallet_type)?;
+    let record = store
+        .records
+        .iter_mut()
+        .find(|item| item.id == wallet_id)
+        .ok_or_else(|| "Wallet record not found".to_string())?;
+
+    if let Some(label) = updates.label {
+        record.label = Some(label);
+    }
+    if let Some(color) = updates.color {
+        record.color = Some(color);
+    }
+    if let Some(card_name) = updates.card_name {
+        record.card_name = Some(card_name);
+    }
+
+    write_wallet_store(storage_dir, wallet_type, &store)?;
+    Ok(store)
+}
+
+fn clear_wallet_store(storage_dir: &str, wallet_type: &str) -> Result<(), String> {
+    let path = wallet_store_path(storage_dir, wallet_type);
+    if path.exists() {
+        fs::remove_file(&path).map_err(|error| error.to_string())
+    } else {
+        Ok(())
+    }
+}
+
 #[no_mangle]
 pub extern "system" fn Java_com_yourcompany_defiaiapp_RustWalletCryptoModule_nativeEncryptWalletKey(
     mut env: JNIEnv,
@@ -146,6 +311,267 @@ pub extern "system" fn Java_com_yourcompany_defiaiapp_RustWalletCryptoModule_nat
 
     match decrypt_wallet_key_impl(&encrypted_json, &password) {
         Ok(result) => rust_to_jstring(&mut env, &result),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_yourcompany_defiaiapp_RustWalletCryptoModule_nativeLoadWalletRecords(
+    mut env: JNIEnv,
+    _thiz: jobject,
+    storage_dir: JString,
+    wallet_type: JString,
+) -> jstring {
+    let storage_dir = match jstring_to_rust(&mut env, storage_dir) {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let wallet_type = match jstring_to_rust(&mut env, wallet_type) {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    match load_records_json(&storage_dir, &wallet_type) {
+        Ok(result) => rust_to_jstring(&mut env, &result),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_yourcompany_defiaiapp_RustWalletCryptoModule_nativeGetActiveWalletId(
+    mut env: JNIEnv,
+    _thiz: jobject,
+    storage_dir: JString,
+    wallet_type: JString,
+) -> jstring {
+    let storage_dir = match jstring_to_rust(&mut env, storage_dir) {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let wallet_type = match jstring_to_rust(&mut env, wallet_type) {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    match read_wallet_store(&storage_dir, &wallet_type) {
+        Ok(store) => rust_to_jstring(&mut env, store.active_wallet_id.as_deref().unwrap_or("")),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_yourcompany_defiaiapp_RustWalletCryptoModule_nativeSetActiveWalletId(
+    mut env: JNIEnv,
+    _thiz: jobject,
+    storage_dir: JString,
+    wallet_type: JString,
+    wallet_id: JString,
+) {
+    let storage_dir = match jstring_to_rust(&mut env, storage_dir) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    let wallet_type = match jstring_to_rust(&mut env, wallet_type) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    let wallet_id = match jstring_to_rust(&mut env, wallet_id) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+
+    if let Ok(mut store) = read_wallet_store(&storage_dir, &wallet_type) {
+        store.active_wallet_id = if wallet_id.trim().is_empty() { None } else { Some(wallet_id) };
+        let _ = write_wallet_store(&storage_dir, &wallet_type, &store);
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_yourcompany_defiaiapp_RustWalletCryptoModule_nativeLoadEncryptedWalletKeyById(
+    mut env: JNIEnv,
+    _thiz: jobject,
+    storage_dir: JString,
+    wallet_type: JString,
+    wallet_id: JString,
+) -> jstring {
+    let storage_dir = match jstring_to_rust(&mut env, storage_dir) {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let wallet_type = match jstring_to_rust(&mut env, wallet_type) {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let wallet_id = match jstring_to_rust(&mut env, wallet_id) {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    match load_record_by_id_json(&storage_dir, &wallet_type, &wallet_id) {
+        Ok(result) => rust_to_jstring(&mut env, &result),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_yourcompany_defiaiapp_RustWalletCryptoModule_nativeLoadEncryptedWalletKey(
+    mut env: JNIEnv,
+    _thiz: jobject,
+    storage_dir: JString,
+    wallet_type: JString,
+) -> jstring {
+    let storage_dir = match jstring_to_rust(&mut env, storage_dir) {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let wallet_type = match jstring_to_rust(&mut env, wallet_type) {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    match load_single_record_json(&storage_dir, &wallet_type) {
+        Ok(result) => rust_to_jstring(&mut env, &result),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_yourcompany_defiaiapp_RustWalletCryptoModule_nativeSaveEncryptedWalletKey(
+    mut env: JNIEnv,
+    _thiz: jobject,
+    storage_dir: JString,
+    wallet_type: JString,
+    record_json: JString,
+) {
+    let storage_dir = match jstring_to_rust(&mut env, storage_dir) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    let wallet_type = match jstring_to_rust(&mut env, wallet_type) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    let record_json = match jstring_to_rust(&mut env, record_json) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+
+    let mut record: StoredWalletRecord = match serde_json::from_str(&record_json) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    if record.wallet_type.is_none() {
+        record.wallet_type = Some(normalize_wallet_type(&wallet_type));
+    }
+
+    let _ = upsert_record(&storage_dir, &wallet_type, record);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_yourcompany_defiaiapp_RustWalletCryptoModule_nativeMarkBackupCompleted(
+    mut env: JNIEnv,
+    _thiz: jobject,
+    storage_dir: JString,
+    wallet_type: JString,
+) {
+    let storage_dir = match jstring_to_rust(&mut env, storage_dir) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    let wallet_type = match jstring_to_rust(&mut env, wallet_type) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+
+    if let Ok(mut store) = read_wallet_store(&storage_dir, &wallet_type) {
+        if let Some(active_id) = store.active_wallet_id.clone() {
+            if let Some(record) = store.records.iter_mut().find(|item| item.id == active_id) {
+                record.backup_completed = Some(true);
+            }
+            let _ = write_wallet_store(&storage_dir, &wallet_type, &store);
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_yourcompany_defiaiapp_RustWalletCryptoModule_nativeClearWallet(
+    mut env: JNIEnv,
+    _thiz: jobject,
+    storage_dir: JString,
+    wallet_type: JString,
+) {
+    let storage_dir = match jstring_to_rust(&mut env, storage_dir) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    let wallet_type = match jstring_to_rust(&mut env, wallet_type) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+
+    let _ = clear_wallet_store(&storage_dir, &wallet_type);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_yourcompany_defiaiapp_RustWalletCryptoModule_nativeRemoveWalletRecord(
+    mut env: JNIEnv,
+    _thiz: jobject,
+    storage_dir: JString,
+    wallet_type: JString,
+    wallet_id: JString,
+) {
+    let storage_dir = match jstring_to_rust(&mut env, storage_dir) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    let wallet_type = match jstring_to_rust(&mut env, wallet_type) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    let wallet_id = match jstring_to_rust(&mut env, wallet_id) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+
+    let _ = remove_record(&storage_dir, &wallet_type, &wallet_id);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_yourcompany_defiaiapp_RustWalletCryptoModule_nativeUpdateWalletRecordMeta(
+    mut env: JNIEnv,
+    _thiz: jobject,
+    storage_dir: JString,
+    wallet_type: JString,
+    wallet_id: JString,
+    updates_json: JString,
+) -> jstring {
+    let storage_dir = match jstring_to_rust(&mut env, storage_dir) {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let wallet_type = match jstring_to_rust(&mut env, wallet_type) {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let wallet_id = match jstring_to_rust(&mut env, wallet_id) {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let updates_json = match jstring_to_rust(&mut env, updates_json) {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let updates: WalletRecordUpdates = match serde_json::from_str(&updates_json) {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    match update_record_meta(&storage_dir, &wallet_type, &wallet_id, updates) {
+        Ok(store) => match serde_json::to_string(&store.records) {
+            Ok(result) => rust_to_jstring(&mut env, &result),
+            Err(_) => std::ptr::null_mut(),
+        },
         Err(_) => std::ptr::null_mut(),
     }
 }

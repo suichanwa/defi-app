@@ -9,6 +9,19 @@ export type ChangelogEntry = {
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    id: '0.24-2026-05-03',
+    version: '0.24',
+    date: '2026-05-03',
+    title: 'Wallet multi-card stability and changelog UI fix',
+    summary: 'Stabilized wallet card behavior when adding multiple wallets and fixed the Latest release label styling.',
+    changes: [
+      'Fixed wallet carousel index sync when creating or switching to second/third wallets.',
+      'Removed aggressive wallet carousel force-scroll loops that caused UI jitter/desync.',
+      'Improved active wallet to viewed card synchronization in Wallet Home.',
+      'Fixed and polished the Latest release badge layout in the changelog list.',
+    ],
+  },
+  {
     id: '0.23-2026-04-27',
     version: '0.23',
     date: '2026-04-27',

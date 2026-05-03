@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -49,24 +50,53 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const walletScrollRef = useRef<ScrollView>(null);
+  const lastSyncedIndexRef = useRef<number>(-1);
   const [containerWidth, setContainerWidth] = useState(0);
   const pageWidth = containerWidth > 0 ? containerWidth : 0;
+  const clampedViewedIndex = useMemo(() => {
+    if (!walletList.length) return 0;
+    return Math.max(0, Math.min(viewedIndex, walletList.length - 1));
+  }, [viewedIndex, walletList.length]);
   const runAsync = useCallback((fn: () => void | Promise<void>) => {
     Promise.resolve(fn()).catch((error) => {
       console.error('[WalletCardCarousel] async handler failed', error);
     });
   }, []);
+  const handleActionPress = useCallback(
+    (action: TAction) => {
+      Promise.resolve(onActionPress(action)).catch((error) => {
+        console.error('[WalletCardCarousel] action press failed', error);
+      });
+    },
+    [onActionPress],
+  );
 
   useEffect(() => {
     if (!walletList.length || !pageWidth) return;
-    walletScrollRef.current?.scrollTo({ x: viewedIndex * pageWidth, animated: false });
-  }, [viewedIndex, pageWidth, walletList.length]);
+    if (lastSyncedIndexRef.current === clampedViewedIndex) return;
+    walletScrollRef.current?.scrollTo({ x: clampedViewedIndex * pageWidth, animated: false });
+    lastSyncedIndexRef.current = clampedViewedIndex;
+  }, [clampedViewedIndex, pageWidth, walletList.length]);
+
+  useEffect(() => {
+    if (!walletList.length) {
+      lastSyncedIndexRef.current = -1;
+    }
+  }, [walletList.length]);
+
+  useEffect(() => {
+    if (!walletList.length) return;
+    if (viewedIndex !== clampedViewedIndex) {
+      onViewedIndexChange(clampedViewedIndex);
+    }
+  }, [walletList.length, viewedIndex, clampedViewedIndex, onViewedIndexChange]);
 
   const handleMomentumScrollEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       if (!pageWidth || walletList.length === 0) return;
       const nextIndex = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
       const clampedIndex = Math.max(0, Math.min(nextIndex, walletList.length - 1));
+      lastSyncedIndexRef.current = clampedIndex;
       if (clampedIndex !== viewedIndex) {
         onViewedIndexChange(clampedIndex);
       }
@@ -87,15 +117,13 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
       <ScrollView
         ref={walletScrollRef}
         horizontal
+        pagingEnabled
         snapToInterval={pageWidth || undefined}
         decelerationRate="fast"
         disableIntervalMomentum
+        snapToAlignment="start"
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={handleMomentumScrollEnd}
-        onContentSizeChange={() => {
-          if (!pageWidth || !walletList.length) return;
-          walletScrollRef.current?.scrollTo({ x: viewedIndex * pageWidth, animated: false });
-        }}
         scrollEventThrottle={16}
       >
         {walletList.map((wallet, index) => {
@@ -139,17 +167,16 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
 
                 <View style={styles.actionsRow}>
                   {actions.map((action) => (
-                    <TouchableOpacity
+                    <Pressable
                       key={action.label}
-                      style={styles.actionButton}
-                      activeOpacity={0.7}
-                      onPress={() => runAsync(() => onActionPress(action))}
+                      style={({ pressed }) => [styles.actionButton, pressed && localStyles.actionButtonPressed]}
+                      onPress={() => handleActionPress(action)}
                     >
                       <View style={styles.actionIcon}>
                         <MaterialCommunityIcons name={action.icon} size={22} color="#ffffff" />
                       </View>
                       <Text style={styles.actionLabel}>{action.label}</Text>
-                    </TouchableOpacity>
+                    </Pressable>
                   ))}
                 </View>
               </TouchableOpacity>
@@ -210,5 +237,9 @@ const localStyles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  actionButtonPressed: {
+    opacity: 0.82,
+    transform: [{ scale: 0.985 }],
   },
 });

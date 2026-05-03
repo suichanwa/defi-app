@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, Text, View, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import { Animated, ScrollView, Text, View, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
@@ -12,6 +12,7 @@ import { ERC20_TOKENS } from '@config/tokens';
 import { fetchNativeBalance, fetchTokenBalances } from '@services/balances';
 import { fetchSolBalance } from '@services/solanaBalances';
 import type { ChainConfig } from '@config/chain';
+import { useWalletCardAnimation } from '../../animations/walletAnimations';
 
 type WalletStackParamList = {
   WalletHome: undefined;
@@ -34,6 +35,12 @@ export default function SendScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<string[]>(['ETH', 'XRP', 'SOL', 'DOGE']);
+  const { animatedStyle } = useWalletCardAnimation([
+    chain.kind,
+    chain.kind === 'solana' ? chain.cluster : chain.chainId,
+    status,
+    address,
+  ]);
 
   const filteredCoins = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -113,7 +120,7 @@ export default function SendScreen() {
   };
 
   return (
-    <View style={localStyles.container}>
+    <Animated.View style={[localStyles.container, animatedStyle]}>
       <ScrollView contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}>
         <View style={localStyles.headerRow}>
           <TouchableOpacity
@@ -204,7 +211,7 @@ export default function SendScreen() {
           )}
         </View>
       </ScrollView>
-    </View>
+    </Animated.View>
   );
 }
 

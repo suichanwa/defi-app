@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, Text, View, StyleSheet, TouchableOpacity } from 'react-native';
+import { Animated, ScrollView, Text, View, StyleSheet, TouchableOpacity } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import { useQRReceive } from '@context/QRReceiveProvider';
 import { useNavVisibility } from '@context/NavVisibilityProvider';
 import { useWalletSession } from '@context/WalletSessionProvider';
 import { fetchSolBalance } from '@services/solanaBalances';
+import { useWalletCardAnimation } from '../../animations/walletAnimations';
 
 type WalletStackParamList = {
   Receive: { address: string };
@@ -29,6 +30,7 @@ export default function ReceiveScreen() {
   const { setQRData } = useQRReceive();
   const { setNavHidden } = useNavVisibility();
   const { wallets, activeWalletId } = useWalletSession();
+  const { animatedStyle } = useWalletCardAnimation([activeWalletId, address]);
   const [solBalance, setSolBalance] = useState<string>('0.00');
   const [balanceError, setBalanceError] = useState<string | null>(null);
   const walletList = wallets.length
@@ -80,7 +82,7 @@ export default function ReceiveScreen() {
   }, [selectedAddress]);
 
   return (
-    <View style={localStyles.container}>
+    <Animated.View style={[localStyles.container, animatedStyle]}>
       <ScrollView contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}>
         <View style={localStyles.headerRow}>
           <TouchableOpacity
@@ -189,7 +191,7 @@ export default function ReceiveScreen() {
           })}
         </View>
       </ScrollView>
-    </View>
+    </Animated.View>
   );
 }
 

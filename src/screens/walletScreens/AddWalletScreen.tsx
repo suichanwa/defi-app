@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Animated, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -10,6 +10,7 @@ import { useWalletSession } from '@context/WalletSessionProvider';
 import { walletErrorMessage } from '@utils/walletErrors';
 import { useNavVisibility } from '@context/NavVisibilityProvider';
 import ColorPicker, { HueSlider, Panel1, Preview } from 'reanimated-color-picker';
+import { useWalletCardAnimation } from '../../animations/walletAnimations';
 
 type AddMode = 'create' | 'import';
 type FlowStep = 'mode' | 'credentials' | 'recovery' | 'success';
@@ -37,6 +38,7 @@ export default function AddScreen() {
 
   const [mode, setMode] = useState<AddMode | null>(initialMode ?? null);
   const [step, setStep] = useState<FlowStep>(initialMode ? 'credentials' : 'mode');
+  const { animatedStyle } = useWalletCardAnimation([step]);
   const [walletName, setWalletName] = useState('Wallet');
   const [walletColor, setWalletColor] = useState(DEFAULT_WALLET_COLOR);
   const [mnemonicInput, setMnemonicInput] = useState('');
@@ -397,7 +399,7 @@ export default function AddScreen() {
   );
 
   return (
-    <View style={[localStyles.container, { backgroundColor: colors.background }]}>
+    <Animated.View style={[localStyles.container, { backgroundColor: colors.background }, animatedStyle]}>
       <ScrollView contentContainerStyle={[styles.scrollContent, localStyles.scrollContent]} keyboardShouldPersistTaps="handled">
         <View style={localStyles.headerRow}>
           <TouchableOpacity
@@ -420,7 +422,7 @@ export default function AddScreen() {
         {step === 'recovery' && renderRecoveryStep()}
         {step === 'success' && renderSuccessStep()}
       </ScrollView>
-    </View>
+    </Animated.View>
   );
 }
 

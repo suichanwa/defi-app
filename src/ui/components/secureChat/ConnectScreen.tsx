@@ -12,6 +12,7 @@ type Props = {
   devicePublicKey: string;
   serverInfo: ServerInfo | null;
   xmtpStatus: 'idle' | 'unsupported' | 'initializing' | 'ready' | 'error';
+  onBackToChats: () => void;
   onConnectAddressChange: (value: string) => void;
   onConnectNameChange: (value: string) => void;
   onConnectPress: () => void;
@@ -24,6 +25,7 @@ export default function ConnectScreen({
   connectionLog,
   devicePublicKey,
   xmtpStatus,
+  onBackToChats,
   onConnectAddressChange,
   onConnectNameChange,
   onConnectPress,
@@ -64,6 +66,17 @@ export default function ConnectScreen({
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={onBackToChats}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel="Back to chats"
+      >
+        <MaterialCommunityIcons name="arrow-left" size={18} color={colors.text} />
+        <Text style={styles.backButtonText}>Back to chats</Text>
+      </TouchableOpacity>
+
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <Text style={shared.cardTitle}>XMTP Direct Message</Text>
@@ -130,6 +143,24 @@ const createStyles = (
       paddingTop: 16,
       paddingBottom: 120,
     },
+    backButton: {
+      marginBottom: 10,
+      alignSelf: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.card,
+    },
+    backButtonText: {
+      color: colors.text,
+      fontSize: 13,
+      fontWeight: '700',
+    },
     card: {
       ...shared.surfaceCard,
       marginBottom: 16,
@@ -174,4 +205,3 @@ const createStyles = (
       backgroundColor: colors.background,
     },
   });
-

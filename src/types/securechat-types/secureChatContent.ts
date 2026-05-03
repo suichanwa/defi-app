@@ -7,6 +7,7 @@ export type SecureChatConnectProps = {
   devicePublicKey: string;
   serverInfo: ServerInfo | null;
   xmtpStatus: 'idle' | 'unsupported' | 'initializing' | 'ready' | 'error';
+  onBackToChats: () => void;
   onConnectAddressChange: (value: string) => void;
   onConnectNameChange: (value: string) => void;
   onConnectPress: () => void;

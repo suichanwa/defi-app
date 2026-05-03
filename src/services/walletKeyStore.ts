@@ -5,7 +5,22 @@ import { verifyOrSetMasterPasscode } from './masterPasscodeStore';
 import aesjs from 'aes-js';
 import { pbkdf2 as pbkdf2Callback } from 'pbkdf2';
 import { Buffer } from 'buffer';
-import { tryRustDecryptWalletKey, tryRustEncryptWalletKey } from './rustWalletCryptoNative';
+import {
+  isRustWalletStoreAvailable,
+  tryRustClearWallet,
+  tryRustDecryptWalletKey,
+  tryRustEncryptWalletKey,
+  tryRustGetActiveWalletId,
+  tryRustLoadEncryptedWalletKey,
+  tryRustLoadEncryptedWalletKeyById,
+  tryRustLoadWalletRecords,
+  tryRustMarkBackupCompleted,
+  tryRustRemoveWalletRecord,
+  tryRustSaveEncryptedWalletKey,
+  tryRustSetActiveWalletId,
+  tryRustUpdateWalletRecordMeta,
+} from './rustWalletCryptoNative';
+import { deriveSolanaKeypairFromMnemonic } from '@utils/solanaMnemonic';
 
 const PBKDF2_ITERATIONS = 100000;
 const SALT_LENGTH = 16;
@@ -57,25 +72,115 @@ function hexToBuffer(hex: string): Uint8Array {
   return bytes;
 }
 
+function mapNativeRecord(record: any): WalletRecordMeta {
+  return {
+    id: record.id,
+    label: record.label ?? 'Wallet',
+    color: record.color ?? '#4f46e5',
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    walletType: record.walletType,
+  };
+}
+
+function mapNativeRecordList(records: unknown[] | null | undefined): WalletRecordMeta[] {
+  if (!records) return [];
+  return records.map((record) => mapNativeRecord(record));
+}
+
+function mapNativeEncryptedRecord(record: any): EncryptedWalletKey | null {
+  if (!record || typeof record !== 'object') return null;
+  if (typeof record.id !== 'string' || typeof record.encryptedJson !== 'string') return null;
+  return {
+    id: record.id,
+    encryptedJson: record.encryptedJson,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    backupCompleted: record.backupCompleted,
+    walletType: record.walletType,
+  };
+}
+
+async function getJsWalletRecords(walletType: WalletKind): Promise<EncryptedWalletKey[]> {
+  return (await getJson<EncryptedWalletKey[]>(getStorageKey(walletType))) ?? [];
+}
+
+async function getJsActiveWalletId(walletType: WalletKind): Promise<string | null> {
+  return getJson<string>(getActiveWalletKey(walletType));
+}
+
+async function saveJsWalletRecord(record: EncryptedWalletKey, walletType: WalletKind): Promise<void> {
+  const records = await getJsWalletRecords(walletType);
+  const index = records.findIndex((item) => item.id === record.id);
+  if (index >= 0) {
+    records[index] = record;
+  } else {
+    records.push(record);
+  }
+  await setJson(getStorageKey(walletType), records);
+  await setJson(getActiveWalletKey(walletType), record.id);
+}
+
+async function migrateJsWalletStoreToRust(walletType: WalletKind): Promise<void> {
+  if (!(await isRustWalletStoreAvailable())) return;
+  const nativeRecords = await tryRustLoadWalletRecords(walletType);
+  if (nativeRecords && nativeRecords.length > 0) return;
+
+  const jsRecords = await getJsWalletRecords(walletType);
+  if (!jsRecords.length) return;
+
+  for (const record of jsRecords) {
+    const saved = await tryRustSaveEncryptedWalletKey(walletType, JSON.stringify(record));
+    if (!saved) {
+      return;
+    }
+  }
+
+  const activeWalletId = await getJsActiveWalletId(walletType);
+  if (activeWalletId) {
+    await tryRustSetActiveWalletId(walletType, activeWalletId);
+  }
+
+  await setJson(getStorageKey(walletType), []);
+  await setJson(getActiveWalletKey(walletType), null);
+}
+
+async function loadRustWalletRecords(walletType: WalletKind): Promise<WalletRecordMeta[] | null> {
+  const records = await tryRustLoadWalletRecords(walletType);
+  return records ? mapNativeRecordList(records) : null;
+}
+
+async function loadRustEncryptedWalletKeyById(walletType: WalletKind, walletId: string): Promise<EncryptedWalletKey | null> {
+  const recordJson = await tryRustLoadEncryptedWalletKeyById(walletType, walletId);
+  return recordJson ? mapNativeEncryptedRecord(JSON.parse(recordJson)) : null;
+}
+
+async function loadRustEncryptedWalletKey(walletType: WalletKind): Promise<EncryptedWalletKey | null> {
+  const recordJson = await tryRustLoadEncryptedWalletKey(walletType);
+  return recordJson ? mapNativeEncryptedRecord(JSON.parse(recordJson)) : null;
+}
+
 export async function loadWalletRecords(
   walletType?: WalletKind,
 ): Promise<WalletRecordMeta[]> {
   const type = walletType ?? await getActiveWalletType();
-  const records = await getJson<EncryptedWalletKey[]>(getStorageKey(type));
-  if (!records) return [];
-  return records.map((r: EncryptedWalletKey) => ({
-    id: r.id,
-    label: (r as any).label ?? 'Wallet',
-    color: (r as any).color ?? '#4f46e5',
-    createdAt: r.createdAt,
-    updatedAt: r.updatedAt,
-    walletType: r.walletType,
-  }));
+  await migrateJsWalletStoreToRust(type);
+
+  const rustRecords = await loadRustWalletRecords(type);
+  if (rustRecords) return rustRecords;
+
+  const records = await getJsWalletRecords(type);
+  return records.map((record) => mapNativeRecord(record));
 }
 
 export async function getActiveWalletId(walletType?: WalletKind): Promise<string | null> {
   const type = walletType ?? await getActiveWalletType();
-  return getJson<string>(getActiveWalletKey(type));
+  await migrateJsWalletStoreToRust(type);
+
+  const rustActiveId = await tryRustGetActiveWalletId(type);
+  if (rustActiveId) return rustActiveId;
+
+  return getJsActiveWalletId(type);
 }
 
 export async function setActiveWalletId(
@@ -83,6 +188,11 @@ export async function setActiveWalletId(
   walletType?: WalletKind,
 ): Promise<void> {
   const type = walletType ?? await getActiveWalletType();
+  if (await isRustWalletStoreAvailable()) {
+    const saved = await tryRustSetActiveWalletId(type, walletId);
+    if (saved) return;
+  }
+
   await setJson(getActiveWalletKey(type), walletId);
 }
 
@@ -91,9 +201,13 @@ export async function loadEncryptedWalletKeyById(
   walletType?: WalletKind,
 ): Promise<EncryptedWalletKey | null> {
   const type = walletType ?? await getActiveWalletType();
-  const records = await getJson<EncryptedWalletKey[]>(getStorageKey(type));
-  if (!records) return null;
-  return records.find((r: EncryptedWalletKey) => r.id === walletId) ?? null;
+  await migrateJsWalletStoreToRust(type);
+
+  const rustRecord = await loadRustEncryptedWalletKeyById(type, walletId);
+  if (rustRecord) return rustRecord;
+
+  const records = await getJsWalletRecords(type);
+  return records.find((record) => record.id === walletId) ?? null;
 }
 
 export async function loadWalletRecordById(walletId: string): Promise<EncryptedWalletKey | null> {
@@ -109,12 +223,17 @@ export async function loadEncryptedWalletKey(
   walletType?: WalletKind,
 ): Promise<EncryptedWalletKey | null> {
   const type = walletType ?? await getActiveWalletType();
+  await migrateJsWalletStoreToRust(type);
+
+  const rustRecord = await loadRustEncryptedWalletKey(type);
+  if (rustRecord) return rustRecord;
+
   const activeId = await getActiveWalletId(type);
   if (activeId) {
     return loadEncryptedWalletKeyById(activeId, type);
   }
-  const records = await getJson<EncryptedWalletKey[]>(getStorageKey(type));
-  if (!records || records.length === 0) return null;
+  const records = await getJsWalletRecords(type);
+  if (!records.length) return null;
   return records[0];
 }
 
@@ -123,15 +242,14 @@ export async function saveEncryptedWalletKey(
   walletType?: WalletKind,
 ): Promise<void> {
   const type = walletType ?? record.walletType ?? await getActiveWalletType();
-  const records = (await getJson<EncryptedWalletKey[]>(getStorageKey(type))) ?? [];
-  const index = records.findIndex((r: EncryptedWalletKey) => r.id === record.id);
-  if (index >= 0) {
-    records[index] = record;
-  } else {
-    records.push(record);
+  if (await isRustWalletStoreAvailable()) {
+    const migrated = await tryRustSaveEncryptedWalletKey(type, JSON.stringify(record));
+    if (migrated) {
+      return;
+    }
   }
-  await setJson(getStorageKey(type), records);
-  await setActiveWalletId(record.id, type);
+
+  await saveJsWalletRecord(record, type);
 }
 
 export async function encryptWalletKey(privateKey: string, password: string): Promise<EncryptedWalletKey> {
@@ -234,10 +352,14 @@ export async function createInitialWalletKey(password: string): Promise<Encrypte
 
 export async function markBackupCompleted(walletType?: WalletKind): Promise<void> {
   const type = walletType ?? await getActiveWalletType();
+  if (await tryRustMarkBackupCompleted(type)) {
+    return;
+  }
+
   const activeId = await getActiveWalletId(type);
   if (!activeId) return;
-  
-  const records = (await getJson<EncryptedWalletKey[]>(getStorageKey(type))) ?? [];
+
+  const records = await getJsWalletRecords(type);
   const index = records.findIndex((r: EncryptedWalletKey) => r.id === activeId);
   if (index >= 0) {
     records[index] = { ...records[index], backupCompleted: true, updatedAt: new Date().toISOString() };
@@ -247,6 +369,7 @@ export async function markBackupCompleted(walletType?: WalletKind): Promise<void
 
 export async function clearWallet(walletType?: WalletKind): Promise<void> {
   if (walletType) {
+    await tryRustClearWallet(walletType);
     await setJson(getStorageKey(walletType), []);
     await setJson(getActiveWalletKey(walletType), null);
     return;
@@ -255,6 +378,7 @@ export async function clearWallet(walletType?: WalletKind): Promise<void> {
   // Full local reset path: wipe all supported wallet namespaces.
   await Promise.all(
     (['ethereum', 'solana'] as WalletKind[]).flatMap((type) => [
+      tryRustClearWallet(type),
       setJson(getStorageKey(type), []),
       setJson(getActiveWalletKey(type), null),
     ]),
@@ -266,21 +390,15 @@ export async function importSolanaWalletRecord(
   password: string,
   walletType: WalletKind = 'solana'
 ): Promise<{ record: EncryptedWalletKey; keypair: any; mnemonic: string }> {
-  // Verify or set master passcode
   const isValid = await verifyOrSetMasterPasscode(password);
   if (!isValid) {
     throw new Error('Invalid master passcode');
   }
-  
-  const { Keypair } = await import('@solana/web3.js');
-  const { mnemonicToSeedSync } = await import('bip39');
-  
-  const seed = mnemonicToSeedSync(mnemonic);
-  const seedBytes = seed.slice(0, 32);
-  const keypair = Keypair.fromSeed(seedBytes);
-  
-  const privateKeyBase58 = Buffer.from(keypair.secretKey).toString('base64');
-  const encrypted = await encryptWalletKey(privateKeyBase58, password);
+
+  const { keypair, mnemonic: normalizedMnemonic } = await deriveSolanaKeypairFromMnemonic(mnemonic);
+
+  const secretKeyBase64 = Buffer.from(keypair.secretKey).toString('base64');
+  const encrypted = await encryptWalletKey(secretKeyBase64, password);
   
   const record: EncryptedWalletKey = {
     ...encrypted,
@@ -290,7 +408,7 @@ export async function importSolanaWalletRecord(
   };
   
   await saveEncryptedWalletKey(record, walletType);
-  return { record, keypair, mnemonic };
+  return { record, keypair, mnemonic: normalizedMnemonic };
 }
 
 export async function unlockSolanaWallet(
@@ -315,17 +433,13 @@ export async function createSolanaWalletRecord(
   if (!isValid) {
     throw new Error('Invalid master passcode');
   }
-  
-  const { Keypair } = await import('@solana/web3.js');
-  const { generateMnemonic, mnemonicToSeedSync } = await import('bip39');
-  
+
+  const { generateMnemonic } = await import('bip39');
   const mnemonic = generateMnemonic();
-  const seed = mnemonicToSeedSync(mnemonic);
-  const seedBytes = seed.slice(0, 32);
-  const keypair = Keypair.fromSeed(seedBytes);
-  
-  const privateKeyBase58 = Buffer.from(keypair.secretKey).toString('base64');
-  const encrypted = await encryptWalletKey(privateKeyBase58, password);
+  const { keypair, mnemonic: normalizedMnemonic } = await deriveSolanaKeypairFromMnemonic(mnemonic);
+
+  const secretKeyBase64 = Buffer.from(keypair.secretKey).toString('base64');
+  const encrypted = await encryptWalletKey(secretKeyBase64, password);
   
   const record: EncryptedWalletKey = {
     ...encrypted,
@@ -335,7 +449,7 @@ export async function createSolanaWalletRecord(
   };
   
   await saveEncryptedWalletKey(record, walletType);
-  return { record, keypair, mnemonic };
+  return { record, keypair, mnemonic: normalizedMnemonic };
 }
 
 export async function removeWalletRecord(
@@ -343,7 +457,11 @@ export async function removeWalletRecord(
   walletType?: WalletKind,
 ): Promise<void> {
   const type = walletType ?? await getActiveWalletType();
-  const records = (await getJson<EncryptedWalletKey[]>(getStorageKey(type))) ?? [];
+  if (await tryRustRemoveWalletRecord(type, walletId)) {
+    return;
+  }
+
+  const records = await getJsWalletRecords(type);
   const filtered = records.filter((r: EncryptedWalletKey) => r.id !== walletId);
   await setJson(getStorageKey(type), filtered);
   
@@ -359,7 +477,13 @@ export async function updateWalletRecordMeta(
   walletType?: WalletKind,
 ): Promise<WalletRecordMeta[]> {
   const type = walletType ?? await getActiveWalletType();
-  const records = (await getJson<EncryptedWalletKey[]>(getStorageKey(type))) ?? [];
+  const updatesJson = JSON.stringify(updates);
+  const rustRecords = await tryRustUpdateWalletRecordMeta(type, walletId, updatesJson);
+  if (rustRecords) {
+    return mapNativeRecordList(rustRecords);
+  }
+
+  const records = await getJsWalletRecords(type);
   const index = records.findIndex((r: EncryptedWalletKey) => r.id === walletId);
   if (index >= 0) {
     records[index] = { ...records[index], ...updates };

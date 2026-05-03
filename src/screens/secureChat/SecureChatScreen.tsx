@@ -806,6 +806,11 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
   useEffect(() => {
     if (Platform.OS !== 'android' || !isActive) return;
     const onBackPress = () => {
+      if (secureTab === 'connect') {
+        setTab('chats');
+        setView('list');
+        return true;
+      }
       if (secureTab === 'chats' && chatView === 'thread') {
         Keyboard.dismiss();
         setView('list');
@@ -840,6 +845,10 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
             devicePublicKey,
             serverInfo,
             xmtpStatus,
+            onBackToChats: () => {
+              setTab('chats');
+              setView('list');
+            },
             onConnectAddressChange: setConnectAddress,
             onConnectNameChange: setConnectName,
             onConnectPress: handleConnectPeer,

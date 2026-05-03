@@ -21,6 +21,11 @@ export default function ChangelogTab({ scrollStyle, cardStyle, onBack }: Changel
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: 10,
+        },
+        titleWrap: {
+          flex: 1,
+          minWidth: 0,
         },
         changeList: {
           marginTop: 8,
@@ -30,7 +35,21 @@ export default function ChangelogTab({ scrollStyle, cardStyle, onBack }: Changel
           color: colors.text,
         },
         latestPill: {
-          alignSelf: 'flex-start',
+          alignSelf: 'center',
+          paddingHorizontal: 10,
+          paddingVertical: 4,
+          borderRadius: 999,
+          borderWidth: 1,
+          borderColor: `${colors.accent}66`,
+          backgroundColor: `${colors.accent}22`,
+          marginLeft: 6,
+          flexShrink: 0,
+        },
+        latestPillText: {
+          color: colors.accent,
+          fontSize: 11,
+          fontWeight: '700',
+          letterSpacing: 0.3,
         },
         footerNote: {
           marginTop: 8,
@@ -48,10 +67,14 @@ export default function ChangelogTab({ scrollStyle, cardStyle, onBack }: Changel
       {CHANGELOG_ENTRIES.map((entry, index) => (
         <View key={entry.id} style={cardStyle}>
           <View style={localStyles.entryHeader}>
-            <Text style={styles.cardTitle}>{entry.title}</Text>
+            <View style={localStyles.titleWrap}>
+              <Text style={styles.cardTitle} numberOfLines={2}>
+                {entry.title}
+              </Text>
+            </View>
             {index === 0 && (
-              <View style={[styles.pill, localStyles.latestPill]}>
-                <Text style={styles.pillText}>Latest</Text>
+              <View style={localStyles.latestPill}>
+                <Text style={localStyles.latestPillText}>Latest</Text>
               </View>
             )}
           </View>

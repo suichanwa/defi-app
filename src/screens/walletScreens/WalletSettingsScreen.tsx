@@ -3,6 +3,7 @@ import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View 
 import { useFocusEffect, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import ColorPicker, { HueSlider, Panel1, Preview } from 'reanimated-color-picker';
 import { useTheme } from '@theme/ThemeProvider';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useNavVisibility } from '@context/NavVisibilityProvider';
@@ -15,8 +16,6 @@ type WalletStackParamList = {
 
 type WalletSettingsRouteProp = RouteProp<WalletStackParamList, 'WalletSettings'>;
 
-const COLOR_OPTIONS = ['#2563eb', '#f97316', '#16a34a', '#db2777', '#7c3aed', '#0ea5e9', '#facc15'];
-
 export default function WalletSettingsScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
@@ -26,10 +25,15 @@ export default function WalletSettingsScreen() {
   const { copyText } = useCopyToClipboard();
   const { setNavHidden } = useNavVisibility();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
   const walletId = route.params?.walletId;
   const wallet = wallets.find((record) => record.id === walletId);
   const [name, setName] = useState(wallet?.label ?? 'Wallet');
-  const [color, setColor] = useState(wallet?.color ?? COLOR_OPTIONS[0]);
+  const [color, setColor] = useState(wallet?.color ?? '#2563eb');
+  const baseName = wallet?.label ?? 'Wallet';
+  const baseColor = wallet?.color ?? '#2563eb';
+  const trimmedName = name.trim() || 'Wallet';
+  const hasChanges = trimmedName !== baseName || color !== baseColor;
 
   useFocusEffect(
     React.useCallback(() => {
@@ -40,11 +44,11 @@ export default function WalletSettingsScreen() {
 
   useEffect(() => {
     setName(wallet?.label ?? 'Wallet');
-    setColor(wallet?.color ?? COLOR_OPTIONS[0]);
+    setColor(wallet?.color ?? '#2563eb');
+    setShowColorPicker(false);
   }, [wallet?.color, wallet?.label, walletId]);
 
-  const label = wallet?.label ?? 'Wallet';
-  const selectedColor = wallet?.color ?? color;
+  const addressShort = walletId ? `${walletId.slice(0, 8)}...${walletId.slice(-8)}` : null;
 
   const handleCopyAddress = () => {
     if (!walletId) return;
@@ -81,11 +85,35 @@ export default function WalletSettingsScreen() {
   const handleSave = async () => {
     if (!walletId) return;
     await updateWalletMeta(walletId, {
-      label: name.trim() || 'Wallet',
+      label: trimmedName,
       color,
     });
     navigation.goBack();
   };
+
+  if (!wallet || !walletId) {
+    return (
+      <View style={[localStyles.container, { backgroundColor: colors.background }]}>
+        <View style={[localStyles.emptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <MaterialCommunityIcons name="wallet-outline" size={34} color={colors.muted} />
+          <Text style={[localStyles.emptyTitle, { color: colors.text }]}>Wallet not found</Text>
+          <Text style={[localStyles.emptySubtitle, { color: colors.muted }]}>
+            This wallet may have been removed from this device.
+          </Text>
+          <TouchableOpacity style={styles.primaryButton} activeOpacity={0.9} onPress={() => navigation.goBack()}>
+            <Text style={styles.primaryButtonText}>Back to wallets</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  const SectionCard = ({ section, children }: { section: string; children: React.ReactNode }) => (
+    <View style={[localStyles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <Text style={[localStyles.sectionLabel, { color: colors.muted }]}>{section}</Text>
+      {children}
+    </View>
+  );
 
   return (
     <View style={[localStyles.container, { backgroundColor: colors.background }]}>
@@ -99,13 +127,23 @@ export default function WalletSettingsScreen() {
           >
             <MaterialCommunityIcons name="chevron-left" size={22} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[localStyles.title, { color: colors.text }]}>Wallet settings</Text>
+          <View style={localStyles.headerTextBlock}>
+            <Text style={[localStyles.title, { color: colors.text }]}>Wallet settings</Text>
+            <Text style={[localStyles.subtitle, { color: colors.muted }]}>Edit name, color, and wallet actions.</Text>
+          </View>
           <View style={localStyles.headerSpacer} />
         </View>
 
-        <View style={[localStyles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[localStyles.infoLabel, { color: colors.muted }]}>Personalize</Text>
-          <Text style={[localStyles.sectionTitle, { color: colors.text, marginTop: 10 }]}>Name</Text>
+        <SectionCard section="Wallet details">
+          <View style={localStyles.walletMetaRow}>
+            <View style={[localStyles.walletMetaDot, { backgroundColor: color }]} />
+            <View style={localStyles.walletMetaText}>
+              <Text style={[localStyles.infoTitle, { color: colors.text }]}>{trimmedName}</Text>
+              <Text style={[localStyles.walletMetaSub, { color: colors.muted }]}>{addressShort}</Text>
+            </View>
+          </View>
+
+          <Text style={[localStyles.fieldTitle, { color: colors.text }]}>Wallet name</Text>
           <TextInput
             value={name}
             onChangeText={setName}
@@ -115,64 +153,69 @@ export default function WalletSettingsScreen() {
               localStyles.input,
               { color: colors.text, backgroundColor: colors.background, borderColor: colors.border },
             ]}
+            maxLength={24}
           />
 
-          <Text style={[localStyles.sectionTitle, { color: colors.text }]}>Color</Text>
-          <View style={localStyles.colorRow}>
-            {COLOR_OPTIONS.map((option) => {
-              const selected = option === color;
-              return (
-                <TouchableOpacity
-                  key={option}
-                  activeOpacity={0.8}
-                  style={[
-                    localStyles.colorSwatch,
-                    { backgroundColor: option, borderColor: selected ? colors.text : 'transparent' },
-                  ]}
-                  onPress={() => setColor(option)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Pick color ${option}`}
-                />
-              );
-            })}
+          <Text style={[localStyles.fieldTitle, { color: colors.text }]}>Card color</Text>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={[localStyles.colorButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+            onPress={() => setShowColorPicker((value) => !value)}
+            accessibilityRole="button"
+            accessibilityLabel="Choose card color"
+          >
+            <View style={localStyles.colorButtonLeft}>
+              <View style={[localStyles.colorButtonDot, { backgroundColor: color }]} />
+              <Text style={[localStyles.colorButtonLabel, { color: colors.text }]}>{color.toUpperCase()}</Text>
+            </View>
+            <MaterialCommunityIcons
+              name={showColorPicker ? 'chevron-up' : 'chevron-down'}
+              size={18}
+              color={colors.muted}
+            />
+          </TouchableOpacity>
+          {showColorPicker ? (
+            <View
+              style={[localStyles.colorPickerCard, { backgroundColor: colors.background, borderColor: colors.border }]}
+            >
+              <ColorPicker value={color} onCompleteJS={(picked) => setColor(picked.hex)} style={localStyles.colorPicker}>
+                <Preview hideText={false} colorFormat="hex" style={localStyles.colorPreview} />
+                <Panel1 style={localStyles.colorPanel} />
+                <HueSlider style={localStyles.hueSlider} />
+              </ColorPicker>
+            </View>
+          ) : null}
+
+          <View style={localStyles.addressBlock}>
+            <Text style={[localStyles.addressLabel, { color: colors.muted }]}>Address</Text>
+            <Text style={[localStyles.infoAddress, { color: colors.text }]}>{walletId}</Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              activeOpacity={0.8}
+              style={[localStyles.copyButton, { borderColor: colors.border, backgroundColor: colors.background }]}
+              onPress={handleCopyAddress}
+            >
+              <MaterialCommunityIcons name="content-copy" size={16} color={colors.text} />
+              <Text style={[localStyles.copyButtonText, { color: colors.text }]}>Copy address</Text>
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity
             activeOpacity={0.9}
-            style={[styles.primaryButton, localStyles.saveButton]}
+            style={[
+              styles.primaryButton,
+              localStyles.saveButton,
+              (!hasChanges || isDeleting) && styles.buttonDisabled,
+            ]}
             onPress={handleSave}
-            disabled={!walletId}
+            disabled={!hasChanges || isDeleting}
           >
-            <Text style={styles.primaryButtonText}>Save changes</Text>
+            <Text style={styles.primaryButtonText}>{hasChanges ? 'Save changes' : 'No changes yet'}</Text>
           </TouchableOpacity>
-        </View>
-
-        <View style={[localStyles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[localStyles.infoLabel, { color: colors.muted }]}>Wallet</Text>
-          <Text style={[localStyles.infoTitle, { color: colors.text }]}>{label}</Text>
-          <View style={localStyles.previewRow}>
-            <View style={[localStyles.previewDot, { backgroundColor: selectedColor }]} />
-            <Text style={[localStyles.previewLabel, { color: colors.muted }]}>Card color preview</Text>
-          </View>
-          {walletId ? (
-            <View style={localStyles.addressBlock}>
-              <Text style={[localStyles.addressLabel, { color: colors.muted }]}>Address</Text>
-              <Text style={[localStyles.infoAddress, { color: colors.text }]}>{walletId}</Text>
-              <TouchableOpacity
-                accessibilityRole="button"
-                activeOpacity={0.8}
-                style={[localStyles.copyButton, { borderColor: colors.border, backgroundColor: colors.background }]}
-                onPress={handleCopyAddress}
-              >
-                <MaterialCommunityIcons name="content-copy" size={16} color={colors.text} />
-                <Text style={[localStyles.copyButtonText, { color: colors.text }]}>Copy address</Text>
-              </TouchableOpacity>
-            </View>
-          ) : null}
-        </View>
+        </SectionCard>
 
         <View style={[localStyles.deleteCard, { borderColor: colors.border }]}>
-          <Text style={[localStyles.deleteTitle, { color: colors.text }]}>Remove wallet</Text>
+          <Text style={[localStyles.deleteTitle, { color: colors.text }]}>Danger zone</Text>
           <Text style={[localStyles.deleteSubtitle, { color: colors.muted }]}>
             This only removes the wallet from this device. You can restore it later with your recovery phrase.
           </Text>
@@ -195,12 +238,17 @@ const localStyles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 28,
   },
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  headerTextBlock: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 12,
   },
   backButton: {
     width: 36,
@@ -214,92 +262,131 @@ const localStyles = StyleSheet.create({
     width: 36,
   },
   title: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
+    marginTop: 2,
+  },
+  subtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 4,
+    lineHeight: 18,
   },
   infoCard: {
-    padding: 16,
-    borderRadius: 16,
+    padding: 14,
+    borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 20,
+    marginBottom: 14,
   },
-  previewRow: {
-    marginTop: 10,
+  walletMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
+    marginTop: 8,
   },
-  previewDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+  walletMetaText: {
+    flex: 1,
+  },
+  walletMetaDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
-  previewLabel: {
+  walletMetaSub: {
     fontSize: 12,
-    fontWeight: '700',
-  },
-  infoLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontWeight: '500',
+    marginTop: 2,
+    fontFamily: 'monospace',
   },
   infoTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '700',
     marginTop: 6,
   },
-  sectionTitle: {
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  fieldTitle: {
     fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 10,
-    marginTop: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+    marginTop: 12,
   },
   input: {
-    borderRadius: 14,
-    borderWidth: 1.5,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 24,
-  },
-  colorRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+    fontWeight: '500',
     marginBottom: 10,
   },
-  colorSwatch: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2,
+  colorButton: {
+    borderWidth: 1,
+    borderRadius: 10,
+    minHeight: 42,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  colorButtonLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  colorButtonDot: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  colorButtonLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  colorPickerCard: {
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 8,
+    marginTop: 8,
+    marginBottom: 2,
+  },
+  colorPicker: {
+    width: '100%',
+  },
+  colorPreview: {
+    marginBottom: 8,
+  },
+  colorPanel: {
+    borderRadius: 10,
+    minHeight: 110,
+  },
+  hueSlider: {
+    marginTop: 8,
   },
   saveButton: {
-    marginTop: 12,
+    marginTop: 10,
   },
   infoAddress: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     marginTop: 4,
     lineHeight: 18,
   },
   addressBlock: {
-    marginTop: 12,
+    marginTop: 10,
   },
   addressLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    fontSize: 12,
+    fontWeight: '600',
   },
   copyButton: {
-    marginTop: 12,
+    marginTop: 10,
     alignSelf: 'flex-start',
     borderWidth: 1,
     borderRadius: 10,
@@ -311,21 +398,21 @@ const localStyles = StyleSheet.create({
   },
   copyButtonText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   deleteCard: {
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
-    padding: 16,
+    padding: 14,
   },
   deleteTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '700',
     marginBottom: 6,
   },
   deleteSubtitle: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
     lineHeight: 18,
     marginBottom: 16,
   },
@@ -343,5 +430,26 @@ const localStyles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.6,
+  },
+  emptyState: {
+    margin: 20,
+    marginTop: 40,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginTop: 10,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 20,
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 18,
   },
 });
