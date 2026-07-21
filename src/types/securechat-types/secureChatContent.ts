@@ -12,6 +12,7 @@ export type SecureChatConnectProps = {
   onConnectNameChange: (value: string) => void;
   onConnectPress: () => void;
   onStartServer: () => void;
+  onClearLog?: () => void;
 };
 
 export type SecureChatThreadProps = {

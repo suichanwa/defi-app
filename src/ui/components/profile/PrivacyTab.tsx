@@ -118,7 +118,8 @@ export default function PrivacyTab({
           <Switch
             value={biometricUnlockEnabled}
             onValueChange={onChangeBiometricUnlockEnabled}
-            color={colors.accent}
+            thumbColor={colors.accent}
+            trackColor={{ false: '#334155', true: colors.accent }}
           />
         </View>
       </View>

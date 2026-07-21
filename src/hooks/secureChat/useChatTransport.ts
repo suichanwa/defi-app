@@ -13,6 +13,7 @@ type TransportArgs = {
   effectiveUserId: string;
   userAvatarType: AvatarType;
   userAvatarUri?: string;
+  xmtpInboxId?: string | null;
   setMessagesByChat: React.Dispatch<React.SetStateAction<Record<string, ChatMessage[]>>>;
   setChats: React.Dispatch<React.SetStateAction<any>>;
   onConnectionLog?: (message: string) => void;
@@ -38,6 +39,7 @@ export function useChatTransport({
   effectiveUserId,
   userAvatarType,
   userAvatarUri,
+  xmtpInboxId,
   setMessagesByChat,
   setChats,
   onConnectionLog,

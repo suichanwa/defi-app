@@ -1,4 +1,4 @@
-import { Connection } from '@solana/web3.js';
+import { Connection, type Commitment } from '@solana/web3.js';
 import { getActiveChain, isSolanaChain } from '../config/chain';
 import { RpcConfigurationError } from './provider';
 
@@ -23,4 +23,29 @@ export function getSolanaConnection(): Connection {
 
 export function resetSolanaConnection() {
   connection = null;
+}
+
+const CONFIRM_POLL_INTERVAL_MS = 2_000;
+const CONFIRM_TIMEOUT_MS = 60_000;
+
+// Polls over HTTP instead of connection.confirmTransaction(), which relies on
+// WebSocket signatureSubscribe — rejected by public devnet RPC endpoints.
+export async function confirmSignatureByPolling(
+  connection: Connection,
+  signature: string,
+  commitment: Commitment = 'confirmed',
+): Promise<void> {
+  const deadline = Date.now() + CONFIRM_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const { value } = await connection.getSignatureStatus(signature);
+    if (value?.err) {
+      throw new Error(`Transaction failed: ${JSON.stringify(value.err)}`);
+    }
+    const status = value?.confirmationStatus;
+    if (status === 'finalized' || (commitment !== 'finalized' && status === 'confirmed')) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, CONFIRM_POLL_INTERVAL_MS));
+  }
+  throw new Error(`Transaction confirmation timed out for signature ${signature}`);
 }

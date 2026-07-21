@@ -45,6 +45,13 @@ import { useXmtpClient } from '@context/XmtpProvider';
 import { notifyAndroidSecureChatMessage } from '@services/androidNotifications';
 import { DEFAULT_GLOBAL_CHAT_ID } from '@constants/secureChat.constants';
 
+const logEntry = (msg: string): string => {
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  return `[${hh}:${mm}] ${msg}`;
+};
+
 type PendingFile = {
   uri: string;
   name: string;
@@ -70,7 +77,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     },
   ]);
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
-  const [connectionLog, setConnectionLog] = useState<string[]>([SecureChatConstants.DEFAULT_CONNECTION_LOG]);
+  const [connectionLog, setConnectionLog] = useState<string[]>([logEntry(SecureChatConstants.DEFAULT_CONNECTION_LOG)]);
   const [roomId, setRoomId] = useState<string>(SecureChatConstants.DEFAULT_GLOBAL_CHAT_ID);
   const [mutedChatIds, setMutedChatIds] = useState<Set<string>>(() => new Set());
   const [unreadCountByChatId, setUnreadCountByChatId] = useState<Record<string, number>>({});
@@ -156,7 +163,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
       mapRow,
       resolveMessages: resolveChatImageMessages,
       onHistoryError: (message) => {
-        setConnectionLog((prev) => [`History error: ${message}`, ...prev]);
+        setConnectionLog((prev) => [logEntry(`History error: ${message}`), ...prev]);
       },
     });
 
@@ -173,7 +180,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
   const selectedHistoryState = historyStateByChat[selectedChatId];
 
   const handleXmtpSyncError = useCallback((message: string) => {
-    setConnectionLog((prev) => [`DM sync error: ${message}`, ...prev]);
+    setConnectionLog((prev) => [logEntry(`DM sync error: ${message}`), ...prev]);
   }, []);
 
   const scopedShowToast = useCallback<ToastFn>(
@@ -203,19 +210,19 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
 
   useEffect(() => {
     if (!xmtpError) return;
-    setConnectionLog((prev) => [`XMTP error: ${xmtpError}`, ...prev]);
+    setConnectionLog((prev) => [logEntry(`XMTP error: ${xmtpError}`), ...prev]);
   }, [xmtpError]);
 
   useEffect(() => {
     if (xmtpStatus !== 'ready' || !xmtpClient?.inboxId) return;
-    const line = `XMTP ready: inbox ${xmtpClient.inboxId}`;
-    setConnectionLog((prev) => (prev.includes(line) ? prev : [line, ...prev]));
+    const line = logEntry(`XMTP ready: inbox ${xmtpClient.inboxId}`);
+    setConnectionLog((prev) => (prev.some((l) => l.includes(`inbox ${xmtpClient.inboxId}`)) ? prev : [line, ...prev]));
   }, [xmtpClient?.inboxId, xmtpStatus]);
 
   useEffect(() => {
     if (xmtpStatus !== 'unsupported') return;
-    const line = 'XMTP unavailable: unlock an Ethereum wallet to enable direct messages (Solana addresses can route via linked XMTP wallet).';
-    setConnectionLog((prev) => (prev.includes(line) ? prev : [line, ...prev]));
+    const line = logEntry('XMTP unavailable: unlock an Ethereum wallet to enable direct messages (Solana addresses can route via linked XMTP wallet).');
+    setConnectionLog((prev) => (prev.some((l) => l.includes('XMTP unavailable')) ? prev : [line, ...prev]));
   }, [xmtpStatus]);
 
   const getChatById = useCallback(
@@ -379,7 +386,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
   );
 
   const handleRealtimeSubscribed = useCallback(async () => {
-    setConnectionLog((prev) => [`Joined room ${roomId}.`, ...prev]);
+    setConnectionLog((prev) => [logEntry(`Joined room ${roomId}.`), ...prev]);
     setServerInfo({ address: 'supabase', port: 0, status: 'running' });
     setChats((prev) =>
       prev.map((chat) => (chat.id === roomId ? { ...chat, isOnline: true } : chat)),
@@ -388,7 +395,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
   }, [roomId]);
 
   const handleRealtimeError = useCallback(() => {
-    setConnectionLog((prev) => [`Failed to join room ${roomId}. Check Supabase Realtime keys.`, ...prev]);
+    setConnectionLog((prev) => [logEntry(`Failed to join room ${roomId}. Check Supabase Realtime keys.`), ...prev]);
   }, [roomId]);
 
   const handlePresenceChange = useCallback(
@@ -414,7 +421,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
   useEffect(() => {
     if (!isSupabaseConfigured) {
       setConnectionLog((prev) => [
-        'Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY to enable chat.',
+        logEntry('Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY to enable chat.'),
         ...prev,
       ]);
     }
@@ -507,10 +514,11 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     effectiveUserId,
     userAvatarType,
     userAvatarUri,
+    xmtpInboxId: xmtpClient?.inboxId,
     setMessagesByChat,
     setChats,
     onConnectionLog: (message) => {
-      setConnectionLog((prev) => [message, ...prev]);
+      setConnectionLog((prev) => [logEntry(message), ...prev]);
     },
     sendRoomBroadcast: async (payload) => {
       await sendBroadcast(payload);
@@ -578,7 +586,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
         setTab('connect');
         setView('list');
         setConnectionLog((prev) => [
-          'Enter a peer wallet address (Ethereum 0x... or Solana base58).',
+          logEntry('Enter a peer wallet address (Ethereum 0x... or Solana base58).'),
           ...prev,
         ]);
         scopedShowToast({
@@ -744,23 +752,30 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     const address = connectAddress.trim();
     const name = connectName.trim() || `Peer @ ${address}`;
     if (!address) {
-      setConnectionLog((prev) => ['Enter a peer wallet address (Ethereum 0x... or Solana base58) to start XMTP DM.', ...prev]);
+      setConnectionLog((prev) => [logEntry('Enter a peer wallet address (Ethereum 0x... or Solana base58) to start XMTP DM.'), ...prev]);
       return;
     }
     try {
       const chatId = await startDM(address, name);
-      setConnectionLog((prev) => [`XMTP DM ready with ${address}.`, ...prev]);
+      setConnectionLog((prev) => [logEntry(`XMTP DM ready with ${address}.`), ...prev]);
       selectChat(chatId);
       setRoomId(chatId);
       setTab('chats');
       setConnectAddress('');
       setConnectName('');
+      scopedShowToast({
+        type: 'success',
+        text1: `Chat started with ${name}`,
+        text2: 'Your new conversation is open and ready.',
+        position: 'top',
+        visibilityTime: 3500,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to start XMTP DM.';
-      setConnectionLog((prev) => [`XMTP connect error: ${message}`, ...prev]);
+      setConnectionLog((prev) => [logEntry(`XMTP connect error: ${message}`), ...prev]);
       Alert.alert('XMTP connection error', message);
     }
-  }, [connectAddress, connectName, selectChat, setConnectAddress, setConnectName, setTab, startDM]);
+  }, [connectAddress, connectName, scopedShowToast, selectChat, setConnectAddress, setConnectName, setTab, startDM]);
 
   const handleStartServer = () => {
     if (serverInfo?.status === 'running') return;
@@ -770,11 +785,11 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
       Math.floor(Math.random() * SecureChatConstants.DEFAULT_HOST_PORT_RANGE);
 
     setServerInfo({ address, port, status: 'starting' });
-    setConnectionLog((prev) => [`Starting secure server on ${address}:${port}...`, ...prev]);
+    setConnectionLog((prev) => [logEntry(`Starting secure server on ${address}:${port}...`), ...prev]);
 
     setTimeout(() => {
       setServerInfo({ address, port, status: 'running' });
-      setConnectionLog((prev) => [`Server ready at ${address}:${port}`, ...prev]);
+      setConnectionLog((prev) => [logEntry(`Server ready at ${address}:${port}`), ...prev]);
       setChats((prev) => {
         const payload: ChatThread = {
           id: 'hosted-server',
@@ -853,6 +868,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
             onConnectNameChange: setConnectName,
             onConnectPress: handleConnectPeer,
             onStartServer: handleStartServer,
+            onClearLog: () => setConnectionLog([]),
           }}
           thread={{
             chat: selectedChat,
@@ -912,7 +928,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
           accessibilityRole="button"
           accessibilityLabel="Open connect screen"
         >
-          <MaterialCommunityIcons name="plus" size={22} color={colors.accentText} />
+          <MaterialCommunityIcons name="plus" size={24} color={colors.accentText} />
         </TouchableOpacity>
       ) : null}
     </View>

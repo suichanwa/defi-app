@@ -25,17 +25,27 @@ export const createWalletStyles = (colors: ReturnType<typeof useTheme>['colors']
       color: colors.muted,
     },
 
+    screenHost: {
+      flex: 1,
+      width: '100%',
+    },
+
+    scrollHost: {
+      flex: 1,
+      width: '100%',
+    },
+
     scrollContent: {
       flexGrow: 1,
       paddingHorizontal: 20,
       paddingTop: 24,
-      paddingBottom: 120,
+      paddingBottom: 160,
     },
 
     // Header styles
     headerRow: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
+      alignItems: 'center',
       justifyContent: 'space-between',
       marginBottom: 24,
       flexWrap: 'wrap',
@@ -690,5 +700,49 @@ export const createWalletStyles = (colors: ReturnType<typeof useTheme>['colors']
     },
     keypadButtonIcon: {
       color: colors.text,
+    },
+
+    // Success card styles
+    successCard: {
+      alignItems: 'center',
+    },
+    successHero: {
+      alignItems: 'center',
+      marginBottom: 24,
+    },
+    successIconWrap: {
+      marginBottom: 16,
+    },
+    successTitle: {
+      ...sharedTitleStyle,
+      color: colors.text,
+      textAlign: 'center',
+      marginBottom: 8,
+    },
+    successSubtitle: {
+      ...sharedSubtitleStyle,
+      color: colors.muted,
+      textAlign: 'center',
+    },
+    successInfoRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderRadius: 12,
+      backgroundColor: `${colors.accent}10`,
+      marginBottom: 20,
+    },
+    successInfoRowSkipped: {
+      backgroundColor: '#f59e0b10',
+    },
+    successInfoText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    successInfoTextSkipped: {
+      color: '#f59e0b',
     },
   });

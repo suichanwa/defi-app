@@ -1,5 +1,5 @@
 import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
-import { getSolanaConnection } from './solanaProvider';
+import { confirmSignatureByPolling, getSolanaConnection } from './solanaProvider';
 import type { Keypair } from '@solana/web3.js';
 
 export async function sendSolTransfer(fromKeypair: Keypair, toAddress: string, amountSol: number): Promise<string> {
@@ -20,9 +20,6 @@ export async function sendSolTransfer(fromKeypair: Keypair, toAddress: string, a
   const signature = await connection.sendRawTransaction(transaction.serialize(), {
     skipPreflight: false,
   });
-  await connection.confirmTransaction(
-    { signature, blockhash: latestBlockhash.blockhash, lastValidBlockHeight: latestBlockhash.lastValidBlockHeight },
-    'confirmed',
-  );
+  await confirmSignatureByPolling(connection, signature, 'confirmed');
   return signature;
 }

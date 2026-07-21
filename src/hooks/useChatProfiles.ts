@@ -71,25 +71,30 @@ export function useChatProfiles({ authorIds, enabled = true }: UseChatProfilesAr
     const batches = chunk(pending, 50);
 
     const fetchProfiles = async () => {
-      for (const ids of batches) {
-        ids.forEach((id) => inFlight.current.add(id));
-        const { data, error } = await supabaseClient
-          .from('user_profiles')
-          .select('id, alias, avatar_type, avatar_url, avatar_seed, updated_at')
-          .in('id', ids);
-        ids.forEach((id) => inFlight.current.delete(id));
-        if (!active) return;
-        ids.forEach((id) => {
-          lastFetchedAtRef.current[id] = Date.now();
-        });
-        if (error || !data) continue;
-        setProfilesById((prev) => {
-          const next = { ...prev };
-          data.forEach((row) => {
-            next[row.id] = mapRowToProfile(row as ProfileRow);
+      try {
+        for (const ids of batches) {
+          ids.forEach((id) => inFlight.current.add(id));
+          const { data, error } = await supabaseClient
+            .from('user_profiles')
+            .select('id, alias, avatar_type, avatar_url, avatar_seed, updated_at')
+            .in('id', ids);
+          ids.forEach((id) => inFlight.current.delete(id));
+          if (!active) return;
+          ids.forEach((id) => {
+            lastFetchedAtRef.current[id] = Date.now();
           });
-          return next;
-        });
+          if (error || !data) continue;
+          setProfilesById((prev) => {
+            const next = { ...prev };
+            data.forEach((row) => {
+              next[row.id] = mapRowToProfile(row as ProfileRow);
+            });
+            return next;
+          });
+        }
+      } catch (fetchError) {
+        batches.flat().forEach((id) => inFlight.current.delete(id));
+        // Gracefully ignore transient network/CORS issues
       }
     };
 

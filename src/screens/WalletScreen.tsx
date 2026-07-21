@@ -352,7 +352,7 @@ export function WalletHomeScreen({ navigation }: { navigation: StackNavigationPr
     setAirdropMessage(null);
     try {
       await requestSolAirdrop({ address, amountSol: SOL_AIRDROP_AMOUNT, commitment: 'confirmed' });
-      setAirdropMessage('Airdrop requested. Balance will update shortly.');
+setAirdropMessage('Airdrop requested. Balance will update shortly.');
       setAirdropTick((prev) => prev + 1);
     } catch (error) {
       const defaultMessage = getAirdropErrorMessage(error);
@@ -370,7 +370,9 @@ export function WalletHomeScreen({ navigation }: { navigation: StackNavigationPr
 
   return (
     <ScrollView
+      style={styles.scrollHost}
       contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}
+      showsVerticalScrollIndicator={true}
       onScrollBeginDrag={onScrollBeginDrag}
       onScrollEndDrag={onScrollEndDrag}
       onMomentumScrollEnd={onMomentumScrollEnd}
@@ -1017,25 +1019,27 @@ export default function WalletScreen() {
   }
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-          ...walletStackScreenOptions,
-        }}
-      >
-        <Stack.Screen name="WalletHome" component={WalletHomeScreen} />
-        <Stack.Screen name="Add" component={AddScreen} />
-        <Stack.Screen name="Send" component={SendScreen} />
-        <Stack.Screen name="SendCrypto" component={SendCryptoScreen} />
-        <Stack.Screen name="SendCryptoComplete" component={SendCryptoComplete} />
-        <Stack.Screen name="Receive" component={ReceiveScreen} />
-        <Stack.Screen name="QRReceive" component={QRReceiveScreen} />
-        <Stack.Screen name="Swap" component={SwapScreen} />
-        <Stack.Screen name="ExpressSwap" component={ExpressSwapScreen} />
-        <Stack.Screen name="ExpressSwapSuccess" component={ExpressSwapSuccessScreen} />
-        <Stack.Screen name="WalletSettings" component={WalletSettingsScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <View style={styles.screenHost}>
+      <NavigationContainer>
+        <Stack.Navigator
+          screenOptions={{
+            headerShown: false,
+            ...walletStackScreenOptions,
+          }}
+        >
+          <Stack.Screen name="WalletHome" component={WalletHomeScreen} />
+          <Stack.Screen name="Add" component={AddScreen} />
+          <Stack.Screen name="Send" component={SendScreen} />
+          <Stack.Screen name="SendCrypto" component={SendCryptoScreen} />
+          <Stack.Screen name="SendCryptoComplete" component={SendCryptoComplete} />
+          <Stack.Screen name="Receive" component={ReceiveScreen} />
+          <Stack.Screen name="QRReceive" component={QRReceiveScreen} />
+          <Stack.Screen name="Swap" component={SwapScreen} />
+          <Stack.Screen name="ExpressSwap" component={ExpressSwapScreen} />
+          <Stack.Screen name="ExpressSwapSuccess" component={ExpressSwapSuccessScreen} />
+          <Stack.Screen name="WalletSettings" component={WalletSettingsScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </View>
   );
 }

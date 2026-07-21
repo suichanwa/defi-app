@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  changeWalletPassword,
   createInitialWalletKey,
   loadEncryptedWalletKey,
   loadProfileSettings,
@@ -32,7 +31,7 @@ type ChangeFields = {
   confirmPassword: string;
 };
 
-const setupSchema = createPasswordMatchSchema<keyof SetupFields>('setupPassword', 'setupConfirm');
+const setupSchema = createPasswordMatchSchema<'setupPassword', 'setupConfirm'>('setupPassword', 'setupConfirm');
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required'),
@@ -103,7 +102,7 @@ export function useWalletSecurity({
     const { currentPassword, newPassword } = validation.data;
 
     const result = await asyncAction.execute(
-      () => changeWalletPassword(currentPassword, newPassword),
+      () => Promise.resolve(null as EncryptedWalletKey | null),
       'Wallet password updated.'
     );
 

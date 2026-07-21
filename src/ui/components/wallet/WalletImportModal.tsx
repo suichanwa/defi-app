@@ -62,18 +62,16 @@ export default function WalletImportModal({
 
   useEffect(() => {
     if (!visible) {
-      setWordCount(12);
-      setWords(Array(12).fill(''));
+      setWordCount((prev) => (prev === 12 ? prev : 12));
+      setWords((prev) => (prev.length === 12 && prev.every((w) => w === '') ? prev : Array(12).fill('')));
     } else if (mnemonicInput) {
       const parentWordCount = getMnemonicWordCount(mnemonicInput);
-      const parentWords = normalizeMnemonicInput(mnemonicInput).split(' ').filter(Boolean);
-      const nextCount = parentWordCount === 24 ? 24 : wordCount;
-      if (parentWords.join(' ') !== words.filter(Boolean).join(' ') || words.length !== nextCount) {
-        setWordCount(nextCount);
-        setWords(buildMnemonicWords(mnemonicInput, nextCount));
-      }
+      const nextCount = parentWordCount === 24 ? 24 : 12;
+      const nextWords = buildMnemonicWords(mnemonicInput, nextCount);
+      setWordCount(nextCount);
+      setWords((prev) => (prev.join(' ') === nextWords.join(' ') && prev.length === nextCount ? prev : nextWords));
     }
-  }, [visible, mnemonicInput, wordCount, words]);
+  }, [visible, mnemonicInput]);
 
   const handleWordCountChange = (nextCount: 12 | 24) => {
     setWordCount(nextCount);

@@ -22,12 +22,12 @@ export default function SecureChatLayout({
   children,
 }: Props) {
   const { colors } = useTheme();
-  const showNav = chatView !== 'thread';
+  const showNav = chatView !== 'thread' && secureTab !== 'connect';
   const navOpacity = useRef(new Animated.Value(1)).current;
   const navTranslateY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (chatView === 'thread') {
+    if (!showNav) {
       // Animate navbar out: fade and slide up
       Animated.parallel([
         Animated.timing(navOpacity, {
@@ -56,7 +56,7 @@ export default function SecureChatLayout({
         }),
       ]).start();
     }
-  }, [chatView, navOpacity, navTranslateY]);
+  }, [showNav, navOpacity, navTranslateY]);
 
   return (
     <View
