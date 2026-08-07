@@ -19,6 +19,7 @@ import {
   updateWalletRecordMeta,
   encryptWalletKey,
   decryptWalletKey,
+  isAppEncryptedWalletPayload,
 } from '../services/walletKeyStore';
 import { getActiveChain } from '../config/chain';
 import { setActiveWalletType } from '../services/activeWalletType';
@@ -118,14 +119,16 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
       }
 
       let walletInstance: Wallet | HDNodeWallet;
-      try {
-        // New path: decrypt app-stored key payload (Rust/native or JS fallback) then create wallet instance.
+      if (isAppEncryptedWalletPayload(record.encryptedJson)) {
+        // App-stored key payload (Rust/native or JS fallback). Branching on the payload
+        // format instead of catching keeps a wrong-passcode error from being masked by
+        // the legacy fallback below.
         const decryptedPrivateKey = await decryptWalletKey(record.encryptedJson, password);
         const normalizedPrivateKey = decryptedPrivateKey.startsWith('0x')
           ? decryptedPrivateKey
           : `0x${decryptedPrivateKey}`;
         walletInstance = new Wallet(normalizedPrivateKey);
-      } catch {
+      } else {
         // Backward compatibility: previously stored Ethereum wallets use ethers encrypted JSON.
         walletInstance = await Wallet.fromEncryptedJson(record.encryptedJson, password);
       }
@@ -245,11 +248,13 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
 
   const createWallet = async (passwordOrOptions?: string | WalletCreateOptions) => {
     const { password, options } = resolveWalletCreateArgs(passwordOrOptions);
-    console.log('=== WalletSessionProvider.createWallet ===');
-    console.log('Password received:', password);
-    console.log('Password type:', typeof password);
-    console.log('Password length:', password?.length);
-    
+    if (__DEV__) {
+      // Never log the value itself: dev logcat is readable by other apps and Sentry
+      // sweeps console output into breadcrumbs on dev builds too.
+      console.log('=== WalletSessionProvider.createWallet ===');
+      console.log('Password type:', typeof password, 'length:', password?.length);
+    }
+
     if (getActiveChain().kind === 'solana') {
       const { record, keypair, mnemonic } = await createSolanaWalletRecord(password);
       await setActiveWalletType(record.walletType ?? 'solana');

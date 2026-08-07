@@ -26,6 +26,31 @@ const PBKDF2_ITERATIONS = 100000;
 const SALT_LENGTH = 16;
 const IV_LENGTH = 16;
 
+// Message text is matched by walletErrorMessage() -> "Incorrect passcode."
+const INVALID_PASSCODE_MESSAGE = 'Invalid password for this wallet.';
+
+// ponytail: AES-CTR carries no MAC, so a wrong passcode decrypts to random bytes
+// instead of failing. Everything we store is printable ASCII (an 0x-hex private key
+// or a base64 secret key), so a non-ASCII result means the key was wrong.
+// Upgrade path: an AEAD payload (AES-GCM, or CTR+HMAC) as version 2 here and in
+// rust-api/src/lib.rs, keeping v1 readable for existing wallets.
+function assertDecryptedPlaintext(plaintext: string): string {
+  if (!plaintext || !/^[\x20-\x7e]+$/.test(plaintext)) {
+    throw new Error(INVALID_PASSCODE_MESSAGE);
+  }
+  return plaintext;
+}
+
+/** True for payloads written by encryptWalletKey (JS or Rust). False for legacy ethers JSON. */
+export function isAppEncryptedWalletPayload(encryptedJson: string): boolean {
+  try {
+    const parsed = JSON.parse(encryptedJson);
+    return parsed?.version === 1 && parsed?.algorithm === 'aes-256-ctr';
+  } catch {
+    return false;
+  }
+}
+
 const getStorageKey = (walletType: WalletKind) => `wallet.records.${walletType}.v1`;
 const getActiveWalletKey = (walletType: WalletKind) => `wallet.active.${walletType}.v1`;
 
@@ -306,7 +331,7 @@ export async function decryptWalletKey(encryptedJson: string, password: string):
 
   const rustDecrypted = await tryRustDecryptWalletKey(encryptedJson, password);
   if (rustDecrypted !== null) {
-    return rustDecrypted;
+    return assertDecryptedPlaintext(rustDecrypted);
   }
 
   const data = JSON.parse(encryptedJson);
@@ -323,9 +348,16 @@ export async function decryptWalletKey(encryptedJson: string, password: string):
 
   const aesCtr = new aesjs.ModeOfOperation.ctr(key, new aesjs.Counter(iv));
   const decryptedBytes = aesCtr.decrypt(ciphertext);
-  const decryptedText = aesjs.utils.utf8.fromBytes(decryptedBytes);
 
-  return decryptedText;
+  let decryptedText: string;
+  try {
+    decryptedText = aesjs.utils.utf8.fromBytes(decryptedBytes);
+  } catch {
+    // Wrong key -> random bytes -> invalid UTF-8.
+    throw new Error(INVALID_PASSCODE_MESSAGE);
+  }
+
+  return assertDecryptedPlaintext(decryptedText);
 }
 
 export async function createInitialWalletKey(password: string): Promise<EncryptedWalletKey> {
