@@ -1,0 +1,180 @@
+diff --git a/node_modules/@xmtp/react-native-sdk/android/src/main/java/expo/modules/xmtpreactnativesdk/XMTPModule.kt b/node_modules/@xmtp/react-native-sdk/android/src/main/java/expo/modules/xmtpreactnativesdk/XMTPModule.kt
+index 53a9353..b6f564d 100644
+--- a/node_modules/@xmtp/react-native-sdk/android/src/main/java/expo/modules/xmtpreactnativesdk/XMTPModule.kt
++++ b/node_modules/@xmtp/react-native-sdk/android/src/main/java/expo/modules/xmtpreactnativesdk/XMTPModule.kt
+@@ -12,6 +12,7 @@ import expo.modules.kotlin.exception.Exceptions
+ import expo.modules.kotlin.functions.Coroutine
+ import expo.modules.kotlin.modules.Module
+ import expo.modules.kotlin.modules.ModuleDefinition
++import expo.modules.kotlin.modules.ModuleDefinitionBuilder
+ import expo.modules.xmtpreactnativesdk.wrappers.ArchiveMetadataWrapper
+ import expo.modules.xmtpreactnativesdk.wrappers.AvailableArchiveWrapper
+ import expo.modules.xmtpreactnativesdk.wrappers.AuthParamsWrapper
+@@ -283,6 +284,24 @@ class XMTPModule : Module() {
+             "messageDeletionClosed"
+         )
+ 
++        definitionPart1()
++        definitionPart2()
++        definitionPart3()
++        definitionPart4()
++        definitionPart5()
++        definitionPart6()
++        definitionPart7()
++        definitionPart8()
++        definitionPart9()
++        definitionPart10()
++        definitionPart11()
++        definitionPart12()
++        definitionPart13()
++        definitionPart14()
++    }
++
++    // Split out of definition() to stay under the JVM 64KB method limit.
++    private fun ModuleDefinitionBuilder.definitionPart1() {
+         Function("inboxId") { installationId: String ->
+             logV("inboxId")
+             val client = clients[installationId]
+@@ -415,6 +434,10 @@ class XMTPModule : Module() {
+             }
+         }
+ 
++    }
++
++    // Split out of definition() to stay under the JVM 64KB method limit.
++    private fun ModuleDefinitionBuilder.definitionPart2() {
+         AsyncFunction("ffiCreateClient") Coroutine { publicIdentity: String, dbEncryptionKey: List<Int>, authParams: String ->
+             withContext(Dispatchers.IO) {
+                 logV("ffiCreateClient")
+@@ -606,6 +629,10 @@ class XMTPModule : Module() {
+             }
+         }
+ 
++    }
++
++    // Split out of definition() to stay under the JVM 64KB method limit.
++    private fun ModuleDefinitionBuilder.definitionPart3() {
+         AsyncFunction("ffiAddWalletSignatureText") Coroutine { installationId: String, newIdentity: String, allowReassignInboxId: Boolean ->
+             withContext(Dispatchers.IO) {
+                 logV("ffiAddWalletSignatureText")
+@@ -758,6 +785,10 @@ class XMTPModule : Module() {
+             }
+         }
+ 
++    }
++
++    // Split out of definition() to stay under the JVM 64KB method limit.
++    private fun ModuleDefinitionBuilder.definitionPart4() {
+         AsyncFunction("ffiStaticAddScwSignature") Coroutine { signatureType: String, signatureBytes: List<Int>, address: String, chainId: Long, blockNumber: Long? ->
+             withContext(Dispatchers.IO) {
+                 logV("ffiAddScwSignature")
+@@ -872,6 +903,10 @@ class XMTPModule : Module() {
+             }
+         }
+ 
++    }
++
++    // Split out of definition() to stay under the JVM 64KB method limit.
++    private fun ModuleDefinitionBuilder.definitionPart5() {
+         AsyncFunction("encryptAttachment") { installationId: String, fileJson: String ->
+             logV("encryptAttachment")
+             val file = DecryptedLocalAttachment.fromJson(fileJson)
+@@ -1110,6 +1145,10 @@ class XMTPModule : Module() {
+             }
+         }
+ 
++    }
++
++    // Split out of definition() to stay under the JVM 64KB method limit.
++    private fun ModuleDefinitionBuilder.definitionPart6() {
+         AsyncFunction("findConversation") Coroutine { installationId: String, conversationId: String ->
+             withContext(Dispatchers.IO) {
+                 logV("findConversation")
+@@ -1273,6 +1312,10 @@ class XMTPModule : Module() {
+             }
+         }
+ 
++    }
++
++    // Split out of definition() to stay under the JVM 64KB method limit.
++    private fun ModuleDefinitionBuilder.definitionPart7() {
+         AsyncFunction("createGroup") Coroutine { installationId: String, peerInboxIds: List<String>, permission: String, groupOptionsJson: String ->
+             withContext(Dispatchers.IO) {
+                 logV("createGroup")
+@@ -1458,6 +1501,10 @@ class XMTPModule : Module() {
+             }
+         }
+ 
++    }
++
++    // Split out of definition() to stay under the JVM 64KB method limit.
++    private fun ModuleDefinitionBuilder.definitionPart8() {
+         AsyncFunction("addGroupMembers") Coroutine { installationId: String, groupId: String, peerInboxIds: List<String> ->
+             withContext(Dispatchers.IO) {
+                 logV("addGroupMembers")
+@@ -1582,6 +1629,10 @@ class XMTPModule : Module() {
+             }
+         }
+ 
++    }
++
++    // Split out of definition() to stay under the JVM 64KB method limit.
++    private fun ModuleDefinitionBuilder.definitionPart9() {
+         AsyncFunction("disappearingMessageSettings") Coroutine { installationId: String, conversationId: String ->
+             withContext(Dispatchers.IO) {
+                 logV("disappearingMessageSettings")
+@@ -1708,6 +1759,10 @@ class XMTPModule : Module() {
+             }
+         }
+ 
++    }
++
++    // Split out of definition() to stay under the JVM 64KB method limit.
++    private fun ModuleDefinitionBuilder.definitionPart10() {
+         AsyncFunction("addSuperAdmin") Coroutine { clientInstallationId: String, groupId: String, inboxId: String ->
+             withContext(Dispatchers.IO) {
+                 logV("addSuperAdmin")
+@@ -1832,6 +1887,10 @@ class XMTPModule : Module() {
+             }
+         }
+ 
++    }
++
++    // Split out of definition() to stay under the JVM 64KB method limit.
++    private fun ModuleDefinitionBuilder.definitionPart11() {
+         AsyncFunction("processWelcomeMessage") Coroutine { installationId: String, encryptedMessage: String ->
+             withContext(Dispatchers.IO) {
+                 logV("processWelcomeMessage")
+@@ -1953,6 +2012,10 @@ class XMTPModule : Module() {
+             }
+         }
+ 
++    }
++
++    // Split out of definition() to stay under the JVM 64KB method limit.
++    private fun ModuleDefinitionBuilder.definitionPart12() {
+         AsyncFunction("getDebugInformation") Coroutine { installationId: String, conversationId: String ->
+             withContext(Dispatchers.IO) {
+                 logV("getDebugInformation")
+@@ -2046,6 +2109,10 @@ class XMTPModule : Module() {
+             subscriptions[getConversationsKey(installationId)]?.cancel()
+         }
+ 
++    }
++
++    // Split out of definition() to stay under the JVM 64KB method limit.
++    private fun ModuleDefinitionBuilder.definitionPart13() {
+         Function("unsubscribeFromAllMessages") { installationId: String ->
+             logV("unsubscribeFromAllMessages")
+             subscriptions[getMessagesKey(installationId)]?.cancel()
+@@ -2189,6 +2256,10 @@ class XMTPModule : Module() {
+             }
+         }
+ 
++    }
++
++    // Split out of definition() to stay under the JVM 64KB method limit.
++    private fun ModuleDefinitionBuilder.definitionPart14() {
+         AsyncFunction("listAvailableArchives") Coroutine { installationId: String, daysCutoff: Long ->
+             withContext(Dispatchers.IO) {
+                 val client = clients[installationId] ?: throw XMTPException("No client")
