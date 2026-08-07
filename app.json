@@ -53,7 +53,9 @@
           "project": "react-native",
           "organization": "httpstmesuityan"
         }
-      ]
+      ],
+      "expo-localization",
+      "expo-status-bar"
     ],
     "extra": {
       "eas": {

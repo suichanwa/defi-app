@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { BackHandler, Platform, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, LogBox, Platform, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import ToastManager from 'toastify-react-native';
 import WalletScreen from './src/screens/WalletScreen';
@@ -25,6 +25,19 @@ import { MD3DarkTheme, MD3LightTheme, PaperProvider } from 'react-native-paper';
 import 'react-native-get-random-values';
 
 const ENABLE_IN_APP_CHAT_NOTIFICATIONS = false;
+
+// Benign dev-only warning from Reanimated 4.x internals (see reanimated GitHub
+// issues for "Tried to modify key `value`"); our shared-value usage follows the
+// documented API. Remove once fixed upstream.
+const WORKLETS_WARNING = '[Worklets] Tried to modify key `value`';
+LogBox.ignoreLogs([WORKLETS_WARNING]);
+if (__DEV__) {
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    if (typeof args[0] === 'string' && args[0].startsWith(WORKLETS_WARNING)) return;
+    originalWarn(...args);
+  };
+}
 
 Sentry.init({
   dsn: 'https://005462e44419a10cf92b86000ff8c484@o4510659003940864.ingest.de.sentry.io/4510659569778768',

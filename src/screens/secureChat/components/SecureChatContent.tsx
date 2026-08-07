@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInLeft, SlideInDown, SlideInRight, SlideOutDown, SlideOutRight } from 'react-native-reanimated';
 import ChatListScreen from '@components/secureChat/ChatListScreen';
@@ -17,18 +17,14 @@ export default function SecureChatContent({ secureTab, chatView, connect, thread
   const isReturningToList =
     !isThreadView && !isConnectTab && (previousChatViewRef.current === 'thread' || previousTabRef.current === 'connect');
 
-  const listEntering = useMemo(
-    () => (isReturningToList ? FadeInLeft.duration(THREAD_TRANSITION_DURATION_MS) : undefined),
-    [isReturningToList],
-  );
-  const threadEntering = useMemo(() => SlideInRight.duration(THREAD_TRANSITION_DURATION_MS), []);
-  const threadExiting = useMemo(() => SlideOutRight.duration(THREAD_TRANSITION_DURATION_MS), []);
-
-  const connectEntering = useMemo(
-    () => SlideInDown.duration(300).springify().damping(18).stiffness(180),
-    [],
-  );
-  const connectExiting = useMemo(() => SlideOutDown.duration(240), []);
+  // Animation builders are created fresh on each render: Reanimated mutates
+  // builder instances when serializing them for worklets, so memoized/reused
+  // instances trigger "Tried to modify key `value`" warnings.
+  const listEntering = isReturningToList ? FadeInLeft.duration(THREAD_TRANSITION_DURATION_MS) : undefined;
+  const threadEntering = SlideInRight.duration(THREAD_TRANSITION_DURATION_MS);
+  const threadExiting = SlideOutRight.duration(THREAD_TRANSITION_DURATION_MS);
+  const connectEntering = SlideInDown.duration(300).springify().damping(18).stiffness(180);
+  const connectExiting = SlideOutDown.duration(240);
 
   useEffect(() => {
     previousChatViewRef.current = chatView;
@@ -65,7 +61,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   viewLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   threadWrapper: {
     marginBottom: 0,

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import { InteractionManager, Pressable, Text, View, StyleSheet, TextInput } from 'react-native';
+import { Pressable, Text, View, StyleSheet, TextInput } from 'react-native';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '@theme/ThemeProvider';
 
@@ -28,7 +28,7 @@ export default function PasscodeField({
   const inputRef = useRef<TextInput>(null);
 
   const focusInput = useCallback(() => {
-    InteractionManager.runAfterInteractions(() => {
+    requestAnimationFrame(() => {
       inputRef.current?.focus();
     });
   }, []);
