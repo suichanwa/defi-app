@@ -36,7 +36,9 @@ module.exports = function (api) {
           '@config': './src/config',
         },
       }],
-      'react-native-reanimated/plugin', // MUST be last
+      // Reanimated 4 moved this plugin into react-native-worklets. The old path is a
+      // deprecated shim. MUST be last.
+      'react-native-worklets/plugin',
     ],
   };
 };

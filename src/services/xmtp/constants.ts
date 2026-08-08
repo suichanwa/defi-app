@@ -5,4 +5,4 @@ export type XmtpEnvironment = 'local' | 'dev' | 'production';
 
 export const DEFAULT_XMTP_ENV: XmtpEnvironment = 'dev';
 
-export const XMTP_APP_VERSION = 'defi-ai-app/1.0.0';
+export const XMTP_APP_VERSION = 'defi-app/1.0.0';

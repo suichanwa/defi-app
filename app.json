@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "DeFi AI Advisor",
-    "slug": "defi-ai-app",
+    "name": "Defi-app",
+    "slug": "defi-app",
     "version": "0.13.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
