@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, View, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { Text, View, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '@theme/ThemeProvider';
@@ -43,19 +43,28 @@ export default function WalletUnlockCard({
   const { colors } = useTheme();
   const canSubmitUnlock = unlockPassword.length === 6 && !isSubmitting;
 
+  const startFreshTitle = 'Start fresh wallet?';
+  const startFreshBody =
+    'This removes local wallet data from this device. You can recover later only with your recovery phrase.';
+
   const handleStartFreshConfirm = () => {
-    Alert.alert(
-      'Start fresh wallet?',
-      'This removes local wallet data from this device. You can recover later only with your recovery phrase.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Start fresh',
-          style: 'destructive',
-          onPress: onStartFresh,
-        },
-      ],
-    );
+    // ponytail: react-native-web has no Alert implementation, so Alert.alert is a
+    // no-op there and the button looks dead. window.confirm is the web equivalent.
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${startFreshTitle}\n\n${startFreshBody}`)) {
+        onStartFresh();
+      }
+      return;
+    }
+
+    Alert.alert(startFreshTitle, startFreshBody, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Start fresh',
+        style: 'destructive',
+        onPress: onStartFresh,
+      },
+    ]);
   };
 
   return (

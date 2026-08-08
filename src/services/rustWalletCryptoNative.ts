@@ -20,11 +20,20 @@ const moduleRef = NativeModules.RustWalletCrypto as RustWalletCryptoModule | und
 
 const isNativePlatform = Platform.OS === 'android' || Platform.OS === 'ios';
 
+if (__DEV__ && isNativePlatform && !moduleRef) {
+  // Every tryRust* helper below swallows failures and returns null, which makes the
+  // app fall back to the much slower JS crypto path with no visible error.
+  console.warn('[rust-wallet] NativeModules.RustWalletCrypto is missing - using slow JS fallback.');
+}
+
 export async function isRustWalletCryptoAvailable(): Promise<boolean> {
   if (!isNativePlatform || !moduleRef?.isAvailable) return false;
   try {
     return await moduleRef.isAvailable();
-  } catch {
+  } catch (error) {
+    if (__DEV__) {
+      console.warn('[rust-wallet] isAvailable() threw - using slow JS fallback:', error);
+    }
     return false;
   }
 }

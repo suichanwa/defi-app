@@ -953,7 +953,10 @@ export default function WalletScreen() {
 
   if (status !== 'unlocked' || backupMnemonic) {
     return (
-      <ScrollView contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}
+        showsVerticalScrollIndicator={false}
+      >
         <ErrorDialog
           visible={!!flowError && showErrorDialog}
           title="Wallet error"
