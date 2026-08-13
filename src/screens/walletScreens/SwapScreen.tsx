@@ -8,6 +8,8 @@ import { createWalletStyles } from '@styles/WalletStyles';
 import { useNavVisibility } from '@context/NavVisibilityProvider';
 import { useWalletCardAnimation } from '../../animations/walletAnimations';
 
+import { ScreenHeader } from '@components/common';
+
 type WalletStackParamList = {
   WalletHome: undefined;
   Add: undefined;
@@ -38,21 +40,12 @@ export default function SwapScreen() {
   return (
     <Animated.View style={[localStyles.container, { backgroundColor: colors.background }, animatedStyle]}>
       <ScrollView contentContainerStyle={[styles.scrollContent, localStyles.scrollContent]}>
-        <View style={localStyles.header}>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={[localStyles.backButton, { borderColor: colors.border }]}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="chevron-back" size={18} color={colors.text} />
-          </TouchableOpacity>
-          <View style={localStyles.headerSpacer} />
-        </View>
-
-        <View style={localStyles.headerCopy}>
-          <Text style={[styles.screenTitle, localStyles.title, { color: colors.text }]}>Swap</Text>
-          <Text style={[styles.screenSubtitle, localStyles.subtitle, { color: colors.muted }]}>Exchange one token for another</Text>
-        </View>
+        <ScreenHeader
+          onBack={() => navigation.goBack()}
+          title="Swap"
+          subtitle="Exchange one token for another"
+          titlePosition="below"
+        />
 
         <TouchableOpacity
           activeOpacity={0.9}

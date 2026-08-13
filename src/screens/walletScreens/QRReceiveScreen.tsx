@@ -11,6 +11,8 @@ import { useNavVisibility } from '@context/NavVisibilityProvider';
 import { useQRReceive } from '@context/QRReceiveProvider';
 import { Share } from 'react-native';
 
+import { ScreenHeader } from '@components/common';
+
 type WalletStackParamList = {
   QRReceive: { symbol: string; name: string; address: string };
 };
@@ -55,16 +57,10 @@ export default function QRReceiveScreen() {
 
   return (
     <View style={[localStyles.container, { backgroundColor: colors.background }]}>
-      <View style={localStyles.header}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => navigation.goBack()}
-          style={localStyles.backButton}
-        >
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={[localStyles.headerTitle, { color: colors.text }]}>Your {name} Address</Text>
-      </View>
+      <ScreenHeader
+        onBack={() => navigation.goBack()}
+        title={`Your ${name} Address`}
+      />
 
       <ScrollView contentContainerStyle={[styles.scrollContent, localStyles.scrollContent]}>
         <View style={localStyles.qrWrap}>

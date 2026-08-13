@@ -15,6 +15,8 @@ import { HDNodeWallet, isAddress, Wallet } from 'ethers';
 import { getErc20TokenBySymbol } from '@config/tokens';
 import { sendErc20Transfer, sendEthTransfer } from '@services/ethereumTransfers';
 
+import { ScreenHeader } from '@components/common';
+
 type RouteParams = {
   symbol: string;
   name: string;
@@ -117,7 +119,7 @@ export default function SendCryptoScreen() {
         }
       }
 
-      navigation.navigate('SendCryptoComplete', {
+      navigation.replace('SendCryptoComplete', {
         symbol: symbol ?? chain.nativeToken.symbol,
         amount: amountValue.toString(),
         toAddress: trimmedAddress,
@@ -133,22 +135,12 @@ export default function SendCryptoScreen() {
   return (
     <View style={[localStyles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={[styles.scrollContent, localStyles.scrollContent]}>
-        <View style={localStyles.headerRow}>
-          <TouchableOpacity
-            accessibilityRole="button"
-            activeOpacity={0.7}
-            style={[localStyles.backButton, { borderColor: colors.border }]}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="chevron-back" size={20} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[localStyles.title, { color: colors.text }]}>
-            {t('wallet.sendCrypto.title', {
-              symbol: symbol ?? t('wallet.sendCrypto.fallbackSymbol'),
-            })}
-          </Text>
-          <View style={localStyles.headerSpacer} />
-        </View>
+        <ScreenHeader
+          onBack={() => navigation.goBack()}
+          title={t('wallet.sendCrypto.title', {
+            symbol: symbol ?? t('wallet.sendCrypto.fallbackSymbol'),
+          })}
+        />
 
         <View style={localStyles.fieldGroup}>
           <Text style={[localStyles.label, { color: colors.text }]}>

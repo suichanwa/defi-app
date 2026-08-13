@@ -389,7 +389,18 @@ setAirdropMessage('Airdrop requested. Balance will update shortly.');
         onToggleNetwork={handleToggleNetwork}
         onAirdrop={handleAirdrop}
       />
-      {airdropMessage && <Text style={[styles.messageText, styles.messageInfo]}>{airdropMessage}</Text>}
+      {airdropMessage && (
+        <View style={[styles.messageText, styles.messageInfo, { flexDirection: 'row', alignItems: 'center' }]}>
+          <Text style={{ color: colors.accent, fontWeight: '600', fontSize: 13, flex: 1 }}>{airdropMessage}</Text>
+          <TouchableOpacity
+            onPress={() => setAirdropMessage(null)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={{ marginLeft: 8, padding: 4 }}
+          >
+            <Text style={{ color: colors.accent, fontSize: 16, fontWeight: '700' }}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       <ErrorDialog
         visible={isErrorVisible}
         title={errorTitle}
@@ -954,8 +965,10 @@ export default function WalletScreen() {
   if (status !== 'unlocked' || backupMnemonic) {
     return (
       <ScrollView
+        style={styles.scrollHost}
         contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <ErrorDialog
           visible={!!flowError && showErrorDialog}

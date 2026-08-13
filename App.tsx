@@ -208,6 +208,7 @@ function AppContent({ activeTab, onTabChange }: { activeTab: TabName; onTabChang
             </Animated.View>
 
             <Animated.View
+              pointerEvents={chatPointerEvents}
               style={[
                 styles.screenLayer,
                 styles.chatLayer,

@@ -7,6 +7,8 @@ import { useTheme } from '@theme/ThemeProvider';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useNavVisibility } from '@context/NavVisibilityProvider';
 
+import { ScreenHeader } from '@components/common';
+
 type WalletStackParamList = {
   WalletHome: undefined;
   Add: undefined;
@@ -162,17 +164,10 @@ export default function ExpressSwapScreen() {
   return (
     <View style={[localStyles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={[styles.scrollContent, localStyles.scrollContent]}>
-        <View style={localStyles.headerRow}>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={[localStyles.backButton, { borderColor: colors.border }]}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="chevron-back" size={18} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[localStyles.title, { color: colors.text }]}>Express Swap</Text>
-          <View style={localStyles.headerSpacer} />
-        </View>
+        <ScreenHeader
+          onBack={() => navigation.goBack()}
+          title="Express Swap"
+        />
 
         <View style={styles.tabRow}>
           <TouchableOpacity style={[styles.tabBase, styles.tabActive]} activeOpacity={0.9}>

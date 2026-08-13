@@ -14,6 +14,8 @@ import { fetchSolBalance } from '@services/solanaBalances';
 import type { ChainConfig } from '@config/chain';
 import { useWalletCardAnimation } from '../../animations/walletAnimations';
 
+import { ScreenHeader } from '@components/common';
+
 type WalletStackParamList = {
   WalletHome: undefined;
   Add: undefined;
@@ -122,23 +124,12 @@ export default function SendScreen() {
   return (
     <Animated.View style={[localStyles.container, animatedStyle]}>
       <ScrollView contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}>
-        <View style={localStyles.headerRow}>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-            activeOpacity={0.7}
-            style={[localStyles.backButton, { borderColor: colors.border }]}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="chevron-back" size={18} color={colors.text} />
-          </TouchableOpacity>
-          <View style={localStyles.headerSpacer} />
-        </View>
-
-        <View style={localStyles.headerCopy}>
-          <Text style={styles.screenTitle}>Send</Text>
-          <Text style={styles.screenSubtitle}>Pick a coin to send from your wallet.</Text>
-        </View>
+        <ScreenHeader
+          onBack={() => navigation.goBack()}
+          title="Send"
+          subtitle="Pick a coin to send from your wallet."
+          titlePosition="below"
+        />
 
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={20} color={colors.muted} />

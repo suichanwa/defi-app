@@ -12,6 +12,8 @@ import { useWalletSession } from '@context/WalletSessionProvider';
 import { fetchSolBalance } from '@services/solanaBalances';
 import { useWalletCardAnimation } from '../../animations/walletAnimations';
 
+import { ScreenHeader } from '@components/common';
+
 type WalletStackParamList = {
   Receive: { address: string };
   QRReceive: { symbol: string; name: string; address: string };
@@ -84,21 +86,12 @@ export default function ReceiveScreen() {
   return (
     <Animated.View style={[localStyles.container, animatedStyle]}>
       <ScrollView contentContainerStyle={[styles.scrollContent, { backgroundColor: colors.background }]}>
-        <View style={localStyles.headerRow}>
-          <TouchableOpacity
-            accessibilityRole="button"
-            activeOpacity={0.7}
-            style={[localStyles.backButton, { borderColor: colors.border }]}
-            onPress={() => navigation.goBack()}
-          >
-            <MaterialCommunityIcons name="chevron-left" size={22} color={colors.text} />
-          </TouchableOpacity>
-          <View style={localStyles.headerSpacer} />
-        </View>
-        <View style={localStyles.headerCopy}>
-          <Text style={styles.screenTitle}>Receive</Text>
-          <Text style={styles.screenSubtitle}>Choose the asset to receive funds.</Text>
-        </View>
+        <ScreenHeader
+          onBack={() => navigation.goBack()}
+          title="Receive"
+          subtitle="Choose the asset to receive funds."
+          titlePosition="below"
+        />
 
         {walletList.length > 0 && (
           <View style={localStyles.walletSection}>

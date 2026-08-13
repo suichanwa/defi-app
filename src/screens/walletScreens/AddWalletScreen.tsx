@@ -11,6 +11,7 @@ import { walletErrorMessage } from '@utils/walletErrors';
 import { useNavVisibility } from '@context/NavVisibilityProvider';
 import ColorPicker, { HueSlider, Panel1, Preview } from 'reanimated-color-picker';
 import { useWalletCardAnimation } from '../../animations/walletAnimations';
+import { ScreenHeader } from '@components/common';
 
 type AddMode = 'create' | 'import';
 type FlowStep = 'mode' | 'credentials' | 'recovery' | 'success';
@@ -401,18 +402,10 @@ export default function AddScreen() {
   return (
     <Animated.View style={[localStyles.container, { backgroundColor: colors.background }, animatedStyle]}>
       <ScrollView contentContainerStyle={[styles.scrollContent, localStyles.scrollContent]} keyboardShouldPersistTaps="handled">
-        <View style={localStyles.headerRow}>
-          <TouchableOpacity
-            accessibilityRole="button"
-            activeOpacity={0.7}
-            style={[localStyles.backButton, { borderColor: colors.border }]}
-            onPress={handleBackFromStep}
-            disabled={isSubmitting}
-          >
-            <Ionicons name="chevron-back" size={20} color={colors.text} />
-          </TouchableOpacity>
-          <View style={localStyles.headerSpacer} />
-        </View>
+        <ScreenHeader
+          onBack={handleBackFromStep}
+          backDisabled={isSubmitting}
+        />
 
         {flowError && <Text style={styles.errorText}>{flowError}</Text>}
         {flowMessage && step !== 'success' && <Text style={[styles.messageText, styles.messageInfo]}>{flowMessage}</Text>}

@@ -10,6 +10,8 @@ import { useNavVisibility } from '@context/NavVisibilityProvider';
 import { useWalletSession } from '@context/WalletSessionProvider';
 import { useCopyToClipboard } from '@hooks/useCopyToClipboard';
 
+import { ScreenHeader } from '@components/common';
+
 type WalletStackParamList = {
   WalletSettings: { walletId: string };
 };
@@ -118,21 +120,12 @@ export default function WalletSettingsScreen() {
   return (
     <View style={[localStyles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={[styles.scrollContent, localStyles.scrollContent]}>
-        <View style={localStyles.headerRow}>
-          <TouchableOpacity
-            accessibilityRole="button"
-            activeOpacity={0.7}
-            style={[localStyles.backButton, { borderColor: colors.border }]}
-            onPress={() => navigation.goBack()}
-          >
-            <MaterialCommunityIcons name="chevron-left" size={22} color={colors.text} />
-          </TouchableOpacity>
-          <View style={localStyles.headerTextBlock}>
-            <Text style={[localStyles.title, { color: colors.text }]}>Wallet settings</Text>
-            <Text style={[localStyles.subtitle, { color: colors.muted }]}>Edit name, color, and wallet actions.</Text>
-          </View>
-          <View style={localStyles.headerSpacer} />
-        </View>
+        <ScreenHeader
+          onBack={() => navigation.goBack()}
+          title="Wallet settings"
+          subtitle="Edit name, color, and wallet actions."
+          titlePosition="left"
+        />
 
         <SectionCard section="Wallet details">
           <View style={localStyles.walletMetaRow}>
