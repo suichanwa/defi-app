@@ -17,7 +17,7 @@ type ProfileRow = {
 const isTransientNetworkError = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error ?? '');
   const lower = message.toLowerCase();
-  return lower.includes('network request failed') || lower.includes('fetch failed');
+  return lower.includes('network request failed') || lower.includes('fetch failed') || lower.includes('failed to fetch');
 };
 
 export async function fetchRemoteProfile(userId: string): Promise<ProfileSettings | null> {

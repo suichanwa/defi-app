@@ -17,62 +17,78 @@ type RewardsActivityRow = {
 
 export async function fetchRewardsSummary(userId: string): Promise<RewardsSummary | null> {
   if (!supabase) return null;
-  const { data, error } = await supabase
-    .from('rewards_summary')
-    .select('points, tier, updated_at')
-    .eq('user_id', userId)
-    .maybeSingle<RewardsSummaryRow>();
+  try {
+    const { data, error } = await supabase
+      .from('rewards_summary')
+      .select('points, tier, updated_at')
+      .eq('user_id', userId)
+      .maybeSingle<RewardsSummaryRow>();
 
-  if (error || !data) return null;
+    if (error || !data) return null;
 
-  return {
-    points: data.points,
-    tier: data.tier,
-    updatedAt: data.updated_at,
-  };
+    return {
+      points: data.points,
+      tier: data.tier,
+      updatedAt: data.updated_at,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchRewardsActivity(userId: string): Promise<RewardActivity[] | null> {
   if (!supabase) return null;
-  const { data, error } = await supabase
-    .from('rewards_activity')
-    .select('id, title, description, points_delta, timestamp')
-    .eq('user_id', userId)
-    .order('timestamp', { ascending: false })
-    .limit(10)
-    .returns<RewardsActivityRow[]>();
+  try {
+    const { data, error } = await supabase
+      .from('rewards_activity')
+      .select('id, title, description, points_delta, timestamp')
+      .eq('user_id', userId)
+      .order('timestamp', { ascending: false })
+      .limit(10)
+      .returns<RewardsActivityRow[]>();
 
-  if (error || !data) return null;
+    if (error || !data) return null;
 
-  return data.map((item) => ({
-    id: item.id,
-    title: item.title,
-    description: item.description,
-    pointsDelta: item.points_delta,
-    timestamp: item.timestamp,
-  }));
+    return data.map((item) => ({
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      pointsDelta: item.points_delta,
+      timestamp: item.timestamp,
+    }));
+  } catch {
+    return null;
+  }
 }
 
 export async function upsertRewardsSummary(userId: string, summary: RewardsSummary): Promise<void> {
   if (!supabase) return;
-  const payload = {
-    user_id: userId,
-    points: summary.points,
-    tier: summary.tier,
-    updated_at: summary.updatedAt,
-  };
-  await supabase.from('rewards_summary').upsert(payload);
+  try {
+    const payload = {
+      user_id: userId,
+      points: summary.points,
+      tier: summary.tier,
+      updated_at: summary.updatedAt,
+    };
+    await supabase.from('rewards_summary').upsert(payload);
+  } catch (error) {
+    console.warn('Failed to upsert rewards summary:', error);
+  }
 }
 
 export async function insertRewardsActivity(userId: string, activity: RewardActivity[]): Promise<void> {
   if (!supabase || activity.length === 0) return;
-  const rows = activity.map((item) => ({
-    id: item.id,
-    user_id: userId,
-    title: item.title,
-    description: item.description,
-    points_delta: item.pointsDelta,
-    timestamp: item.timestamp,
-  }));
-  await supabase.from('rewards_activity').upsert(rows);
+  try {
+    const rows = activity.map((item) => ({
+      id: item.id,
+      user_id: userId,
+      title: item.title,
+      description: item.description,
+      points_delta: item.pointsDelta,
+      timestamp: item.timestamp,
+    }));
+    await supabase.from('rewards_activity').upsert(rows);
+  } catch (error) {
+    console.warn('Failed to insert rewards activity:', error);
+  }
 }

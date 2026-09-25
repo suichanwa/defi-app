@@ -1,8 +1,9 @@
 import { sendSolTransfer } from '../src/services/solanaTransfers';
-import { getSolanaConnection } from '../src/services/solanaProvider';
+import { getSolanaConnection, confirmSignatureByPolling } from '../src/services/solanaProvider';
 
 jest.mock('../src/services/solanaProvider', () => ({
   getSolanaConnection: jest.fn(),
+  confirmSignatureByPolling: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('@solana/web3.js', () => {
@@ -59,8 +60,9 @@ describe('sendSolTransfer', () => {
 
     expect(mockConnection.getLatestBlockhash).toHaveBeenCalledWith('confirmed');
     expect(mockConnection.sendRawTransaction).toHaveBeenCalled();
-    expect(mockConnection.confirmTransaction).toHaveBeenCalledWith(
-      { signature: 'signature', blockhash: 'blockhash', lastValidBlockHeight: 99 },
+    expect(confirmSignatureByPolling).toHaveBeenCalledWith(
+      mockConnection,
+      'signature',
       'confirmed',
     );
     expect(signature).toBe('signature');

@@ -1,8 +1,9 @@
 import { requestSolAirdrop } from '../src/services/airdrop/solanaAirdrop.service';
-import { getSolanaConnection } from '../src/services/solanaProvider';
+import { getSolanaConnection, confirmSignatureByPolling } from '../src/services/solanaProvider';
 
 jest.mock('../src/services/solanaProvider', () => ({
   getSolanaConnection: jest.fn(),
+  confirmSignatureByPolling: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('@solana/web3.js', () => {
@@ -22,12 +23,7 @@ jest.mock('@solana/web3.js', () => {
 describe('requestSolAirdrop', () => {
   it('requests and confirms a 1 SOL devnet airdrop for the user address', async () => {
     const mockConnection = {
-      getLatestBlockhash: jest.fn().mockResolvedValue({
-        blockhash: 'blockhash',
-        lastValidBlockHeight: 99,
-      }),
       requestAirdrop: jest.fn().mockResolvedValue('airdrop-signature'),
-      confirmTransaction: jest.fn().mockResolvedValue({}),
     };
 
     (getSolanaConnection as jest.Mock).mockReturnValue(mockConnection);
@@ -38,17 +34,13 @@ describe('requestSolAirdrop', () => {
       commitment: 'confirmed',
     });
 
-    expect(mockConnection.getLatestBlockhash).toHaveBeenCalledWith('confirmed');
     expect(mockConnection.requestAirdrop).toHaveBeenCalledWith(
       expect.objectContaining({ value: 'devnet-user-address' }),
       1_000_000_000,
     );
-    expect(mockConnection.confirmTransaction).toHaveBeenCalledWith(
-      {
-        signature: 'airdrop-signature',
-        blockhash: 'blockhash',
-        lastValidBlockHeight: 99,
-      },
+    expect(confirmSignatureByPolling).toHaveBeenCalledWith(
+      mockConnection,
+      'airdrop-signature',
       'confirmed',
     );
     expect(result).toEqual({ signature: 'airdrop-signature' });

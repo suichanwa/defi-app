@@ -92,14 +92,18 @@ export function useRealtimeRoom({
     async (payload: ChatMessage) => {
       const channel = channelRef.current;
       if (!channel) return;
-      if (isReady) {
-        await channel.send({
-          type: 'broadcast',
-          event: 'message',
-          payload,
-        });
-      } else {
-        await channel.httpSend('message', payload);
+      try {
+        if (isReady) {
+          await channel.send({
+            type: 'broadcast',
+            event: 'message',
+            payload,
+          });
+        } else {
+          await channel.httpSend('message', payload);
+        }
+      } catch (error) {
+        console.warn('Supabase realtime broadcast failed:', error);
       }
     },
     [isReady],
@@ -109,14 +113,18 @@ export function useRealtimeRoom({
     async (payload: TypingPayload) => {
       const channel = channelRef.current;
       if (!channel) return;
-      if (isReady) {
-        await channel.send({
-          type: 'broadcast',
-          event: 'typing',
-          payload,
-        });
-      } else {
-        await channel.httpSend('typing', payload);
+      try {
+        if (isReady) {
+          await channel.send({
+            type: 'broadcast',
+            event: 'typing',
+            payload,
+          });
+        } else {
+          await channel.httpSend('typing', payload);
+        }
+      } catch (error) {
+        console.warn('Supabase realtime sendTyping failed:', error);
       }
     },
     [isReady],

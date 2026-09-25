@@ -33,6 +33,12 @@ jest.mock('@react-navigation/stack', () => ({
     Navigator: ({ children }: { children: React.ReactNode }) => children,
     Screen: () => null,
   }),
+  CardStyleInterpolators: {
+    forHorizontalIOS: jest.fn(),
+  },
+  TransitionSpecs: {
+    TransitionIOSSpec: {},
+  },
 }));
 
 jest.mock('../src/theme/ThemeProvider', () => ({

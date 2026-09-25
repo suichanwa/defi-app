@@ -115,6 +115,17 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
       type: 'sourceFile',
     };
   }
+
+  // Handle expo-modules-core directly to avoid Metro appending extension to "src/index.ts"
+  if (moduleName === 'expo-modules-core') {
+    const expoModulesCoreIndex = path.join(projectRoot, 'node_modules', 'expo-modules-core', 'src', 'index.ts');
+    if (fs.existsSync(expoModulesCoreIndex)) {
+      return {
+        filePath: expoModulesCoreIndex,
+        type: 'sourceFile',
+      };
+    }
+  }
   
   // Fall back to default resolver
   return context.resolveRequest(context, moduleName, platform);
