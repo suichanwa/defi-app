@@ -2,7 +2,7 @@
   // Point directly to the Expo base config so the TS server resolves JSX/react-native types.
   "extends": "./node_modules/expo/tsconfig.base.json",
   "compilerOptions": {
-    "ignoreDeprecations": "6.0",
+    "ignoreDeprecations": "5.0",
     "strict": true,
     "baseUrl": "./src",
     "paths": {
