@@ -86,7 +86,7 @@ export function useChatProfiles({ authorIds, enabled = true }: UseChatProfilesAr
           if (error || !data) continue;
           setProfilesById((prev) => {
             const next = { ...prev };
-            data.forEach((row) => {
+            data.forEach((row: any) => {
               next[row.id] = mapRowToProfile(row as ProfileRow);
             });
             return next;

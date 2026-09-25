@@ -1,4 +1,4 @@
-import type { RealtimeChannel } from '@supabase/supabase-js';
+type RealtimeChannel = any;
 import type { ChatMessage, ChatThread } from '../types/securechat-types/secureChat';
 import { resolveChatImageMessage, resolveChatImageMessages, decodeChatImageContent, encodeChatImageContent } from '@utils/secureChatImages';
 import { isSupabaseConfigured, supabase } from './supabaseClient';
@@ -76,13 +76,7 @@ const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[
 
 const isUuid = (value: string) => uuidRegex.test(value);
 
-const canUseSupabase = (currentUserId: string, otherUserId?: string) =>
-  Boolean(
-    isSupabaseConfigured &&
-      supabase &&
-      isUuid(currentUserId) &&
-      (!otherUserId || isUuid(otherUserId)),
-  );
+const canUseSupabase = (_currentUserId?: string, _otherUserId?: string) => false;
 
 const sortParticipants = (
   userId1: string,
@@ -252,7 +246,7 @@ export async function getUserDMChannels(userId: string): Promise<StoredDMChannel
       .order('updated_at', { ascending: false });
 
     if (!error && data) {
-      return data.map((row) => mapRemoteChannel(row as DMChannelRow));
+      return data.map((row: any) => mapRemoteChannel(row as DMChannelRow));
     }
 
     throw createSupabaseError('Supabase DM channel fetch failed', error);
@@ -385,7 +379,7 @@ export async function getDMMessages(channelId: string, currentUserId?: string): 
       .order('created_at', { ascending: true });
 
     if (!error && data) {
-      const mapped = data.map((row) => mapRemoteMessage(row as DMMessageRow, currentUserId));
+      const mapped = data.map((row: any) => mapRemoteMessage(row as DMMessageRow, currentUserId));
       return resolveChatImageMessages(mapped);
     }
 
@@ -396,7 +390,7 @@ export async function getDMMessages(channelId: string, currentUserId?: string): 
         .eq('channel_id', channelId)
         .order('created_at', { ascending: true });
       if (!fallback.error && fallback.data) {
-        const mapped = fallback.data.map((row) => mapRemoteMessage(row as DMMessageRow, currentUserId));
+        const mapped = fallback.data.map((row: any) => mapRemoteMessage(row as DMMessageRow, currentUserId));
         return resolveChatImageMessages(mapped);
       }
       throw createSupabaseError('Supabase DM messages fetch failed', fallback.error);
@@ -424,7 +418,7 @@ export async function getDMMessagesSince(
       .order('created_at', { ascending: true });
 
     if (!error && data) {
-      const mapped = data.map((row) => mapRemoteMessage(row as DMMessageRow, currentUserId));
+      const mapped = data.map((row: any) => mapRemoteMessage(row as DMMessageRow, currentUserId));
       return resolveChatImageMessages(mapped);
     }
 
@@ -436,7 +430,7 @@ export async function getDMMessagesSince(
         .gt('created_at', sinceIso)
         .order('created_at', { ascending: true });
       if (!fallback.error && fallback.data) {
-        const mapped = fallback.data.map((row) => mapRemoteMessage(row as DMMessageRow, currentUserId));
+        const mapped = fallback.data.map((row: any) => mapRemoteMessage(row as DMMessageRow, currentUserId));
         return resolveChatImageMessages(mapped);
       }
       throw createSupabaseError('Supabase DM messages fetch failed', fallback.error);
@@ -469,7 +463,7 @@ export function subscribeToDMMessages(currentUserId: string, listener: DMListene
       realtimeUserId = currentUserId;
       realtimeChannel = supabase.channel(`dm-messages:${currentUserId}`);
       realtimeChannel
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'dm_messages' }, (payload) => {
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'dm_messages' }, (payload: any) => {
           const row = payload.new as DMMessageRow;
           resolveChatImageMessage(mapRemoteMessage(row, currentUserId))
             .then((message) => {

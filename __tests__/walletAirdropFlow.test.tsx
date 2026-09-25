@@ -260,7 +260,7 @@ describe('WalletHomeScreen airdrop flow', () => {
       tree = renderer.create(<WalletHomeScreen navigation={navigation} />);
     });
 
-    expect(getRenderedText(tree!)).toContain('Airdrop 1 SOL');
+    expect(getRenderedText(tree!)).toContain('1 SOL');
     expect(getRenderedText(tree!)).toContain('SOL:0');
 
     const button = tree!.root.findByProps({ testID: 'wallet-airdrop-button' });

@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { RealtimeChannel } from '@supabase/supabase-js';
+type RealtimeChannel = {
+  send: (payload: any) => Promise<any>;
+  httpSend?: (event: string, payload: any) => Promise<any>;
+};
 import type { ChatMessage } from '@app-types/securechat-types/secureChat';
 import { isSupabaseConfigured, supabase } from '@services/supabaseClient';
 
@@ -54,10 +57,10 @@ export function useRealtimeRoom({
     });
 
     channel
-      .on('broadcast', { event: 'message' }, ({ payload }) => {
+      .on('broadcast', { event: 'message' }, ({ payload }: any) => {
         onIncomingMessage(payload as ChatMessage);
       })
-      .on('broadcast', { event: 'typing' }, ({ payload }) => {
+      .on('broadcast', { event: 'typing' }, ({ payload }: any) => {
         onTyping?.(payload as TypingPayload);
       })
       .on('presence', { event: 'sync' }, () => {
@@ -66,7 +69,7 @@ export function useRealtimeRoom({
         setParticipantCount(keys.length);
         onPresenceChange?.(keys.length);
       })
-      .subscribe(async (status) => {
+      .subscribe(async (status: any) => {
         if (status === 'SUBSCRIBED') {
           setIsReady(true);
           await channel.track(presencePayload ?? { user: presenceKey, room: roomId });
@@ -100,7 +103,7 @@ export function useRealtimeRoom({
             payload,
           });
         } else {
-          await channel.httpSend('message', payload);
+          await channel.httpSend?.('message', payload);
         }
       } catch (error) {
         console.warn('Supabase realtime broadcast failed:', error);
@@ -121,7 +124,7 @@ export function useRealtimeRoom({
             payload,
           });
         } else {
-          await channel.httpSend('typing', payload);
+          await channel.httpSend?.('typing', payload);
         }
       } catch (error) {
         console.warn('Supabase realtime sendTyping failed:', error);

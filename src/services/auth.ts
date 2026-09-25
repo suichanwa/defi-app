@@ -1,5 +1,20 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
-import type { Session, AuthError } from '@supabase/supabase-js';
+
+export type Session = {
+  user: {
+    id: string;
+    email?: string;
+    [key: string]: any;
+  };
+  access_token?: string;
+  [key: string]: any;
+};
+
+export type AuthError = {
+  message: string;
+  name?: string;
+  status?: number;
+};
 
 export type AuthSession = Session | null;
 
@@ -27,7 +42,7 @@ export async function getAuthSession(): Promise<AuthSession> {
 export function onAuthStateChange(callback: (session: AuthSession) => void) {
   if (!isSupabaseConfigured || !supabase) return null;
   
-  const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+  const { data } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
     callback(session);
   });
   
