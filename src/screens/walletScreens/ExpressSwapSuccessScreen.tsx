@@ -1,11 +1,11 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { useTheme } from '@theme/ThemeProvider';
 import { createWalletStyles } from '@styles/WalletStyles';
-import { useNavVisibility } from '@context/NavVisibilityProvider';
+import { ScreenContainer } from '@components/common';
 
 type WalletStackParamList = {
   WalletHome: undefined;
@@ -24,17 +24,9 @@ export default function ExpressSwapSuccessScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const navigation = useNavigation<StackNavigationProp<WalletStackParamList, 'ExpressSwapSuccess'>>();
-  const { setNavHidden } = useNavVisibility();
-
-  useFocusEffect(
-    useCallback(() => {
-      setNavHidden(true);
-      return () => setNavHidden(false);
-    }, [setNavHidden]),
-  );
 
   return (
-    <View style={[localStyles.container, { backgroundColor: colors.background }]}>
+    <ScreenContainer scrollable={false}>
       <View style={localStyles.content}>
         <View style={[localStyles.iconCircle, { backgroundColor: colors.success }]}>
           <Ionicons name="checkmark" size={34} color="#ffffff" />
@@ -51,15 +43,11 @@ export default function ExpressSwapSuccessScreen() {
           <Text style={styles.primaryButtonText}>Back</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </ScreenContainer>
   );
 }
 
 const localStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'space-between',
-  },
   content: {
     flex: 1,
     alignItems: 'center',

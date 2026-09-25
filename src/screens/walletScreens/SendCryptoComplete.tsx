@@ -5,7 +5,7 @@ import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navig
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { useTheme } from '@theme/ThemeProvider';
 import { createWalletStyles } from '@styles/WalletStyles';
-import { useNavVisibility } from '@context/NavVisibilityProvider';
+import { ScreenContainer } from '@components/common';
 
 type WalletStackParamList = {
   WalletHome: undefined;
@@ -24,20 +24,12 @@ export default function SendCryptoComplete() {
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const navigation = useNavigation<StackNavigationProp<WalletStackParamList, 'SendCryptoComplete'>>();
   const route = useRoute<SendCompleteRoute>();
-  const { setNavHidden } = useNavVisibility();
   const { symbol, amount, toAddress, signature } = route.params ?? {
     symbol: 'SOL',
     amount: '--',
     toAddress: '--',
     signature: '--',
   };
-
-  useFocusEffect(
-    useCallback(() => {
-      setNavHidden(true);
-      return () => setNavHidden(false);
-    }, [setNavHidden]),
-  );
 
   const formatAddress = (value: string) => {
     if (!value || value === '--') return value;
@@ -46,8 +38,8 @@ export default function SendCryptoComplete() {
   };
 
   return (
-    <View style={[localStyles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={localStyles.content}>
+    <ScreenContainer contentContainerStyle={localStyles.content}>
+      <View style={localStyles.content}>
         <View style={[localStyles.iconCircle, { backgroundColor: colors.success }]}>
           <Ionicons name="checkmark" size={34} color="#ffffff" />
         </View>
@@ -74,7 +66,7 @@ export default function SendCryptoComplete() {
             <Text style={[localStyles.detailValue, { color: colors.text }]}>{formatAddress(signature)}</Text>
           </View>
         </View>
-      </ScrollView>
+      </View>
 
       <View style={localStyles.footer}>
         <TouchableOpacity
@@ -85,7 +77,7 @@ export default function SendCryptoComplete() {
           <Text style={styles.primaryButtonText}>Return to wallet</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </ScreenContainer>
   );
 }
 

@@ -5,7 +5,7 @@ import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/nativ
 import type { StackNavigationProp } from '@react-navigation/stack';
 import { useTheme } from '@theme/ThemeProvider';
 import { createWalletStyles } from '@styles/WalletStyles';
-import { useNavVisibility } from '@context/NavVisibilityProvider';
+import { ScreenContainer } from '@components/common';
 import { useChain } from '@context/ChainProvider';
 import { useWalletSession } from '@context/WalletSessionProvider';
 import { sendSolTransfer } from '@services/solanaTransfers';
@@ -14,8 +14,6 @@ import { t } from '@i18n';
 import { HDNodeWallet, isAddress, Wallet } from 'ethers';
 import { getErc20TokenBySymbol } from '@config/tokens';
 import { sendErc20Transfer, sendEthTransfer } from '@services/ethereumTransfers';
-
-import { ScreenHeader } from '@components/common';
 
 type RouteParams = {
   symbol: string;
@@ -44,7 +42,6 @@ export default function SendCryptoScreen() {
   const [amount, setAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const { setNavHidden } = useNavVisibility();
   const { chain } = useChain();
   const { wallet } = useWalletSession();
   const selectedToken = useMemo(
@@ -58,13 +55,6 @@ export default function SendCryptoScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({ headerShown: false });
   }, [navigation]);
-
-  useFocusEffect(
-    useCallback(() => {
-      setNavHidden(true);
-      return () => setNavHidden(false);
-    }, [setNavHidden]),
-  );
 
   const handleSend = async () => {
     if (isSubmitting) return;
@@ -133,14 +123,12 @@ export default function SendCryptoScreen() {
   };
 
   return (
-    <View style={[localStyles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={[styles.scrollContent, localStyles.scrollContent]}>
-        <ScreenHeader
-          onBack={() => navigation.goBack()}
-          title={t('wallet.sendCrypto.title', {
-            symbol: symbol ?? t('wallet.sendCrypto.fallbackSymbol'),
-          })}
-        />
+    <ScreenContainer
+      onBack={() => navigation.goBack()}
+      title={t('wallet.sendCrypto.title', {
+        symbol: symbol ?? t('wallet.sendCrypto.fallbackSymbol'),
+      })}
+    >
 
         <View style={localStyles.fieldGroup}>
           <Text style={[localStyles.label, { color: colors.text }]}>
@@ -233,8 +221,7 @@ export default function SendCryptoScreen() {
             {isSubmitting ? t('wallet.sendCrypto.sending') : t('wallet.sendCrypto.withdraw')}
           </Text>
         </TouchableOpacity>
-      </ScrollView>
-    </View>
+    </ScreenContainer>
   );
 }
 
