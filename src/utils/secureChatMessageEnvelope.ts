@@ -79,7 +79,7 @@ export const buildReplyReferenceFromMessage = (
         ? message.fileName?.trim() || message.content.trim() || 'File'
         : message.content.trim(),
   attachment: buildReplyAttachmentLabel(message),
-  source: message.chatId.startsWith('dm:') ? 'xmtp' : 'supabase',
+  source: message.chatId.startsWith('dm:') ? 'xmtp' : 'local',
 });
 
 export const parseSecureChatMessageContent = (

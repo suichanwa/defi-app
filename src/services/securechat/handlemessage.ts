@@ -3,7 +3,7 @@ import { decodeChatImageContent, resolveChatImageMessage } from '@utils/secureCh
 import { buildReplyReferenceFromMessage, serializeSecureChatMessageContent } from '@utils/secureChatMessageEnvelope';
 import { CHAT_IMAGE_BUCKET } from '@constants/chatImages.constants';
 import { DEFAULT_GLOBAL_CHAT_ID } from '@constants/secureChat.constants';
-import { deleteLocalRoomMessage } from '@services/messageQueries';
+import { deleteLocalRoomMessage, saveLocalRoomMessage } from '@services/messageQueries';
 import type { ChatReplyReference } from '@app-types/securechat-types/secureChat';
 
 import type * as HandleMessageTypes from '@app-types/securechat-types/secureChatHandleMessage';
@@ -78,6 +78,15 @@ export const createIncomingRoomMessageHandler = ({
         const existing = prev[resolved.chatId] ?? [];
         const seen = existing.some((m) => m.id === resolved.id);
         if (seen) return prev;
+        void saveLocalRoomMessage(resolved.chatId, {
+          id: resolved.id,
+          room_id: resolved.chatId,
+          author_id: resolved.authorId,
+          author: resolved.author,
+          content: resolved.content,
+          image_path: resolved.imageUri,
+          created_at: resolved.createdAt ?? new Date().toISOString(),
+        });
         notifyIncomingRef.current(resolved.chatId, resolved);
         return { ...prev, [resolved.chatId]: [...existing, resolved] };
       });
@@ -103,6 +112,15 @@ export const createIncomingRoomMessageHandler = ({
         const existing = prev[msg.chatId] ?? [];
         const seen = existing.some((m) => m.id === msg.id);
         if (seen) return prev;
+        void saveLocalRoomMessage(msg.chatId, {
+          id: msg.id,
+          room_id: msg.chatId,
+          author_id: msg.authorId,
+          author: msg.author,
+          content: msg.content,
+          image_path: msg.imageUri,
+          created_at: msg.createdAt ?? new Date().toISOString(),
+        });
         notifyIncomingRef.current(msg.chatId, msg);
         return { ...prev, [msg.chatId]: [...existing, msg] };
       });
@@ -251,11 +269,16 @@ export const createSendMessageHandler = ({
   if (hasText && !hasImage) {
     setDraft('');
     const wireContent = serializeSecureChatMessageContent(trimmed, replyTarget);
-    const result = await sendText({ chatId: selectedChat.id, content: wireContent, isDM });
-    if (!result.sent && result.error) {
-      showAlert(isDM ? 'Direct message unavailable' : 'Supabase not configured', result.error);
-    } else {
-      clearReplyTarget();
+    try {
+      const result = await sendText({ chatId: selectedChat.id, content: wireContent, isDM });
+      if (!result.sent && result.error) {
+        showAlert(isDM ? 'Direct message unavailable' : 'Chat unavailable', result.error);
+      } else {
+        clearReplyTarget();
+      }
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      showAlert('Error', error instanceof Error ? error.message : 'Failed to send message');
     }
   }
 

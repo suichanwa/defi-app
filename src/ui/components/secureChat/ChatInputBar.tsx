@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Image, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, Platform, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@theme/ThemeProvider';
 import type { ChatReplyReference } from '@app-types/securechat-types/secureChat';
@@ -107,6 +107,12 @@ export default function ChatInputBar({
           value={draft}
           onChangeText={onDraftChange}
           onSubmitEditing={onSend}
+          onKeyPress={(e: any) => {
+            if (Platform.OS === 'web' && e.nativeEvent?.key === 'Enter' && !e.nativeEvent?.shiftKey) {
+              e.preventDefault?.();
+              onSend();
+            }
+          }}
           returnKeyType="send"
           blurOnSubmit={false}
           multiline

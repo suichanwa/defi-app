@@ -37,7 +37,6 @@ import {
   createSendMessageHandler,
 } from '@services/securechat/handlemessage';
 import { createSecureChatUserActions } from '@services/securechat/userMessageActions';
-import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import { useChatAvatar } from '../../hooks/useChatAvatar';
 import { useChatProfiles } from '../../hooks/useChatProfiles';
 import { useTheme } from '@theme/ThemeProvider';
@@ -68,7 +67,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
       name: SecureChatConstants.DEFAULT_GLOBAL_CHAT_NAME,
       participants: ['You'],
       peerAddress: SecureChatConstants.DEFAULT_GLOBAL_CHAT_PEER,
-      isOnline: false,
+      isOnline: true,
       lastMessage: {
         text: SecureChatConstants.DEFAULT_GLOBAL_CHAT_JOIN_TEXT,
         ts: date.format(new Date(), 'HH:mm'),
@@ -387,7 +386,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
 
   const handleRealtimeSubscribed = useCallback(async () => {
     setConnectionLog((prev) => [logEntry(`Joined room ${roomId}.`), ...prev]);
-    setServerInfo({ address: 'supabase', port: 0, status: 'running' });
+    setServerInfo({ address: 'global-network', port: 8082, status: 'running' });
     setChats((prev) =>
       prev.map((chat) => (chat.id === roomId ? { ...chat, isOnline: true } : chat)),
     );
@@ -395,7 +394,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
   }, [roomId]);
 
   const handleRealtimeError = useCallback(() => {
-    setConnectionLog((prev) => [logEntry(`Failed to join room ${roomId}. Check Supabase Realtime keys.`), ...prev]);
+    setConnectionLog((prev) => [logEntry(`Failed to join room ${roomId}. Retrying connection...`), ...prev]);
   }, [roomId]);
 
   const handlePresenceChange = useCallback(
@@ -418,14 +417,6 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
   );
 
 
-  useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setConnectionLog((prev) => [
-        logEntry('Supabase is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY to enable chat.'),
-        ...prev,
-      ]);
-    }
-  }, []);
 
   useEffect(() => {
     // Always keep a "global" room available.
@@ -457,12 +448,8 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     [setChats, setMessagesByChat],
   );
 
-  const { participantCount, sendBroadcast, sendTyping } = useRealtimeRoom({
-    roomId,
-    presenceKey: typingSenderId,
-    presencePayload,
-    onIncomingMessage: handleIncomingRoomMessage,
-    onTyping: (payload: TypingPayload) => {
+  const handleTyping = useCallback(
+    (payload: TypingPayload) => {
       const safePayload = payload as unknown as Record<string, unknown>;
       const readString = (key: string) => {
         const value = safePayload[key];
@@ -500,6 +487,15 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
         setTypingByChatId((prev) => ({ ...prev, [payloadChatId]: null }));
       }
     },
+    [getChatById, typingSenderId],
+  );
+
+  const { participantCount, sendBroadcast, sendTyping } = useRealtimeRoom({
+    roomId,
+    presenceKey: typingSenderId,
+    presencePayload,
+    onIncomingMessage: handleIncomingRoomMessage,
+    onTyping: handleTyping,
     onSubscribed: handleRealtimeSubscribed,
     onError: handleRealtimeError,
     onPresenceChange: handlePresenceChange,

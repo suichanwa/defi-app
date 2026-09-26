@@ -54,4 +54,23 @@ if (typeof global.TextEncoder === 'undefined') {
   (global as any).TextDecoder = TextDecoder;
 }
 
+// Polyfill StatusBar stack methods for React Native Web
+try {
+  const { StatusBar } = require('react-native');
+  const sb = StatusBar as any;
+  const stub = () => ({});
+  if (sb) {
+    if (typeof sb.pushStackEntry !== 'function') sb.pushStackEntry = stub;
+    if (typeof sb.popStackEntry !== 'function') sb.popStackEntry = () => {};
+    if (typeof sb.replaceStackEntry !== 'function') sb.replaceStackEntry = stub;
+    if (sb.default) {
+      if (typeof sb.default.pushStackEntry !== 'function') sb.default.pushStackEntry = stub;
+      if (typeof sb.default.popStackEntry !== 'function') sb.default.popStackEntry = () => {};
+      if (typeof sb.default.replaceStackEntry !== 'function') sb.default.replaceStackEntry = stub;
+    }
+  }
+} catch {
+  // Ignore if react-native is not yet initialized
+}
+
 export {};

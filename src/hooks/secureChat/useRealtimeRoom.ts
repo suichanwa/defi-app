@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-type RealtimeChannel = {
-  send: (payload: any) => Promise<any>;
-  httpSend?: (event: string, payload: any) => Promise<any>;
-};
 import type { ChatMessage } from '@app-types/securechat-types/secureChat';
-import { isSupabaseConfigured, supabase } from '@services/supabaseClient';
+import {
+  DecentralizedRoomTransport,
+  type TypingPayload,
+} from '@services/securechat/roomTransport';
+
+export type { TypingPayload };
 
 type RealtimeArgs = {
   roomId: string;
@@ -17,14 +18,6 @@ type RealtimeArgs = {
   onPresenceChange?: (count: number) => void;
 };
 
-export type TypingPayload = {
-  chatId: string;
-  senderId?: string;
-  authorId?: string;
-  author?: string;
-  isTyping: boolean;
-};
-
 export function useRealtimeRoom({
   roomId,
   presenceKey,
@@ -35,103 +28,80 @@ export function useRealtimeRoom({
   onError,
   onPresenceChange,
 }: RealtimeArgs) {
-  const channelRef = useRef<RealtimeChannel | null>(null);
+  const transportRef = useRef<DecentralizedRoomTransport | null>(null);
   const [isReady, setIsReady] = useState(false);
-  const [participantCount, setParticipantCount] = useState(0);
+  const [participantCount, setParticipantCount] = useState(1);
+
+  const onIncomingMessageRef = useRef(onIncomingMessage);
+  const onTypingRef = useRef(onTyping);
+  const onSubscribedRef = useRef(onSubscribed);
+  const onErrorRef = useRef(onError);
+  const onPresenceChangeRef = useRef(onPresenceChange);
+  const presencePayloadRef = useRef(presencePayload);
+
+  onIncomingMessageRef.current = onIncomingMessage;
+  onTypingRef.current = onTyping;
+  onSubscribedRef.current = onSubscribed;
+  onErrorRef.current = onError;
+  onPresenceChangeRef.current = onPresenceChange;
+  presencePayloadRef.current = presencePayload;
 
   useEffect(() => {
-    if (!isSupabaseConfigured || !supabase) return;
     setIsReady(false);
-    setParticipantCount(0);
+    setParticipantCount(1);
 
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
+    if (transportRef.current) {
+      transportRef.current.destroy();
+      transportRef.current = null;
     }
 
-    const channel = supabase.channel(`chat:${roomId}`, {
-      config: {
-        broadcast: { self: true },
-        presence: { key: presenceKey },
+    const transport = new DecentralizedRoomTransport({
+      roomId,
+      presenceKey,
+      presencePayload: presencePayloadRef.current,
+      onIncomingMessage: (msg) => onIncomingMessageRef.current(msg),
+      onTyping: (payload) => onTypingRef.current?.(payload),
+      onSubscribed: () => {
+        setIsReady(true);
+        onSubscribedRef.current?.();
+      },
+      onError: () => onErrorRef.current?.(),
+      onPresenceChange: (count) => {
+        setParticipantCount(count);
+        onPresenceChangeRef.current?.(count);
       },
     });
 
-    channel
-      .on('broadcast', { event: 'message' }, ({ payload }: any) => {
-        onIncomingMessage(payload as ChatMessage);
-      })
-      .on('broadcast', { event: 'typing' }, ({ payload }: any) => {
-        onTyping?.(payload as TypingPayload);
-      })
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState();
-        const keys = Object.keys(state);
-        setParticipantCount(keys.length);
-        onPresenceChange?.(keys.length);
-      })
-      .subscribe(async (status: any) => {
-        if (status === 'SUBSCRIBED') {
-          setIsReady(true);
-          await channel.track(presencePayload ?? { user: presenceKey, room: roomId });
-          onSubscribed?.();
-        }
-        if (status === 'CHANNEL_ERROR') {
-          setIsReady(false);
-          onError?.();
-        }
-      });
+    transportRef.current = transport;
 
-    channelRef.current = channel;
     return () => {
       setIsReady(false);
-      setParticipantCount(0);
-      if (supabase) {
-        supabase.removeChannel(channel);
+      transport.destroy();
+      if (transportRef.current === transport) {
+        transportRef.current = null;
       }
     };
-  }, [onError, onIncomingMessage, onPresenceChange, onSubscribed, presenceKey, presencePayload, roomId]);
+  }, [roomId, presenceKey]);
 
-  const sendBroadcast = useCallback(
-    async (payload: ChatMessage) => {
-      const channel = channelRef.current;
-      if (!channel) return;
-      try {
-        if (isReady) {
-          await channel.send({
-            type: 'broadcast',
-            event: 'message',
-            payload,
-          });
-        } else {
-          await channel.httpSend?.('message', payload);
-        }
-      } catch (error) {
-        console.warn('Supabase realtime broadcast failed:', error);
-      }
-    },
-    [isReady],
-  );
+  const sendBroadcast = useCallback(async (payload: ChatMessage) => {
+    const transport = transportRef.current;
+    if (!transport) return;
+    try {
+      await transport.sendBroadcast(payload);
+    } catch (error) {
+      console.warn('Realtime room broadcast failed:', error);
+    }
+  }, []);
 
-  const sendTyping = useCallback(
-    async (payload: TypingPayload) => {
-      const channel = channelRef.current;
-      if (!channel) return;
-      try {
-        if (isReady) {
-          await channel.send({
-            type: 'broadcast',
-            event: 'typing',
-            payload,
-          });
-        } else {
-          await channel.httpSend?.('typing', payload);
-        }
-      } catch (error) {
-        console.warn('Supabase realtime sendTyping failed:', error);
-      }
-    },
-    [isReady],
-  );
+  const sendTyping = useCallback(async (payload: TypingPayload) => {
+    const transport = transportRef.current;
+    if (!transport) return;
+    try {
+      await transport.sendTyping(payload);
+    } catch (error) {
+      console.warn('Realtime room sendTyping failed:', error);
+    }
+  }, []);
 
   return {
     isReady,

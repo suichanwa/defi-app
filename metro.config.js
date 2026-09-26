@@ -4,6 +4,11 @@ const fs = require('fs');
 
 const config = getDefaultConfig(__dirname);
 
+try {
+  const { startChatRelay } = require('./scripts/chatRelay');
+  startChatRelay();
+} catch {}
+
 // Get the root node_modules path
 const projectRoot = __dirname;
 const nobleHashesRoot = path.join(projectRoot, 'node_modules', '@noble', 'hashes');
