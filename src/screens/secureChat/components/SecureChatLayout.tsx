@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
+import { Animated, Platform, StyleSheet, View } from 'react-native';
 import ChatHeader from '@components/secureChat/ChatHeader';
 import ChatTabs from '@components/secureChat/ChatTabs';
 import { useTheme } from '@theme/ThemeProvider';
@@ -27,18 +27,19 @@ export default function SecureChatLayout({
   const navTranslateY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    const useNativeDriver = Platform.OS !== 'web';
     if (!showNav) {
       // Animate navbar out: fade and slide up
       Animated.parallel([
         Animated.timing(navOpacity, {
           toValue: 0,
           duration: 250,
-          useNativeDriver: true,
+          useNativeDriver,
         }),
         Animated.timing(navTranslateY, {
           toValue: -20,
           duration: 250,
-          useNativeDriver: true,
+          useNativeDriver,
         }),
       ]).start();
     } else {
@@ -47,12 +48,12 @@ export default function SecureChatLayout({
         Animated.timing(navOpacity, {
           toValue: 1,
           duration: 300,
-          useNativeDriver: true,
+          useNativeDriver,
         }),
         Animated.timing(navTranslateY, {
           toValue: 0,
           duration: 300,
-          useNativeDriver: true,
+          useNativeDriver,
         }),
       ]).start();
     }

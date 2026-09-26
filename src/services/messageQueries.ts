@@ -1,5 +1,5 @@
 import type { SecureChatMessageRow } from '@app-types/securechat-types/secureChatScreen';
-import { isSupabaseConfigured, supabase } from './supabaseClient';
+import { getJson, setJson } from './storage';
 
 type SelectMessagesPageArgs = {
   roomId: string;
@@ -12,43 +12,47 @@ type SelectMessagesPageResult = {
   error: { message?: string } | null;
 };
 
-const FIELD_VARIANTS = [
-  'id, room_id, author, author_id, content, created_at, image_path, message_type',
-  'id, room_id, author, author_id, content, created_at',
-  'id, room_id, author, content, created_at, image_path, message_type',
-  'id, room_id, author, content, created_at',
-];
+const ROOM_MESSAGES_KEY_PREFIX = 'room.messages.v1.';
 
 export async function selectMessagesPage({
   roomId,
   beforeCreatedAt,
   limit,
 }: SelectMessagesPageArgs): Promise<SelectMessagesPageResult> {
-  if (!isSupabaseConfigured || !supabase) {
-    return { data: [], error: { message: 'Supabase is not configured.' } };
-  }
-
-  let lastError: { message?: string } | null = null;
-
-  for (const fields of FIELD_VARIANTS) {
-    let query = supabase
-      .from('messages')
-      .select(fields)
-      .eq('room_id', roomId)
-      .order('created_at', { ascending: false })
-      .limit(limit);
-
+  try {
+    const key = `${ROOM_MESSAGES_KEY_PREFIX}${roomId}`;
+    const stored = (await getJson<SecureChatMessageRow[]>(key)) ?? [];
+    let filtered = stored;
     if (beforeCreatedAt) {
-      query = query.lt('created_at', beforeCreatedAt);
+      filtered = filtered.filter((m) => (m.created_at ?? '') < beforeCreatedAt);
     }
-
-    const { data, error } = await query;
-    if (!error && data) {
-      return { data: data as unknown as SecureChatMessageRow[], error: null };
-    }
-
-    lastError = error ?? { message: 'Unknown query error.' };
+    const sorted = [...filtered].sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''));
+    const page = sorted.slice(0, limit);
+    return { data: page, error: null };
+  } catch (error) {
+    return { data: [], error: { message: error instanceof Error ? error.message : 'Storage error' } };
   }
-
-  return { data: [], error: lastError };
 }
+
+export async function saveLocalRoomMessage(roomId: string, message: SecureChatMessageRow): Promise<void> {
+  try {
+    const key = `${ROOM_MESSAGES_KEY_PREFIX}${roomId}`;
+    const stored = (await getJson<SecureChatMessageRow[]>(key)) ?? [];
+    const next = [...stored.filter((m) => m.id !== message.id), message];
+    await setJson(key, next);
+  } catch (error) {
+    console.warn('Failed to save room message locally:', error);
+  }
+}
+
+export async function deleteLocalRoomMessage(roomId: string, messageId: string): Promise<void> {
+  try {
+    const key = `${ROOM_MESSAGES_KEY_PREFIX}${roomId}`;
+    const stored = (await getJson<SecureChatMessageRow[]>(key)) ?? [];
+    const next = stored.filter((m) => m.id !== messageId);
+    await setJson(key, next);
+  } catch (error) {
+    console.warn('Failed to delete room message locally:', error);
+  }
+}
+

@@ -1,5 +1,5 @@
 import React, { useMemo, useRef } from 'react';
-import { Animated, PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, PanResponder, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import PulseBadge from '@components/PulseBadge';
 import type { ChatAvatarSource, ChatThread } from '@app-types/securechat-types/secureChat';
@@ -57,17 +57,18 @@ export default function ChatListScreen({
   }, [chats]);
 
   const handleChatOpen = (chatId: string) => {
+    const useNativeDriver = Platform.OS !== 'web';
     // Parallel animations for slide and fade
     Animated.parallel([
       Animated.timing(slideAnim, {
         toValue: -50,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
       Animated.timing(fadeAnim, {
         toValue: 0,
         duration: 250,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
     ]).start(() => {
       onOpenSelected(chatId);

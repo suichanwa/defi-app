@@ -42,7 +42,6 @@ export default function PasscodeField({
   // Clear input when error occurs
   useEffect(() => {
     if (error && value.length > 0) {
-      console.log('=== PasscodeField: Error detected, clearing input ===', label, error);
       onChange('');
     }
   }, [error, value.length, onChange, label]);
@@ -58,7 +57,6 @@ export default function PasscodeField({
           isActive && { backgroundColor: `${colors.accent}10` }
         ]}
         onPress={() => {
-          console.log('=== PasscodeField Pressable Pressed ===', label);
           onActivate?.();
           focusInput();
         }}
@@ -69,7 +67,6 @@ export default function PasscodeField({
           ref={inputRef}
           value={value}
           onChangeText={(text) => {
-            console.log('=== PasscodeField TextInput onChangeText ===', label, text);
             onChange(text);
           }}
           keyboardType="number-pad"
@@ -79,11 +76,9 @@ export default function PasscodeField({
           secureTextEntry={false}
           style={localStyles.hiddenInput}
           onFocus={() => {
-            console.log('=== PasscodeField TextInput onFocus ===', label);
             onActivate?.();
           }}
           onBlur={() => {
-            console.log('=== PasscodeField TextInput onBlur ===', label);
           }}
           editable={true}
           selectTextOnFocus={false}

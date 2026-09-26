@@ -3,8 +3,7 @@ import type { ChatMessage } from '@app-types/securechat-types/secureChat';
 import type { AvatarType } from '@app-types/profile';
 import { createOutgoingImageMessage, createOutgoingTextMessage } from '@utils/secureChatUtils';
 import { encodeChatImageContent } from '@utils/secureChatImages';
-import { uploadChatImage } from '@services/chatImageStorage';
-import { supabase as supabaseClient, isSupabaseConfigured } from '@services/supabaseClient';
+import { saveLocalRoomMessage } from '@services/messageQueries';
 import { MAX_MESSAGES_IN_MEMORY } from '@constants/secureChat.constants';
 
 type TransportArgs = {
@@ -75,76 +74,39 @@ export function useChatTransport({
 
   const persistRoomMessage = useCallback(
     async (chatId: string, message: ChatMessage, wireContent: string) => {
-      if (!supabaseClient) return;
-      const { error } = await supabaseClient.from('messages').insert({
+      await saveLocalRoomMessage(chatId, {
+        id: message.id,
         room_id: chatId,
         author: displayLabel,
         author_id: authorId ?? null,
         content: wireContent,
-        message_type: message.type ?? 'text',
-        created_at: new Date().toISOString(),
+        message_type: message.type === 'image' ? 'image' : message.type === 'system' ? 'system' : 'text',
+        created_at: message.createdAt ?? new Date().toISOString(),
       });
-
-      if (!error) return;
-      if (error.message?.includes('author_id') || error.message?.includes('message_type')) {
-        const fallback = await supabaseClient.from('messages').insert({
-          room_id: chatId,
-          author: displayLabel,
-          author_id: authorId ?? null,
-          content: wireContent,
-          created_at: new Date().toISOString(),
-        });
-        if (fallback.error) {
-          onConnectionLog?.(`Save error: ${fallback.error.message}`);
-        }
-        return;
-      }
-      onConnectionLog?.(`Save error: ${error.message}`);
     },
-    [authorId, displayLabel, onConnectionLog],
+    [authorId, displayLabel],
   );
 
   const persistRoomImage = useCallback(
     async (chatId: string, payload: ChatMessage, imagePath: string, wireContent: string) => {
-      if (!supabaseClient) return;
-      const { error } = await supabaseClient.from('messages').insert({
+      await saveLocalRoomMessage(chatId, {
+        id: payload.id,
         room_id: chatId,
         author: payload.author,
         author_id: payload.authorId ?? null,
         content: wireContent,
-        message_type: payload.type ?? 'image',
+        message_type: 'image',
         image_path: imagePath,
         created_at: payload.createdAt ?? new Date().toISOString(),
       });
-
-      if (!error) return;
-      if (error.message?.includes('image_path') || error.message?.includes('message_type')) {
-        const fallbackContent = encodeChatImageContent(imagePath);
-        const fallback = await supabaseClient.from('messages').insert({
-          room_id: chatId,
-          author: payload.author,
-          author_id: payload.authorId ?? null,
-          content: fallbackContent,
-          created_at: payload.createdAt ?? new Date().toISOString(),
-        });
-        if (fallback.error) {
-          onConnectionLog?.(`Save error: ${fallback.error.message}`);
-        }
-        return;
-      }
-      onConnectionLog?.(`Save error: ${error.message}`);
     },
-    [onConnectionLog],
+    [],
   );
 
   const sendText = useCallback(
     async ({ chatId, content, isDM }: SendTextArgs) => {
       if (isDM) {
         return { sent: false, error: 'Direct messages are handled by the XMTP transport layer.' };
-      }
-
-      if (!isSupabaseConfigured || !supabaseClient) {
-        return { sent: false, error: 'Supabase not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY to send messages.' };
       }
 
       const outgoingAvatarUri = userAvatarType === 'custom' ? userAvatarUri : undefined;
@@ -166,6 +128,7 @@ export function useChatTransport({
       appendLocalMessage,
       authorId,
       displayLabel,
+      persistRoomMessage,
       sendRoomBroadcast,
       userAvatarType,
       userAvatarUri,
@@ -178,30 +141,20 @@ export function useChatTransport({
         return { sent: false, error: 'Image attachments over XMTP are not enabled in this build.' };
       }
 
-      if (!isSupabaseConfigured || !supabaseClient) {
-        return { sent: false, error: 'Supabase not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY to send images.' };
-      }
-
-      const upload = await uploadChatImage({
-        fileUri: imageUri,
-        chatId,
-        authorId: authorId ?? effectiveUserId,
-      });
-
       const imagePayload = createOutgoingImageMessage({
         chatId,
         authorId,
         author: displayLabel,
         avatarUri: userAvatarType === 'custom' ? userAvatarUri : undefined,
-        imagePath: upload.path,
-        imageUri: upload.signedUrl,
+        imagePath: imageUri,
+        imageUri,
         content,
       });
 
       appendLocalMessage(chatId, imagePayload);
 
       const wireContent = content ?? imagePayload.content;
-      await persistRoomImage(chatId, imagePayload, upload.path, wireContent);
+      await persistRoomImage(chatId, imagePayload, imageUri, wireContent);
       await sendRoomBroadcast({ ...imagePayload, content: wireContent, outgoing: false });
       return { sent: true };
     },
@@ -209,7 +162,7 @@ export function useChatTransport({
       appendLocalMessage,
       authorId,
       displayLabel,
-      effectiveUserId,
+      persistRoomImage,
       sendRoomBroadcast,
       userAvatarType,
       userAvatarUri,

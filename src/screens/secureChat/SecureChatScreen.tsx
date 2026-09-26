@@ -428,9 +428,6 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
   }, []);
 
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
-    if (!supabase) return;
-
     // Always keep a "global" room available.
     setChats((prev) => {
       if (prev.find((c) => c.id === SecureChatConstants.DEFAULT_GLOBAL_CHAT_ID)) return prev;

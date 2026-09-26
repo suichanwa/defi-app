@@ -3,7 +3,7 @@ import { decodeChatImageContent, resolveChatImageMessage } from '@utils/secureCh
 import { buildReplyReferenceFromMessage, serializeSecureChatMessageContent } from '@utils/secureChatMessageEnvelope';
 import { CHAT_IMAGE_BUCKET } from '@constants/chatImages.constants';
 import { DEFAULT_GLOBAL_CHAT_ID } from '@constants/secureChat.constants';
-import { isSupabaseConfigured, supabase } from '@services/supabaseClient';
+import { deleteLocalRoomMessage } from '@services/messageQueries';
 import type { ChatReplyReference } from '@app-types/securechat-types/secureChat';
 
 import type * as HandleMessageTypes from '@app-types/securechat-types/secureChatHandleMessage';
@@ -422,52 +422,9 @@ export const createDeleteMessageHandler =
       visibilityTime: 2000,
     });
 
-    if (!isSupabaseConfigured || !supabase) return;
-    if (message.chatId.startsWith('dm:')) return;
-
-    try {
-      const imagePath = message.imagePath ?? decodeChatImageContent(message.content ?? '') ?? undefined;
-      let deleteQuery = supabase.from('messages').delete();
-      if (message.id) {
-        deleteQuery = deleteQuery.eq('id', message.id);
-      } else {
-        deleteQuery = deleteQuery
-          .eq('room_id', message.chatId)
-          .eq('created_at', message.createdAt ?? '')
-          .eq(message.authorId ? 'author_id' : 'author', message.authorId ?? message.author ?? '');
-      }
-      const { error } = await deleteQuery;
-      if (error) {
-        showToast({
-          type: 'default',
-          text1: 'Delete failed',
-          text2: error.message,
-          position: 'top',
-          visibilityTime: 3000,
-        });
-        console.warn('Failed to delete message:', error.message);
-      }
-      if (imagePath) {
-        const { error: storageError } = await supabase.storage.from(CHAT_IMAGE_BUCKET).remove([imagePath]);
-        if (storageError) {
-          showToast({
-            type: 'default',
-            text1: 'Image delete failed',
-            text2: storageError.message,
-            position: 'top',
-            visibilityTime: 3000,
-          });
-          console.warn('Failed to delete chat image:', storageError.message);
-        }
-      }
-    } catch (error) {
-      showToast({
-        type: 'default',
-        text1: 'Delete failed',
-        text2: error instanceof Error ? error.message : 'Unknown error.',
-        position: 'top',
-        visibilityTime: 3000,
+    if (!message.chatId.startsWith('dm:')) {
+      deleteLocalRoomMessage(message.chatId, message.id).catch((err) => {
+        console.warn('Failed to delete local message:', err);
       });
-      console.warn('Failed to delete message:', error);
     }
   };

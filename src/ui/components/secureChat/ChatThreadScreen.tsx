@@ -525,7 +525,7 @@ export default function ChatThreadScreen({
           ) : null}
           <View style={styles.imageContainer}>
             <ImageMessage message={message as any} messageWidth={messageWidth} />
-            <View pointerEvents="none" style={styles.imageOverlay}>
+            <View style={[styles.imageOverlay, { pointerEvents: 'none' }]}>
               <View style={styles.imageOverlayInner}>
                 <Text style={styles.imageMetaText}>{message.name ?? 'Photo'}</Text>
                 {timeLabel ? <Text style={styles.imageMetaTime}>{timeLabel}</Text> : null}

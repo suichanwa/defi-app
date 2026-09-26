@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@theme/ThemeProvider';
 import { useNotifications } from '@context/NotificationProvider';
@@ -48,7 +48,7 @@ function NotificationItem({
     Animated.timing(progress, {
       toValue: 1,
       duration: 220,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   }, [progress]);
 
@@ -57,7 +57,7 @@ function NotificationItem({
       Animated.timing(progress, {
         toValue: 0,
         duration: 180,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }).start(({ finished }) => {
         if (finished) onDismiss(id);
       });
@@ -131,7 +131,7 @@ export default function NotificationHost({
   if (!enabled) return null;
 
   return (
-    <View pointerEvents="box-none" style={[localStyles.host, { top: insets.top + offset }]}>
+    <View style={[localStyles.host, { top: insets.top + offset, pointerEvents: 'box-none' }]}>
       {visibleNotifications.map((item) => (
         <NotificationItem
           key={item.id}

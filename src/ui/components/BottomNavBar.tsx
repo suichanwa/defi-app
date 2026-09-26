@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { TouchableOpacity, View, StyleSheet, Animated } from 'react-native';
+import { TouchableOpacity, View, StyleSheet, Animated, Platform } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@theme/ThemeProvider';
 import { createNavigationChromeStyles } from '@styles/NavigationChrome';
@@ -24,17 +24,18 @@ export default function BottomNavBar({ activeTab, onTabChange }: BottomNavBarPro
   const profileBgOpacity = useRef(new Animated.Value(activeTab === 'profile' ? 1 : 0)).current;
 
   useEffect(() => {
+    const useNativeDriver = Platform.OS !== 'web';
     Animated.parallel([
       Animated.spring(walletScale, {
         toValue: activeTab === 'wallet' ? 1.1 : 0.9,
         friction: 4,
         tension: 80,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
       Animated.timing(walletBgOpacity, {
         toValue: activeTab === 'wallet' ? 1 : 0,
         duration: 200,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
     ]).start();
 
@@ -44,12 +45,12 @@ export default function BottomNavBar({ activeTab, onTabChange }: BottomNavBarPro
         toValue: activeTab === 'secureChat' ? 1.1 : 0.9,
         friction: 4,
         tension: 80,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
       Animated.timing(secureChatBgOpacity, {
         toValue: activeTab === 'secureChat' ? 1 : 0,
         duration: 200,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
     ]).start();
 
@@ -59,12 +60,12 @@ export default function BottomNavBar({ activeTab, onTabChange }: BottomNavBarPro
         toValue: activeTab === 'profile' ? 1.1 : 0.9,
         friction: 4,
         tension: 80,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
       Animated.timing(profileBgOpacity, {
         toValue: activeTab === 'profile' ? 1 : 0,
         duration: 200,
-        useNativeDriver: true,
+        useNativeDriver,
       }),
     ]).start();
   }, [activeTab, walletScale, secureChatScale, profileScale, walletBgOpacity, secureChatBgOpacity, profileBgOpacity]);

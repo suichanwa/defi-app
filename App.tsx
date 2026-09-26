@@ -29,12 +29,21 @@ const ENABLE_IN_APP_CHAT_NOTIFICATIONS = false;
 // Benign dev-only warning from Reanimated 4.x internals (see reanimated GitHub
 // issues for "Tried to modify key `value`"); our shared-value usage follows the
 // documented API. Remove once fixed upstream.
-const WORKLETS_WARNING = '[Worklets] Tried to modify key `value`';
-LogBox.ignoreLogs([WORKLETS_WARNING]);
+const IGNORED_WARNINGS = [
+  '[Worklets] Tried to modify key `value`',
+  'props.pointerEvents is deprecated',
+  'useNativeDriver',
+];
+LogBox.ignoreLogs(IGNORED_WARNINGS);
 if (__DEV__) {
   const originalWarn = console.warn;
   console.warn = (...args: unknown[]) => {
-    if (typeof args[0] === 'string' && args[0].startsWith(WORKLETS_WARNING)) return;
+    if (
+      typeof args[0] === 'string' &&
+      IGNORED_WARNINGS.some((warning) => (args[0] as string).includes(warning))
+    ) {
+      return;
+    }
     originalWarn(...args);
   };
 }
@@ -208,7 +217,6 @@ function AppContent({ activeTab, onTabChange }: { activeTab: TabName; onTabChang
             </Animated.View>
 
             <Animated.View
-              pointerEvents={chatPointerEvents}
               style={[
                 styles.screenLayer,
                 styles.chatLayer,
