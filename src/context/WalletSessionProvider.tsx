@@ -20,10 +20,12 @@ import {
   encryptWalletKey,
   decryptWalletKey,
   isAppEncryptedWalletPayload,
+  hasAnyWallets,
 } from '../services/walletKeyStore';
 import { getActiveChain } from '../config/chain';
 import { setActiveWalletType } from '../services/activeWalletType';
 import { clearBiometricPassword } from '../services/biometricAuth';
+import { clearMasterPasscode, verifyOrSetMasterPasscode } from '../services/masterPasscodeStore';
 
 type Status = 'loading' | 'missing' | 'locked' | 'unlocked';
 
@@ -95,7 +97,7 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
     const storedActive = await getActiveWalletId();
     const nextActive =
       storedActive && records.some((record) => record.id === storedActive) ? storedActive : records[0]?.id ?? null;
-    if (nextActive && nextActive !== storedActive) {
+    if (nextActive !== storedActive) {
       await setActiveWalletId(nextActive);
     }
     setActiveWalletIdState(nextActive);
@@ -169,8 +171,16 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
 
   useEffect(() => {
     const init = async () => {
-      const { activeId } = await refreshWallets();
-      if (!activeId) {
+      const { activeId, records } = await refreshWallets();
+      const hasAny = records.length > 0 || (await hasAnyWallets());
+      if (!activeId || !hasAny) {
+        await clearWallet();
+        await clearMasterPasscode();
+        await clearBiometricPassword();
+        lastPasswordRef.current = null;
+        clearLockTimer();
+        setWallets([]);
+        setActiveWalletIdState(null);
         setStatus('missing');
         return;
       }
@@ -237,6 +247,8 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
     clearLockTimer();
     await clearWalletStorage();
     await clearBiometricPassword();
+    await clearMasterPasscode();
+    lastPasswordRef.current = null;
     setWallet(null);
     setAddress(null);
     setRecoveryPhrase(null);
@@ -286,6 +298,10 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
       backupCompleted: false,
       walletType: 'ethereum',
     };
+    const isValid = await verifyOrSetMasterPasscode(password);
+    if (!isValid) {
+      throw new Error('Invalid master passcode');
+    }
     await saveEncryptedWalletKey(record);
     await setActiveWalletType('ethereum');
     setAddress(record.id);
@@ -341,6 +357,10 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
       backupCompleted: false,
       walletType: 'ethereum',
     };
+    const isValid = await verifyOrSetMasterPasscode(password);
+    if (!isValid) {
+      throw new Error('Invalid master passcode');
+    }
     await saveEncryptedWalletKey(record);
     await setActiveWalletType('ethereum');
     setAddress(record.id);
@@ -376,12 +396,20 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
   const removeWallet = async (walletId: string) => {
     await removeWalletRecord(walletId);
     const { records, activeId } = await refreshWallets();
-    if (!activeId) {
-      setStatus('missing');
+    const hasRemaining = records.length > 0 || (await hasAnyWallets());
+    if (!hasRemaining || !activeId) {
+      clearLockTimer();
+      await clearWalletStorage();
+      await clearBiometricPassword();
+      await clearMasterPasscode();
+      lastPasswordRef.current = null;
       setWallet(null);
       setAddress(null);
       setRecoveryPhrase(null);
       setBackupCompletedState(false);
+      setWallets([]);
+      setActiveWalletIdState(null);
+      setStatus('missing');
       return;
     }
     if (walletId === activeWalletId && lastPasswordRef.current) {

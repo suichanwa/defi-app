@@ -209,16 +209,32 @@ export async function getActiveWalletId(walletType?: WalletKind): Promise<string
 }
 
 export async function setActiveWalletId(
-  walletId: string,
+  walletId: string | null,
   walletType?: WalletKind,
 ): Promise<void> {
   const type = walletType ?? await getActiveWalletType();
+  if (!walletId) {
+    if (await isRustWalletStoreAvailable()) {
+      await tryRustSetActiveWalletId(type, '');
+    }
+    await setJson(getActiveWalletKey(type), null);
+    return;
+  }
+
   if (await isRustWalletStoreAvailable()) {
     const saved = await tryRustSetActiveWalletId(type, walletId);
     if (saved) return;
   }
 
   await setJson(getActiveWalletKey(type), walletId);
+}
+
+export async function hasAnyWallets(): Promise<boolean> {
+  const [ethRecords, solRecords] = await Promise.all([
+    loadWalletRecords('ethereum'),
+    loadWalletRecords('solana'),
+  ]);
+  return ethRecords.length > 0 || solRecords.length > 0;
 }
 
 export async function loadEncryptedWalletKeyById(
@@ -498,8 +514,8 @@ export async function removeWalletRecord(
   await setJson(getStorageKey(type), filtered);
   
   const activeId = await getActiveWalletId(type);
-  if (activeId === walletId && filtered.length > 0) {
-    await setActiveWalletId(filtered[0].id, type);
+  if (activeId === walletId) {
+    await setActiveWalletId(filtered[0]?.id ?? null, type);
   }
 }
 

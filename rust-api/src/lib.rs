@@ -1,7 +1,7 @@
 use aes::Aes256;
 use ctr::cipher::{KeyIvInit, StreamCipher};
 use jni::objects::JString;
-use jni::sys::{jobject, jstring};
+use jni::sys::{jboolean, jobject, jstring};
 use jni::JNIEnv;
 use pbkdf2::pbkdf2_hmac;
 use rand::RngCore;
@@ -576,9 +576,69 @@ pub extern "system" fn Java_com_yourcompany_defiaiapp_RustWalletCryptoModule_nat
     }
 }
 
+pub fn hash_passcode_impl(passcode: &str) -> String {
+    let mut salt = [0_u8; SALT_LENGTH];
+    rand::thread_rng().fill_bytes(&mut salt);
+    let key = derive_key(passcode, &salt);
+    format!("{}:{}", hex::encode(salt), hex::encode(key))
+}
+
+pub fn verify_passcode_impl(passcode: &str, hash: &str) -> bool {
+    let parts: Vec<&str> = hash.split(':').collect();
+    if parts.len() != 2 {
+        return false;
+    }
+    let salt = match hex::decode(parts[0]) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+    if salt.len() != SALT_LENGTH {
+        return false;
+    }
+    let expected_key = parts[1];
+    let key = derive_key(passcode, &salt);
+    hex::encode(key) == expected_key
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_yourcompany_defiaiapp_RustWalletCryptoModule_nativeHashPasscode(
+    mut env: JNIEnv,
+    _thiz: jobject,
+    passcode: JString,
+) -> jstring {
+    let passcode = match jstring_to_rust(&mut env, passcode) {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let result = hash_passcode_impl(&passcode);
+    rust_to_jstring(&mut env, &result)
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_yourcompany_defiaiapp_RustWalletCryptoModule_nativeVerifyPasscode(
+    mut env: JNIEnv,
+    _thiz: jobject,
+    passcode: JString,
+    hash: JString,
+) -> jboolean {
+    let passcode = match jstring_to_rust(&mut env, passcode) {
+        Ok(v) => v,
+        Err(_) => return 0,
+    };
+    let hash = match jstring_to_rust(&mut env, hash) {
+        Ok(v) => v,
+        Err(_) => return 0,
+    };
+    if verify_passcode_impl(&passcode, &hash) {
+        1
+    } else {
+        0
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{decrypt_wallet_key_impl, encrypt_wallet_key_impl};
+    use super::{decrypt_wallet_key_impl, encrypt_wallet_key_impl, hash_passcode_impl, verify_passcode_impl};
 
     #[test]
     fn encrypts_and_decrypts_wallet_key() {
@@ -593,5 +653,13 @@ mod tests {
         let err = encrypt_wallet_key_impl("", "password").unwrap_err();
 
         assert_eq!(err, "Private key must be a non-empty string");
+    }
+
+    #[test]
+    fn hashes_and_verifies_passcode() {
+        let hash = hash_passcode_impl("123456");
+        assert!(verify_passcode_impl("123456", &hash));
+        assert!(!verify_passcode_impl("654321", &hash));
+        assert!(!verify_passcode_impl("", &hash));
     }
 }

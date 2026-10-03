@@ -4,6 +4,8 @@ type RustWalletCryptoModule = {
   isAvailable: () => Promise<boolean>;
   encryptWalletKey: (privateKey: string, password: string) => Promise<string>;
   decryptWalletKey: (encryptedJson: string, password: string) => Promise<string>;
+  hashPasscode: (passcode: string) => Promise<string>;
+  verifyPasscode: (passcode: string, hash: string) => Promise<boolean>;
   loadWalletRecords: (walletType: string) => Promise<string>;
   getActiveWalletId: (walletType: string) => Promise<string>;
   setActiveWalletId: (walletType: string, walletId: string) => Promise<boolean>;
@@ -51,6 +53,24 @@ export async function tryRustDecryptWalletKey(encryptedJson: string, password: s
   if (!isNativePlatform || !moduleRef?.decryptWalletKey) return null;
   try {
     return await moduleRef.decryptWalletKey(encryptedJson, password);
+  } catch {
+    return null;
+  }
+}
+
+export async function tryRustHashPasscode(passcode: string): Promise<string | null> {
+  if (!isNativePlatform || !moduleRef?.hashPasscode) return null;
+  try {
+    return await moduleRef.hashPasscode(passcode);
+  } catch {
+    return null;
+  }
+}
+
+export async function tryRustVerifyPasscode(passcode: string, hash: string): Promise<boolean | null> {
+  if (!isNativePlatform || !moduleRef?.verifyPasscode) return null;
+  try {
+    return await moduleRef.verifyPasscode(passcode, hash);
   } catch {
     return null;
   }

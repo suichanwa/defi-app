@@ -243,7 +243,6 @@ export function WalletHomeScreen({ navigation }: { navigation: StackNavigationPr
     }, [setNavHidden]),
   );
 
-  const totalValueAnimated = useRef(new Animated.Value(0)).current;
   const [displayTotal, setDisplayTotal] = useState(0);
 
   const formatCurrency = (value: number) => {
@@ -268,18 +267,26 @@ export function WalletHomeScreen({ navigation }: { navigation: StackNavigationPr
   }, [prices, chainTokens]);
 
   useEffect(() => {
-    totalValueAnimated.setValue(totalValueUSD);
-    const id = totalValueAnimated.addListener(({ value }) => setDisplayTotal(value));
-    return () => totalValueAnimated.removeListener(id);
-  }, [totalValueAnimated, totalValueUSD]);
+    const startVal = displayTotal;
+    const endVal = totalValueUSD;
+    if (startVal === endVal) return;
 
-  useEffect(() => {
-    Animated.timing(totalValueAnimated, {
-      toValue: totalValueUSD,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
-  }, [totalValueUSD, totalValueAnimated]);
+    const startTime = Date.now();
+    const duration = 300;
+    let animId: number;
+
+    const step = () => {
+      const now = Date.now();
+      const progress = Math.min((now - startTime) / duration, 1);
+      const current = startVal + (endVal - startVal) * progress;
+      setDisplayTotal(current);
+      if (progress < 1) {
+        animId = requestAnimationFrame(step);
+      }
+    };
+    animId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(animId);
+  }, [totalValueUSD]);
 
   useEffect(() => {
     setAirdropMessage(null);
@@ -456,6 +463,7 @@ export default function WalletScreen() {
     status,
     address,
     wallet,
+    wallets,
     unlock,
     createWallet,
     importWallet,
@@ -528,6 +536,8 @@ export default function WalletScreen() {
   useEffect(() => {
     if (status === 'missing') {
       setFlow('menu');
+      setHasMasterPasscode(false);
+      void clearMasterPasscode();
     } else if (status === 'locked') {
       setFlow('unlock');
     }
@@ -641,7 +651,7 @@ export default function WalletScreen() {
     
     resetFlowMessages();
 
-    if (hasMasterPasscode) {
+    if (wallets.length > 0 && hasMasterPasscode) {
       setFlow('unlock');
       setFlowError('This device already has an app passcode. Unlock with that passcode to add wallets.');
       setShowErrorDialog(true);
@@ -902,8 +912,16 @@ export default function WalletScreen() {
 
   useEffect(() => {
     canUseBiometrics().then(setBiometricsAvailable).catch(() => setBiometricsAvailable(false));
-    isMasterPasscodeSet().then(setHasMasterPasscode).catch(() => setHasMasterPasscode(false));
   }, []);
+
+  useEffect(() => {
+    if (wallets.length === 0 || status === 'missing') {
+      setHasMasterPasscode(false);
+      void clearMasterPasscode();
+    } else {
+      isMasterPasscodeSet().then(setHasMasterPasscode).catch(() => setHasMasterPasscode(false));
+    }
+  }, [wallets.length, status]);
 
   const executeStartFresh = async () => {
     if (isResetting) return;
@@ -1015,7 +1033,7 @@ export default function WalletScreen() {
           }}
           onGoCreate={() => {
             resetFlowMessages();
-            if (hasMasterPasscode) {
+            if (wallets.length > 0 && hasMasterPasscode) {
               setFlow('unlock');
               setFlowMessage('Enter your existing app passcode to create a wallet.');
               return;

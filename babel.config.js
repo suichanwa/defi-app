@@ -15,7 +15,7 @@ module.exports = function (api) {
         {
           moduleName: '@env',
           path: '.env',
-          blocklist: null,
+          blocklist: ['JEST_WORKER_ID'],
           allowlist: null,
           safe: false,
           allowUndefined: true,

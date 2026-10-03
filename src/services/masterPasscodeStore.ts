@@ -1,6 +1,7 @@
 import { getJson, setJson } from './storage';
 import { pbkdf2 as pbkdf2Callback } from 'pbkdf2';
 import { Buffer } from 'buffer';
+import { tryRustHashPasscode, tryRustVerifyPasscode } from './rustWalletCryptoNative';
 
 const MASTER_PASSCODE_KEY = 'wallet.master.passcode.v1';
 const MASTER_PASSCODE_SET_KEY = 'wallet.master.passcode.set.v1';
@@ -54,6 +55,9 @@ function hexToBuffer(hex: string): Uint8Array {
  * Create a hash of the passcode for verification
  */
 async function hashPasscode(passcode: string): Promise<string> {
+  const rustHash = await tryRustHashPasscode(passcode);
+  if (rustHash) return rustHash;
+
   const salt = getRandomBytes(SALT_LENGTH);
   const key = await deriveKey(passcode, salt);
   return bufferToHex(salt) + ':' + bufferToHex(key);
@@ -63,6 +67,9 @@ async function hashPasscode(passcode: string): Promise<string> {
  * Verify a passcode against the stored hash
  */
 async function verifyPasscode(passcode: string, hash: string): Promise<boolean> {
+  const rustResult = await tryRustVerifyPasscode(passcode, hash);
+  if (rustResult !== null) return rustResult;
+
   try {
     const [saltHex, expectedKeyHex] = hash.split(':');
     if (!saltHex || !expectedKeyHex) return false;

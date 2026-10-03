@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -51,17 +52,24 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const walletScrollRef = useRef<ScrollView>(null);
   const lastSyncedIndexRef = useRef<number>(-1);
-  const [containerWidth, setContainerWidth] = useState(0);
-  const pageWidth = containerWidth > 0 ? containerWidth : 0;
+  const initialWidth = useMemo(() => {
+    const screenWidth = Dimensions.get('window').width;
+    return Math.max(0, screenWidth - 40);
+  }, []);
+  const [containerWidth, setContainerWidth] = useState(initialWidth);
+  const pageWidth = containerWidth > 0 ? containerWidth : initialWidth;
+  const lastPageWidthRef = useRef<number>(pageWidth);
   const clampedViewedIndex = useMemo(() => {
     if (!walletList.length) return 0;
     return Math.max(0, Math.min(viewedIndex, walletList.length - 1));
   }, [viewedIndex, walletList.length]);
+
   const runAsync = useCallback((fn: () => void | Promise<void>) => {
     Promise.resolve(fn()).catch((error) => {
       console.error('[WalletCardCarousel] async handler failed', error);
     });
   }, []);
+
   const handleActionPress = useCallback(
     (action: TAction) => {
       Promise.resolve(onActionPress(action)).catch((error) => {
@@ -71,11 +79,29 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
     [onActionPress],
   );
 
+  const scrollToIndex = useCallback(
+    (index: number, animated = true) => {
+      if (!pageWidth || !walletScrollRef.current || walletList.length === 0) return;
+      const clamped = Math.max(0, Math.min(index, walletList.length - 1));
+      walletScrollRef.current.scrollTo({ x: clamped * pageWidth, animated });
+      lastSyncedIndexRef.current = clamped;
+      if (clamped !== viewedIndex) {
+        onViewedIndexChange(clamped);
+      }
+    },
+    [pageWidth, walletList.length, viewedIndex, onViewedIndexChange],
+  );
+
   useEffect(() => {
     if (!walletList.length || !pageWidth) return;
-    if (lastSyncedIndexRef.current === clampedViewedIndex) return;
-    walletScrollRef.current?.scrollTo({ x: clampedViewedIndex * pageWidth, animated: false });
-    lastSyncedIndexRef.current = clampedViewedIndex;
+    if (lastSyncedIndexRef.current === clampedViewedIndex && lastPageWidthRef.current === pageWidth) return;
+
+    const animFrame = requestAnimationFrame(() => {
+      walletScrollRef.current?.scrollTo({ x: clampedViewedIndex * pageWidth, animated: false });
+      lastSyncedIndexRef.current = clampedViewedIndex;
+      lastPageWidthRef.current = pageWidth;
+    });
+    return () => cancelAnimationFrame(animFrame);
   }, [clampedViewedIndex, pageWidth, walletList.length]);
 
   useEffect(() => {
@@ -91,11 +117,18 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
     }
   }, [walletList.length, viewedIndex, clampedViewedIndex, onViewedIndexChange]);
 
-  const handleMomentumScrollEnd = useCallback(
+  const handleScrollEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       if (!pageWidth || walletList.length === 0) return;
-      const nextIndex = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
+      const offsetX = event.nativeEvent.contentOffset.x;
+      const nextIndex = Math.round(offsetX / pageWidth);
       const clampedIndex = Math.max(0, Math.min(nextIndex, walletList.length - 1));
+      const targetOffset = clampedIndex * pageWidth;
+
+      if (Math.abs(offsetX - targetOffset) > 1) {
+        walletScrollRef.current?.scrollTo({ x: targetOffset, animated: true });
+      }
+
       lastSyncedIndexRef.current = clampedIndex;
       if (clampedIndex !== viewedIndex) {
         onViewedIndexChange(clampedIndex);
@@ -109,7 +142,7 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
       style={styles.cardWrapper}
       onLayout={(event) => {
         const width = Math.round(event.nativeEvent.layout.width);
-        if (width > 0 && width !== containerWidth) {
+        if (width > 0 && Math.abs(width - containerWidth) > 1) {
           setContainerWidth(width);
         }
       }}
@@ -118,19 +151,16 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
         ref={walletScrollRef}
         horizontal
         pagingEnabled
-        snapToInterval={pageWidth || undefined}
-        decelerationRate="fast"
-        disableIntervalMomentum
-        snapToAlignment="start"
         showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={handleMomentumScrollEnd}
+        onMomentumScrollEnd={handleScrollEnd}
+        onScrollEndDrag={handleScrollEnd}
         scrollEventThrottle={16}
       >
         {walletList.map((wallet, index) => {
           const isActive = wallet.id === activeWalletId || (!activeWalletId && index === 0);
           const isActivating = wallet.id === activatingWalletId;
           return (
-            <View key={wallet.id} style={{ width: pageWidth || '100%' }}>
+            <View key={wallet.id} style={{ width: pageWidth }}>
               <TouchableOpacity
                 activeOpacity={0.92}
                 disabled={isActive || isActivating}
@@ -187,8 +217,11 @@ export default function WalletCardCarousel<TAction extends WalletActionItem>({
       {walletList.length > 1 && (
         <View style={localStyles.walletPager}>
           {walletList.map((wallet, index) => (
-            <View
+            <TouchableOpacity
               key={`wallet-dot-${wallet.id}`}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+              onPress={() => scrollToIndex(index, true)}
               style={[
                 localStyles.walletDot,
                 { backgroundColor: index === viewedIndex ? colors.accent : colors.border },
