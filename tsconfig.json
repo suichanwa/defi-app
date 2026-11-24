@@ -84,15 +84,12 @@
     "src/**/*",
     "App.tsx",
     "index.ts",
-    "nativewind-env.d.ts",
-    "src/ui/components/secureChat/ChatAvatar.tsx"
-, "WalletCardSettingsScreen.tsx"  ],
+    "nativewind-env.d.ts"
+  ],
   "exclude": [
     "node_modules",
     "android",
     "ios",
-    "repo",
-    "supabase",
     "metro.config.js",
     "babel.config.js"
   ]

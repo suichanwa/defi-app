@@ -3,16 +3,12 @@ import type { ChatMessage, ChatThread } from '@app-types/securechat-types/secure
 import {
   getOrCreateDMChannel,
   getDMMessages,
-  getDMMessagesSince,
-  getUserDMChannelHeads,
   getUserDMChannels,
   sendDMMessage,
   dmChannelToChatThread,
   subscribeToDMMessages,
 } from '@services/directMessages';
-import { isSupabaseConfigured, supabase } from '@services/supabaseClient';
-import { isUuid } from '@utils/secureChatUtils';
-import { DM_POLL_INTERVAL_ACTIVE_MS, DM_POLL_INTERVAL_IDLE_MS, MAX_MESSAGES_IN_MEMORY } from '@constants/secureChat.constants';
+import { MAX_MESSAGES_IN_MEMORY } from '@constants/secureChat.constants';
 
 type UseDirectMessagesArgs = {
   effectiveUserId: string;
@@ -62,10 +58,6 @@ export function useDirectMessages({
     async (otherUserId: string, otherUserName: string) => {
       if (!effectiveUserId) {
         throw new Error('No effective user ID available');
-      }
-
-      if (isSupabaseConfigured && (!isUuid(effectiveUserId) || !isUuid(otherUserId))) {
-        throw new Error('Both users must be signed in with Supabase accounts to use synced DMs.');
       }
 
       if (otherUserId === effectiveUserId) {
@@ -164,85 +156,6 @@ export function useDirectMessages({
       unsubscribe();
     };
   }, [effectiveUserId, notifyIncoming, refreshChannels, setMessagesByChat]);
-
-  useEffect(() => {
-    if (!isActive) return;
-    if (!isSupabaseConfigured || !supabase) return;
-    if (!isUuid(effectiveUserId)) return;
-
-    let mounted = true;
-    const poll = async () => {
-      if (dmPollInFlightRef.current) return;
-      dmPollInFlightRef.current = true;
-      try {
-        const heads = await getUserDMChannelHeads(effectiveUserId);
-        if (!mounted) return;
-
-        const nextHeads: Record<string, string | null> = {};
-        let headsChanged = Object.keys(dmChannelHeadsRef.current).length !== heads.length;
-        heads.forEach((head) => {
-          const activityAt = head.lastMessageAt ?? head.updatedAt ?? head.createdAt ?? null;
-          nextHeads[head.id] = activityAt;
-          if (!headsChanged) {
-            const prev = dmChannelHeadsRef.current[head.id] ?? null;
-            if (prev !== activityAt) headsChanged = true;
-          }
-        });
-        dmChannelHeadsRef.current = nextHeads;
-
-        if (headsChanged) {
-          await refreshChannels();
-        }
-
-        if (!selectedChatId.startsWith('dm:')) return;
-        const lastSeen = lastDmFetchRef.current[selectedChatId];
-        const newMessages = lastSeen
-          ? await getDMMessagesSince(selectedChatId, effectiveUserId, lastSeen)
-          : await getDMMessages(selectedChatId, effectiveUserId);
-        if (!mounted) return;
-
-        if (newMessages.length === 0) return;
-        setMessagesByChat((prev) => {
-          const existing = prev[selectedChatId] ?? [];
-          const next = [...existing];
-          newMessages.forEach((message) => {
-            if (next.some((m) => m.id === message.id)) return;
-            next.push(message);
-            notifyIncoming(selectedChatId, message);
-          });
-          
-          // Limit messages in memory to prevent crashes from excessive message accumulation
-          // Keep only the most recent MAX_MESSAGES_IN_MEMORY messages
-          const limited = next.length > MAX_MESSAGES_IN_MEMORY
-            ? next.slice(-MAX_MESSAGES_IN_MEMORY)
-            : next;
-          
-          return { ...prev, [selectedChatId]: limited };
-        });
-
-        const last = newMessages[newMessages.length - 1];
-        if (last?.createdAt) {
-          lastDmFetchRef.current[selectedChatId] = last.createdAt;
-        }
-      } catch (error) {
-        if (!mounted) return;
-        const message = error instanceof Error ? error.message : 'Unknown DM sync error.';
-        onError?.(message);
-      } finally {
-        dmPollInFlightRef.current = false;
-      }
-    };
-
-    poll();
-    const isDmThreadActive =
-      secureTab === 'chats' && chatView === 'thread' && selectedChatId.startsWith('dm:');
-    const intervalMs = isDmThreadActive ? DM_POLL_INTERVAL_ACTIVE_MS : DM_POLL_INTERVAL_IDLE_MS;
-    const interval = setInterval(poll, intervalMs);
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, [chatView, effectiveUserId, isActive, notifyIncoming, onError, refreshChannels, secureTab, selectedChatId, setMessagesByChat]);
 
   return {
     dmChannels,

@@ -1,82 +1,51 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
+# Dependencies
 node_modules/
 
-# Expo
+# Expo / Metro / TypeScript
 .expo/
 dist/
 web-build/
 expo-env.d.ts
-rust-api/target/
-# Rust build output
+*.tsbuildinfo
+.metro-health-check*
+
+# Rust & Native builds
 target/
+rust-api/target/
 rust-wallet-core/target/
-# Gradle local caches
 .gradle-local/
 .gradle-local-sandbox/
-
-# Native
 .kotlin/
+/ios
+
+# Keystores & Certificates
 *.orig.*
 *.jks
 *.p8
 *.p12
 *.key
+*.pem
 *.mobileprovision
 
-# Metro
-.metro-health-check*
-
-# debug
+# Logs & OS files
 npm-debug.*
 yarn-debug.*
 yarn-error.*
-
-# macOS
 .DS_Store
-*.pem
 
-# local env files
-.env*.local
-
-# typescript
-*.tsbuildinfo
-
-# generated native folders
-/ios
-# Environment variables
+# Local environment secrets
 .env
 .env.local
 .env.*.local
 
-# Dependencies
-node_modules/
-
-# Expo
-.expo/
-dist/
-npm-debug.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-*.orig.*
-web-build/
-
-.env.local
-.cline
-.agents
-.agent
-.cursor
-.continue
-.claude
-.trae
-.vscode
-.windsurf
-
-# OMX
+# AI / Editor local state
+.vscode/
+.claude/
+.cursor/
+.continue/
+.agents/
+.agent/
+.cline/
+.trae/
+.windsurf/
 .omx/
-**/.omx/
-.omx

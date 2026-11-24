@@ -6,11 +6,6 @@ jest.mock('@utils/secureChatImages', () => ({
   resolveChatImageMessage: jest.fn(),
 }));
 
-jest.mock('@services/supabaseClient', () => ({
-  isSupabaseConfigured: false,
-  supabase: null,
-}));
-
 const incomingMessage: ChatMessage = {
   id: 'msg-1',
   chatId: 'dm:xmtp:1',

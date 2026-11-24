@@ -4,23 +4,16 @@ import type { AvatarType, LanguageCode, ThemePreference } from '@app-types/profi
 import { createProfileStyles } from '@styles/ProfileStyles';
 import type { LocalSession } from '@hooks/useProfileAuth';
 import {
-  fetchRemoteProfile,
-  getAnonymousId,
-  getAuthSession,
-  isSupabaseConfigured,
   loadEncryptedWalletKey,
   loadProfileSettings,
   normalizeLanguage,
   saveProfileSettings,
-  toAnonymousProfileId,
-  upsertRemoteProfile,
   type AuthSession,
 } from '@services';
 import { clearBiometricPassword } from '@services/biometrics';
 import { makeSeed } from '@utils/identicon';
 import type { StyleProp, ViewStyle } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { uploadAvatar } from '@services/avatarStorage';
 
 const ALIAS_MIN = 3;
 const ALIAS_MAX = 24;
@@ -77,34 +70,8 @@ const initialStatus: ProfilePreferencesStatus = {
   error: null,
 };
 
-const isSupabaseSession = (value: AuthSession | LocalSession | null | undefined): value is NonNullable<AuthSession> =>
-  Boolean(value && typeof value === 'object' && 'access_token' in value);
-
-const resolveProfileId = async (currentSession: AuthSession | LocalSession | null | undefined) => {
-  if (!isSupabaseConfigured) return null;
-  if (isSupabaseSession(currentSession)) {
-    return currentSession.user?.id ?? null;
-  }
-  if (currentSession) {
-    return null;
-  }
-  const anonId = await getAnonymousId();
-  return toAnonymousProfileId(anonId);
-};
-
 const normalizeProfileError = (error: unknown, fallback: string) => {
   const message = error instanceof Error ? error.message : String(error ?? '');
-  const lower = message.toLowerCase();
-  if (!message) return fallback;
-  if (lower.includes('bucket') && lower.includes('not found')) {
-    return 'Avatar upload failed. Create a public storage bucket named "avatars" in Supabase.';
-  }
-  if (lower.includes('row level security') || lower.includes('permission') || lower.includes('unauthorized')) {
-    return 'Supabase policy blocked the request. Check RLS and storage policies.';
-  }
-  if (lower.includes('invalid input syntax for type uuid')) {
-    return 'Supabase expects UUIDs for profile ids. Update user_profiles.id to text for anon/local profiles.';
-  }
   return message || fallback;
 };
 
@@ -148,17 +115,13 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
       updateStatus({ loading: true, error: null });
       try {
         const [settings, key] = await Promise.all([loadProfileSettings(), loadEncryptedWalletKey()]);
-        const currentSession = session ?? (await getAuthSession());
-        const profileId = await resolveProfileId(currentSession);
-        const remoteProfile = profileId ? await fetchRemoteProfile(profileId) : null;
         if (!isActive()) return;
 
-        const merged = remoteProfile ?? settings;
+        const merged = settings;
         const mergedTheme = merged.themePreference ?? 'system';
         const mergedLanguage = normalizeLanguage(merged.language);
         const nextSeed = merged.avatarSeed ?? key?.id ?? makeSeed();
 
-        // Always use local experimental settings (never sync from Supabase)
         const localExperimental = settings.experimental ?? { cardNamesEnabled: false };
 
         setState({
@@ -171,7 +134,7 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
           language: mergedLanguage,
           walletBiometricUnlockEnabled: merged.walletBiometricUnlockEnabled ?? true,
           experimental: localExperimental,
-          profileSource: remoteProfile ? 'supabase' : 'local',
+          profileSource: 'local',
         });
 
         setI18nLanguage(mergedLanguage);
@@ -258,66 +221,24 @@ export function useProfilePreferences({ theme, session }: ProfilePreferencesArgs
       return;
     }
     try {
-      const currentSession = session ?? (await getAuthSession());
-      const profileId = await resolveProfileId(currentSession);
-      let remoteAvatarUrl = state.avatarUri;
-      const shouldUploadAvatar =
-        state.avatarType === 'custom' &&
-        Boolean(state.avatarUri) &&
-        Boolean(profileId) &&
-        !state.avatarUri?.startsWith('http');
-
-      if (shouldUploadAvatar) {
-        try {
-          remoteAvatarUrl = await uploadAvatar(profileId!, state.avatarUri!);
-          setState((prev) => ({ ...prev, avatarUri: remoteAvatarUrl }));
-        } catch (uploadError) {
-          setStatus({
-            loading: false,
-            message: null,
-            error: normalizeProfileError(uploadError, 'Unable to upload avatar.'),
-          });
-          saveInFlightRef.current = false;
-          return;
-        }
-      }
       const settings = {
         alias: trimmed,
         bio: state.bio.trim(),
         avatarType: state.avatarType,
         avatarSeed: state.avatarType === 'identicon' ? state.avatarSeed : undefined,
-        avatarUri: state.avatarType === 'custom' ? remoteAvatarUrl : undefined,
+        avatarUri: state.avatarType === 'custom' ? state.avatarUri : undefined,
         themePreference: state.themePreference,
         language: state.language,
         walletBiometricUnlockEnabled: state.walletBiometricUnlockEnabled,
         experimental: state.experimental,
         updatedAt: new Date().toISOString(),
       };
-      // Always save locally first (including experimental settings)
       await saveProfileSettings(settings);
       if (!state.walletBiometricUnlockEnabled) {
         await clearBiometricPassword();
       }
       setStatus({ loading: false, message: 'Profile saved locally.', error: null });
-
-      // Save remotely when a remote profile id is available (signed-in or anon profile id).
-      // Exclude experimental settings from remote sync - keep them local-only.
-      if (profileId && isSupabaseConfigured) {
-        // Run in background, don't block UI
-        const { experimental: _, ...settingsWithoutExperimental } = settings;
-        upsertRemoteProfile(profileId, settingsWithoutExperimental)
-          .then(() => {
-            setState((prev) => ({ ...prev, profileSource: 'supabase' }));
-            setStatus({ loading: false, message: 'Profile saved and synced.', error: null });
-          })
-          .catch((remoteError) => {
-            console.warn('Failed to sync profile to Supabase:', remoteError);
-            // Keep local success message, just note the source
-            setState((prev) => ({ ...prev, profileSource: 'local' }));
-          });
-      } else {
-        setState((prev) => ({ ...prev, profileSource: 'local' }));
-      }
+      setState((prev) => ({ ...prev, profileSource: 'local' }));
 
       setI18nLanguage(state.language);
       setState((prev) => ({ ...prev, alias: settings.alias }));

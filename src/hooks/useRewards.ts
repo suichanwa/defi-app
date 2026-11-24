@@ -2,10 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { RewardActivity, RewardsSummary } from '@app-types/rewards';
 import {
   clearRewardsCache,
-  fetchRewardsActivity,
-  fetchRewardsSummary,
   getAnonymousId,
-  isSupabaseConfigured,
   loadRewardsActivity,
   loadRewardsSummary,
 } from '@services';
@@ -46,17 +43,12 @@ export function useRewards({ session }: { session: AuthSession | LocalSession | 
       try {
         const currentUserId = session?.user?.id ?? (await getAnonymousId());
         if (!isActive()) return;
-        const useSupabaseRewards = Boolean(isSupabaseConfigured && session?.user?.id);
-        const [remoteSummary, remoteActivity] = await Promise.all([
-          useSupabaseRewards ? fetchRewardsSummary(currentUserId) : Promise.resolve(null),
-          useSupabaseRewards ? fetchRewardsActivity(currentUserId) : Promise.resolve(null),
-        ]);
         const [localSummary, localActivity] = await Promise.all([loadRewardsSummary(), loadRewardsActivity()]);
 
         setState({
-          rewardsSummary: remoteSummary ?? localSummary,
-          rewardsActivity: remoteActivity ?? localActivity,
-          rewardsSource: remoteSummary || remoteActivity ? 'supabase' : 'local',
+          rewardsSummary: localSummary,
+          rewardsActivity: localActivity,
+          rewardsSource: 'local',
           effectiveUserId: currentUserId,
         });
         setStatus({ loading: false, error: null });

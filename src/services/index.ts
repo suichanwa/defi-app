@@ -6,5 +6,4 @@ export * from './profileRemote';
 export * from './profileStore';
 export * from './rewardsRemote';
 export * from './rewardsStore';
-export * from './supabaseClient';
 export * from './walletKeyStore';

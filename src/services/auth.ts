@@ -1,5 +1,3 @@
-import { supabase, isSupabaseConfigured } from './supabaseClient';
-
 export type Session = {
   user: {
     id: string;
@@ -23,89 +21,36 @@ type AuthResult = {
   error: AuthError | null;
 };
 
+const CLOUD_AUTH_DISABLED_ERROR: AuthError = {
+  message: 'Cloud email authentication is disabled in serverless local mode.',
+};
+
 export async function getAuthSession(): Promise<AuthSession> {
-  if (!isSupabaseConfigured || !supabase) return null;
-  
-  try {
-    const { data, error } = await supabase.auth.getSession();
-    if (error) {
-      console.warn('Error getting auth session:', error.message);
-      return null;
-    }
-    return data.session;
-  } catch (err) {
-    console.warn('Exception getting auth session:', err);
-    return null;
-  }
+  return null;
 }
 
-export function onAuthStateChange(callback: (session: AuthSession) => void) {
-  if (!isSupabaseConfigured || !supabase) return null;
-  
-  const { data } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
-    callback(session);
-  });
-  
-  return data.subscription;
+export type AuthSubscription = {
+  unsubscribe: () => void;
+};
+
+export function onAuthStateChange(_callback: (session: AuthSession) => void): AuthSubscription | null {
+  return null;
+}
+
+export async function signUp(_email: string, _password: string): Promise<AuthResult> {
+  return { session: null, error: CLOUD_AUTH_DISABLED_ERROR };
 }
 
 /**
- * Sign up with email and password
- */
-export async function signUp(email: string, password: string): Promise<AuthResult> {
-  if (!isSupabaseConfigured || !supabase) {
-    return { session: null, error: { message: 'Supabase not configured' } as AuthError };
-  }
-  
-  try {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-    
-    return { session: data.session, error };
-  } catch (err) {
-    return { session: null, error: { message: err instanceof Error ? err.message : 'Sign up failed' } as AuthError };
-  }
-}
-
-/**
- * Sign in anonymously - creates an anonymous user without email
- * Falls back to local anonymous session if Supabase anonymous auth is not enabled
+ * Create a local-only anonymous session stored on device.
  */
 export async function signInAnonymously(): Promise<AuthResult> {
-  if (!isSupabaseConfigured || !supabase) {
-    // Create local anonymous session
-    return createLocalAnonymousSession();
-  }
-  
-  try {
-    const { data, error } = await supabase.auth.signInAnonymously();
-    
-    // If anonymous sign-in is not enabled (422 error), fall back to local
-    if (error) {
-      console.warn('Supabase anonymous sign-in failed:', error.message);
-      if (error.message.includes('Anonymous sign-ins are disabled') || 
-          error.status === 422) {
-        return createLocalAnonymousSession();
-      }
-      return { session: null, error };
-    }
-    
-    return { session: data.session, error: null };
-  } catch (err) {
-    console.warn('Anonymous sign-in exception:', err);
-    return createLocalAnonymousSession();
-  }
+  return createLocalAnonymousSession();
 }
 
-/**
- * Create a local-only anonymous session (not stored in Supabase)
- */
 function createLocalAnonymousSession(): AuthResult {
   const anonId = `anon-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  
-  // Create a fake session object that matches the Session interface
+
   const localSession = {
     access_token: `local-${anonId}`,
     refresh_token: '',
@@ -128,73 +73,22 @@ function createLocalAnonymousSession(): AuthResult {
       updated_at: new Date().toISOString(),
     },
   } as AuthSession;
-  
+
   return { session: localSession, error: null };
 }
 
-/**
- * Sign in with email and password
- */
-export async function signIn(email: string, password: string): Promise<AuthResult> {
-  if (!isSupabaseConfigured || !supabase) {
-    return { session: null, error: { message: 'Supabase not configured' } as AuthError };
-  }
-  
-  try {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    
-    return { session: data.session, error };
-  } catch (err) {
-    return { session: null, error: { message: err instanceof Error ? err.message : 'Sign in failed' } as AuthError };
-  }
+export async function signIn(_email: string, _password: string): Promise<AuthResult> {
+  return { session: null, error: CLOUD_AUTH_DISABLED_ERROR };
 }
 
 export async function signOut(): Promise<void> {
-  if (!isSupabaseConfigured || !supabase) return;
-  
-  const { error } = await supabase.auth.signOut();
-  if (error) {
-    throw error;
-  }
+  return;
 }
 
-export async function updatePassword(newPassword: string): Promise<{ error: AuthError | null }> {
-  if (!isSupabaseConfigured || !supabase) {
-    return { error: { message: 'Supabase not configured' } as AuthError };
-  }
-  
-  try {
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword,
-    });
-    
-    return { error };
-  } catch (err) {
-    return { error: { message: err instanceof Error ? err.message : 'Password update failed' } as AuthError };
-  }
+export async function updatePassword(_newPassword: string): Promise<{ error: AuthError | null }> {
+  return { error: CLOUD_AUTH_DISABLED_ERROR };
 }
 
-/**
- * Link email to anonymous account (upgrade anonymous to full account)
- */
-export async function linkEmail(email: string, password: string): Promise<AuthResult> {
-  if (!isSupabaseConfigured || !supabase) {
-    return { session: null, error: { message: 'Supabase not configured' } as AuthError };
-  }
-  
-  try {
-    const { data, error } = await supabase.auth.updateUser({
-      email,
-      password,
-    });
-    
-    // Get updated session
-    const sessionResult = await supabase.auth.getSession();
-    return { session: sessionResult.data.session, error };
-  } catch (err) {
-    return { session: null, error: { message: err instanceof Error ? err.message : 'Failed to link email' } as AuthError };
-  }
+export async function linkEmail(_email: string, _password: string): Promise<AuthResult> {
+  return { session: null, error: CLOUD_AUTH_DISABLED_ERROR };
 }
