@@ -31,7 +31,7 @@ type ProfilePreferencesState = {
   experimental?: {
     cardNamesEnabled?: boolean;
   };
-  profileSource: 'local' | 'supabase';
+  profileSource: 'local';
 };
 
 type ProfilePreferencesStatus = {

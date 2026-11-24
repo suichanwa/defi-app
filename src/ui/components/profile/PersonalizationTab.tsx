@@ -15,7 +15,7 @@ type PersonalizationTabProps = {
   scrollStyle: StyleProp<ViewStyle>;
   cardStyle: StyleProp<ViewStyle>;
   onBack: () => void;
-  profileSource: 'local' | 'supabase';
+  profileSource: 'local';
   alias: string;
   onChangeAlias: (value: string) => void;
   bio: string;
@@ -84,23 +84,6 @@ export default function PersonalizationTab({
         />
         <Text style={styles.hint}>Optional. 3-24 characters using letters, numbers, spaces, _ and -.</Text>
       </View>
-
-      {profileSource === 'supabase' ? (
-        <View style={cardStyle}>
-          <Text style={styles.cardTitle}>Bio</Text>
-          <TextInput
-            value={bio}
-            onChangeText={onChangeBio}
-            placeholder="Tell people a little about yourself"
-            placeholderTextColor="#94a3b8"
-            style={[styles.input, styles.bioInput]}
-            multiline
-            textAlignVertical="top"
-            maxLength={160}
-          />
-          <Text style={styles.hint}>Visible on Supabase-backed profiles only. Up to 160 characters.</Text>
-        </View>
-      ) : null}
 
       <View style={cardStyle}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -186,7 +169,7 @@ export default function PersonalizationTab({
           </View>
         </View>
         <Text style={styles.hint}>
-          Identicon is derived from your wallet id. Custom photos sync to your profile when connected to Supabase.
+          Identicon is derived from your wallet id. Custom photos are stored locally on your device.
         </Text>
         {avatarType === 'custom' && !hasCustomAvatar ? (
           <Text style={{ marginTop: 8, color: '#b45309', fontSize: 12, fontWeight: '500' }}>

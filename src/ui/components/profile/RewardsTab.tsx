@@ -10,7 +10,7 @@ type RewardsTabProps = {
   cardStyle: StyleProp<ViewStyle>;
   onBack: () => void;
   rewardsSummary: RewardsSummary | null;
-  rewardsSource: 'local' | 'supabase';
+  rewardsSource: 'local';
   effectiveUserId: string | null;
   rules: string[];
   rewardsActivity: RewardActivity[];
@@ -37,7 +37,7 @@ export default function RewardsTab({
         <Text style={styles.pointsValue}>{rewardsSummary?.points ?? 0} pts</Text>
         <Text style={styles.metaText}>Tier: {rewardsSummary?.tier ?? 'bronze'}</Text>
         <Text style={styles.metaText}>
-          Source: {rewardsSource === 'supabase' ? 'Supabase' : 'Local mock data'}
+          Source: Local mock data
           {effectiveUserId ? ` Aú User: ${effectiveUserId.slice(0, 8)}` : ''}
         </Text>
       </View>

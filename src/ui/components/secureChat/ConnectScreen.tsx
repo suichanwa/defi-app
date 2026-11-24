@@ -10,11 +10,6 @@ type GroupedEntry = LogEntry & { friendly: string; count: number };
 
 const FRIENDLY: Array<{ match: (t: string) => boolean; msg: string; type: LogEntry['type'] }> = [
   {
-    match: (t) => t.includes('Failed to join room') && t.includes('Supabase'),
-    msg: 'Chat server unreachable — check your internet connection.',
-    type: 'error',
-  },
-  {
     match: (t) => t.includes('XMTP native module is not linked'),
     msg: 'XMTP needs a native build. Switch from Expo Go to a dev or release APK.',
     type: 'error',
@@ -28,11 +23,6 @@ const FRIENDLY: Array<{ match: (t: string) => boolean; msg: string; type: LogEnt
     match: (t) => t.startsWith('History error:') && t.includes('Failed to fetch'),
     msg: "Couldn't load message history — check your internet connection.",
     type: 'error',
-  },
-  {
-    match: (t) => t.includes('Supabase is not configured'),
-    msg: 'Chat server not set up. Ask the developer to configure Supabase.',
-    type: 'info',
   },
   {
     match: (t) => t.includes('XMTP ready:'),

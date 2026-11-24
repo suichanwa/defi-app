@@ -40,6 +40,7 @@ import { createSecureChatUserActions } from '@services/securechat/userMessageAct
 import { useChatAvatar } from '../../hooks/useChatAvatar';
 import { useChatProfiles } from '../../hooks/useChatProfiles';
 import { useTheme } from '@theme/ThemeProvider';
+import { useWalletSession } from '@context/WalletSessionProvider';
 import { useXmtpClient } from '@context/XmtpProvider';
 import { notifyAndroidSecureChatMessage } from '@services/androidNotifications';
 import { DEFAULT_GLOBAL_CHAT_ID } from '@constants/secureChat.constants';
@@ -60,14 +61,16 @@ type PendingFile = {
 
 export default function SecureChatScreen({ isActive = false, onChatViewChange }: SecureChatScreenProps) {
   const { colors } = useTheme();
+  const { status: walletStatus } = useWalletSession();
   const { client: xmtpClient } = useXmtpClient();
+  const isRealtimeRoomEnabled = Boolean(isActive && walletStatus === 'unlocked');
   const [chats, setChats] = useState<ChatThread[]>([
     {
       id: SecureChatConstants.DEFAULT_GLOBAL_CHAT_ID,
       name: SecureChatConstants.DEFAULT_GLOBAL_CHAT_NAME,
       participants: ['You'],
       peerAddress: SecureChatConstants.DEFAULT_GLOBAL_CHAT_PEER,
-      isOnline: true,
+      isOnline: false,
       lastMessage: {
         text: SecureChatConstants.DEFAULT_GLOBAL_CHAT_JOIN_TEXT,
         ts: date.format(new Date(), 'HH:mm'),
@@ -429,7 +432,7 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
           name: SecureChatConstants.DEFAULT_GLOBAL_CHAT_NAME,
           participants: ['You'],
           peerAddress: SecureChatConstants.DEFAULT_GLOBAL_CHAT_PEER,
-          isOnline: true,
+          isOnline: false,
           lastMessage: { text: SecureChatConstants.DEFAULT_GLOBAL_CONNECTED_TEXT, ts: now, from: 'System' },
         },
         ...prev,
@@ -490,7 +493,16 @@ export default function SecureChatScreen({ isActive = false, onChatViewChange }:
     [getChatById, typingSenderId],
   );
 
+  useEffect(() => {
+    if (isRealtimeRoomEnabled) return;
+    setServerInfo((prev) => (prev?.address === 'global-network' ? null : prev));
+    setChats((prev) =>
+      prev.map((chat) => (chat.id === roomId && chat.isOnline ? { ...chat, isOnline: false } : chat)),
+    );
+  }, [isRealtimeRoomEnabled, roomId]);
+
   const { participantCount, sendBroadcast, sendTyping } = useRealtimeRoom({
+    enabled: isRealtimeRoomEnabled,
     roomId,
     presenceKey: typingSenderId,
     presencePayload,

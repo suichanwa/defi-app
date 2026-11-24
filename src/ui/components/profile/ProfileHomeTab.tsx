@@ -7,7 +7,7 @@ import { useTheme } from '@theme/ThemeProvider';
 type ProfileHomeTabProps = {
   scrollStyle: StyleProp<ViewStyle>;
   cardStyle: StyleProp<ViewStyle>;
-  profileSource: 'local' | 'supabase';
+  profileSource: 'local';
   onOpenPersonalization: () => void;
   onOpenAuth: () => void;
   onOpenPrivacy: () => void;
@@ -71,7 +71,7 @@ export default function ProfileHomeTab({
           <View style={styles.cardBody}>
             <Text style={styles.cardTitle}>Personalization</Text>
             <Text style={styles.cardSubtitle}>
-              Alias, avatar, and theme preferences. Source: {profileSource === 'supabase' ? 'Supabase' : 'Local'}.
+              Alias, avatar, and theme preferences. Source: Local.
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.muted} />

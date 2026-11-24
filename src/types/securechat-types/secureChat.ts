@@ -51,7 +51,7 @@ export type ChatReplyReference = {
   author: string;
   content: string;
   attachment?: ChatReplyAttachment;
-  source?: 'xmtp' | 'supabase' | 'local';
+  source?: 'xmtp' | 'local';
 };
 
 export type ChatThread = {

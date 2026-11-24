@@ -12,7 +12,7 @@ import type { LocalSession } from '@hooks/useProfileAuth';
 type RewardsState = {
   rewardsSummary: RewardsSummary | null;
   rewardsActivity: RewardActivity[];
-  rewardsSource: 'local' | 'supabase';
+  rewardsSource: 'local';
   effectiveUserId: string | null;
 };
 

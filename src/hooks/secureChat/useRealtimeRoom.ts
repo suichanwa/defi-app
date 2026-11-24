@@ -8,6 +8,7 @@ import {
 export type { TypingPayload };
 
 type RealtimeArgs = {
+  enabled?: boolean;
   roomId: string;
   presenceKey: string;
   presencePayload?: Record<string, unknown>;
@@ -19,6 +20,7 @@ type RealtimeArgs = {
 };
 
 export function useRealtimeRoom({
+  enabled = true,
   roomId,
   presenceKey,
   presencePayload,
@@ -30,7 +32,7 @@ export function useRealtimeRoom({
 }: RealtimeArgs) {
   const transportRef = useRef<DecentralizedRoomTransport | null>(null);
   const [isReady, setIsReady] = useState(false);
-  const [participantCount, setParticipantCount] = useState(1);
+  const [participantCount, setParticipantCount] = useState(enabled ? 1 : 0);
 
   const onIncomingMessageRef = useRef(onIncomingMessage);
   const onTypingRef = useRef(onTyping);
@@ -48,11 +50,15 @@ export function useRealtimeRoom({
 
   useEffect(() => {
     setIsReady(false);
-    setParticipantCount(1);
+    setParticipantCount(enabled ? 1 : 0);
 
     if (transportRef.current) {
       transportRef.current.destroy();
       transportRef.current = null;
+    }
+
+    if (!enabled) {
+      return;
     }
 
     const transport = new DecentralizedRoomTransport({
@@ -81,7 +87,7 @@ export function useRealtimeRoom({
         transportRef.current = null;
       }
     };
-  }, [roomId, presenceKey]);
+  }, [enabled, roomId, presenceKey]);
 
   const sendBroadcast = useCallback(async (payload: ChatMessage) => {
     const transport = transportRef.current;

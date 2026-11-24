@@ -1,15 +1,36 @@
 const { WebSocketServer } = require('ws');
 
 const DEFAULT_PORT = 8082;
+const DEFAULT_HOST = '127.0.0.1';
 let serverInstance = null;
 
-function startChatRelay(port = DEFAULT_PORT) {
+function resolveRelayConfig(portOrOptions, hostArg) {
+  const envPort = Number(process.env.CHAT_RELAY_PORT);
+  const defaultPort = Number.isFinite(envPort) && envPort > 0 ? envPort : DEFAULT_PORT;
+  const defaultHost = process.env.CHAT_RELAY_HOST?.trim() || DEFAULT_HOST;
+
+  if (portOrOptions && typeof portOrOptions === 'object') {
+    return {
+      port: portOrOptions.port ?? defaultPort,
+      host: portOrOptions.host?.trim() || defaultHost,
+    };
+  }
+
+  return {
+    port: typeof portOrOptions === 'number' ? portOrOptions : defaultPort,
+    host: (typeof hostArg === 'string' && hostArg.trim()) || defaultHost,
+  };
+}
+
+function startChatRelay(portOrOptions = DEFAULT_PORT, hostArg) {
   if (serverInstance) {
     return serverInstance;
   }
 
+  const { port, host } = resolveRelayConfig(portOrOptions, hostArg);
+
   try {
-    const wss = new WebSocketServer({ port, host: '0.0.0.0' });
+    const wss = new WebSocketServer({ port, host });
     serverInstance = wss;
 
     // roomId -> Set<WebSocket>
@@ -135,7 +156,7 @@ function startChatRelay(port = DEFAULT_PORT) {
       console.warn('[ChatRelay] WebSocketServer error:', err.message);
     });
 
-    console.log(`[ChatRelay] Local chat relay server ready on 0.0.0.0:${port}`);
+    console.log(`[ChatRelay] Local chat relay server ready on ${host}:${port}`);
     return wss;
   } catch (err) {
     console.warn('[ChatRelay] Failed to start local chat relay:', err.message);
@@ -147,4 +168,4 @@ if (require.main === module) {
   startChatRelay();
 }
 
-module.exports = { startChatRelay };
+module.exports = { startChatRelay, resolveRelayConfig };

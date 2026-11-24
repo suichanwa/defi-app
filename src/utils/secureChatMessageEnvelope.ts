@@ -38,7 +38,7 @@ const sanitizeReplyReference = (value: unknown): ChatReplyReference | undefined 
     author,
     content,
     attachment: sanitizeAttachment(typed.attachment),
-    source: typed.source === 'xmtp' || typed.source === 'supabase' || typed.source === 'local' ? typed.source : undefined,
+    source: typed.source === 'xmtp' || typed.source === 'local' ? typed.source : undefined,
   };
 };
 
