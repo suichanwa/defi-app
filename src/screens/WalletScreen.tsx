@@ -10,7 +10,8 @@ import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createWalletStyles } from '@styles/WalletStyles';
 import { useTheme } from '../theme/ThemeProvider';
 import { useChain } from '../context/ChainProvider';
-import { CHAINS, getSolanaClusterLabel, type ChainKey } from '../config/chain';
+import { getSolanaClusterLabel } from '../config/chain';
+import { getNextChainKey, switchNetworkAndRequireAuth } from '@utils/networkSwitch';
 import { useWalletSession } from '../context/WalletSessionProvider';
 import type { WalletRecordMeta } from '../types/wallet';
 import WalletSetupScreen from '@components/wallet/WalletSetupScreen';
@@ -101,29 +102,12 @@ const walletStackScreenOptions = Platform.select({
   },
 });
 
-const promptChainChange = ({
-  currentKey,
-  nextKey,
-  setChainKey,
-}: {
-  currentKey: ChainKey;
-  nextKey: ChainKey;
-  setChainKey: (key: ChainKey) => void;
-}) => {
-  if (nextKey === currentKey) return;
-
-  const nextChain = CHAINS[nextKey];
-  const nextChainName = nextChain?.name ?? nextKey;
-
-  setChainKey(nextKey);
-  Alert.alert('Relaunch required', `Switched to ${nextChainName}. You have to relaunch the app.`);
-};
-
 export function WalletHomeScreen({ navigation }: { navigation: StackNavigationProp<WalletStackParamList, 'WalletHome'> }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createWalletStyles(colors), [colors]);
   const { chain, chainKey, setChainKey } = useChain();
-  const { status, address, wallets, activeWalletId, switchWallet, registerActivity } = useWalletSession();
+  const { status, address, wallets, activeWalletId, switchWallet, registerActivity, lockForNetworkSwitch } =
+    useWalletSession();
   const { setNavHidden } = useNavVisibility();
   const [isAirdropLoading, setIsAirdropLoading] = useState(false);
   const [airdropMessage, setAirdropMessage] = useState<string | null>(null);
@@ -307,30 +291,20 @@ export function WalletHomeScreen({ navigation }: { navigation: StackNavigationPr
 
   const airdropCooldownMsRemaining = Math.max(0, (airdropCooldownUntil ?? 0) - nowMs);
 
-  const confirmChainChange = useCallback(
-    (nextKey: ChainKey) => {
-      promptChainChange({
-        currentKey: chainKey,
-        nextKey,
-        setChainKey,
+  const handleToggleNetwork = useCallback(() => {
+    const nextKey = getNextChainKey(chainKey);
+    void switchNetworkAndRequireAuth({
+      currentKey: chainKey,
+      nextKey,
+      setChainKey,
+      lockForNetworkSwitch: lockForNetworkSwitch ?? (async () => 'locked'),
+      reloadOnWeb: true,
+    }).catch((error) => {
+      handleError(error, {
+        defaultMessage: 'Unable to switch network right now. Please try again.',
       });
-    },
-    [chainKey, setChainKey],
-  );
-
-  const handleToggleNetwork = () => {
-    if (chainKey === 'solanaDevnet') {
-      confirmChainChange('solanaMainnet');
-      return;
-    }
-    if (chainKey === 'solanaMainnet') {
-      confirmChainChange('ethereumMainnet');
-      return;
-    }
-    if (chainKey === 'ethereumMainnet') {
-      confirmChainChange('solanaDevnet');
-    }
-  };
+    });
+  }, [chainKey, setChainKey, lockForNetworkSwitch, handleError]);
 
   const handleWalletActionPress = useCallback(
     (action: WalletAction) => {
@@ -464,7 +438,10 @@ export default function WalletScreen() {
     address,
     wallet,
     wallets,
+    networkSwitchMessage,
+    suppressAutoBiometric,
     unlock,
+    lockForNetworkSwitch,
     createWallet,
     importWallet,
     confirmBackup,
@@ -498,28 +475,19 @@ export default function WalletScreen() {
     [chain],
   );
 
-  const confirmChainChange = useCallback(
-    (nextKey: ChainKey) => {
-      promptChainChange({
-        currentKey: chainKey,
-        nextKey,
-        setChainKey,
-      });
-    },
-    [chainKey, setChainKey],
-  );
-
   const handleToggleSetupNetwork = useCallback(() => {
-    if (chainKey === 'solanaDevnet') {
-      confirmChainChange('solanaMainnet');
-      return;
-    }
-    if (chainKey === 'solanaMainnet') {
-      confirmChainChange('ethereumMainnet');
-      return;
-    }
-    confirmChainChange('solanaDevnet');
-  }, [chainKey, confirmChainChange]);
+    const nextKey = getNextChainKey(chainKey);
+    void switchNetworkAndRequireAuth({
+      currentKey: chainKey,
+      nextKey,
+      setChainKey,
+      lockForNetworkSwitch: lockForNetworkSwitch ?? (async () => 'locked'),
+      reloadOnWeb: false,
+    }).catch((error) => {
+      setFlowError(walletErrorMessage(error, 'unlock'));
+      setShowErrorDialog(true);
+    });
+  }, [chainKey, setChainKey, lockForNetworkSwitch]);
 
   const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const biometricInFlightRef = useRef(false);
@@ -540,8 +508,13 @@ export default function WalletScreen() {
       void clearMasterPasscode();
     } else if (status === 'locked') {
       setFlow('unlock');
+      if (networkSwitchMessage) {
+        setUnlockPassword('');
+        setFlowError(null);
+        setFlowMessage(networkSwitchMessage);
+      }
     }
-  }, [status]);
+  }, [status, networkSwitchMessage]);
 
   useEffect(() => {
     let cancelled = false;
@@ -569,6 +542,7 @@ export default function WalletScreen() {
     
     const tryBiometricUnlock = async () => {
       if (status !== 'locked') return;
+      if (suppressAutoBiometric) return;
       if (!biometricUnlockEnabled) return;
       if (biometricInFlightRef.current) return;
       if (resetInFlightRef.current) return;
@@ -603,7 +577,7 @@ export default function WalletScreen() {
     return () => {
       cancelled = true;
     };
-  }, [status, unlock, biometricUnlockEnabled]);
+  }, [status, unlock, biometricUnlockEnabled, suppressAutoBiometric]);
 
   const resetFlowMessages = () => {
     setFlowError(null);
@@ -915,13 +889,13 @@ export default function WalletScreen() {
   }, []);
 
   useEffect(() => {
-    if (wallets.length === 0 || status === 'missing') {
+    if (status === 'missing') {
       setHasMasterPasscode(false);
       void clearMasterPasscode();
     } else {
       isMasterPasscodeSet().then(setHasMasterPasscode).catch(() => setHasMasterPasscode(false));
     }
-  }, [wallets.length, status]);
+  }, [status]);
 
   const executeStartFresh = async () => {
     if (isResetting) return;

@@ -6,78 +6,30 @@
     "strict": true,
     "baseUrl": "./src",
     "paths": {
-      "@env": [
-        "../types/env.d.ts"
-      ],
-      "@components": [
-        "ui/components"
-      ],
-      "@components/*": [
-        "ui/components/*"
-      ],
-      "@screens": [
-        "screens"
-      ],
-      "@screens/*": [
-        "screens/*"
-      ],
-      "@hooks": [
-        "hooks"
-      ],
-      "@hooks/*": [
-        "hooks/*"
-      ],
-      "@services": [
-        "services/index"
-      ],
-      "@services/*": [
-        "services/*"
-      ],
-      "@app-types": [
-        "types"
-      ],
-      "@app-types/*": [
-        "types/*"
-      ],
-      "@styles/*": [
-        "ui/styles/*"
-      ],
-      "@context": [
-        "context"
-      ],
-      "@context/*": [
-        "context/*"
-      ],
-      "@theme": [
-        "theme"
-      ],
-      "@theme/*": [
-        "theme/*"
-      ],
-      "@i18n": [
-        "i18n"
-      ],
-      "@i18n/*": [
-        "i18n/*"
-      ],
-      "@utils": [
-        "utils"
-      ],
-      "@utils/*": [
-        "utils/*"
-      ],
-      "@constants": [
-        "constants"
-      ],
-      "@constants/*": [
-        "constants/*"
-      ],
-      "@config": [
-        "config"
-      ],
-      "@config/*": [
-        "config/*"
-      ]
+      "@app-types": ["types"],
+      "@app-types/*": ["types/*"],
+      "@components": ["ui/components"],
+      "@components/*": ["ui/components/*"],
+      "@config": ["config"],
+      "@config/*": ["config/*"],
+      "@constants": ["constants"],
+      "@constants/*": ["constants/*"],
+      "@context": ["context"],
+      "@context/*": ["context/*"],
+      "@env": ["../types/env.d.ts"],
+      "@hooks": ["hooks"],
+      "@hooks/*": ["hooks/*"],
+      "@i18n": ["i18n"],
+      "@i18n/*": ["i18n/*"],
+      "@screens": ["screens"],
+      "@screens/*": ["screens/*"],
+      "@services": ["services/index"],
+      "@services/*": ["services/*"],
+      "@styles/*": ["ui/styles/*"],
+      "@theme": ["theme"],
+      "@theme/*": ["theme/*"],
+      "@utils": ["utils"],
+      "@utils/*": ["utils/*"]
     }
   },
   "include": [

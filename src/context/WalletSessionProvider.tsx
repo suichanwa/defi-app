@@ -43,8 +43,12 @@ type WalletSession = {
   backupCompleted: boolean;
   wallets: WalletRecordMeta[];
   activeWalletId: string | null;
+  networkSwitchMessage: string | null;
+  suppressAutoBiometric: boolean;
   unlock: (password: string) => Promise<void>;
   lock: () => void;
+  lockForNetworkSwitch: (chainName?: string) => Promise<'locked' | 'missing'>;
+  clearNetworkSwitchPrompt: () => void;
   createWallet: (passwordOrOptions?: string | WalletCreateOptions) => Promise<{ mnemonic: string; address: string }>;
   importWallet: (mnemonic: string, passwordOrOptions?: string | WalletCreateOptions) => Promise<{ address: string }>;
   confirmBackup: () => Promise<void>;
@@ -81,6 +85,8 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
   const [backupCompletedState, setBackupCompletedState] = useState(false);
   const [wallets, setWallets] = useState<WalletRecordMeta[]>([]);
   const [activeWalletId, setActiveWalletIdState] = useState<string | null>(null);
+  const [networkSwitchMessage, setNetworkSwitchMessage] = useState<string | null>(null);
+  const [suppressAutoBiometric, setSuppressAutoBiometric] = useState(false);
   const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastPasswordRef = useRef<string | null>(null);
 
@@ -171,9 +177,9 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
 
   useEffect(() => {
     const init = async () => {
-      const { activeId, records } = await refreshWallets();
+      const { records } = await refreshWallets();
       const hasAny = records.length > 0 || (await hasAnyWallets());
-      if (!activeId || !hasAny) {
+      if (!hasAny) {
         await clearWallet();
         await clearMasterPasscode();
         await clearBiometricPassword();
@@ -196,18 +202,23 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
     }
     setActiveWalletIdState(existing.id);
     await setActiveWalletType(existing.walletType ?? getActiveChain().kind);
-    lastPasswordRef.current = password;
     if ((existing.walletType ?? getActiveChain().kind) === 'solana') {
       const { keypair } = await unlockSolanaWallet(existing.encryptedJson, password);
+      lastPasswordRef.current = password;
       setWallet(keypair);
       setAddress(keypair.publicKey.toBase58());
       setBackupCompletedState(Boolean(existing.backupCompleted));
       setRecoveryPhrase(null);
+      setNetworkSwitchMessage(null);
+      setSuppressAutoBiometric(false);
       setStatus('unlocked');
       scheduleLock();
       return;
     }
     await hydrateUnlockedWallet(existing, password);
+    lastPasswordRef.current = password;
+    setNetworkSwitchMessage(null);
+    setSuppressAutoBiometric(false);
     setStatus('unlocked');
     scheduleLock();
   };
@@ -219,6 +230,46 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
     clearLockTimer();
     lastPasswordRef.current = null;
   };
+
+  const clearNetworkSwitchPrompt = useCallback(() => {
+    setNetworkSwitchMessage(null);
+    setSuppressAutoBiometric(false);
+  }, []);
+
+  const lockForNetworkSwitch = useCallback(
+    async (chainName?: string): Promise<'locked' | 'missing'> => {
+      clearLockTimer();
+      lastPasswordRef.current = null;
+      setWallet(null);
+      setAddress(null);
+      setRecoveryPhrase(null);
+      setBackupCompletedState(false);
+
+      const { activeId, records } = await refreshWallets();
+      const hasAny = records.length > 0 || (await hasAnyWallets());
+      if (!hasAny) {
+        setWallets([]);
+        setActiveWalletIdState(null);
+        setNetworkSwitchMessage(null);
+        setSuppressAutoBiometric(false);
+        setStatus('missing');
+        return 'missing';
+      }
+
+      if (!activeId) {
+        setActiveWalletIdState(null);
+      }
+      setSuppressAutoBiometric(true);
+      setNetworkSwitchMessage(
+        chainName
+          ? `Switched to ${chainName}. Enter your passcode to continue.`
+          : 'Network switched. Enter your passcode to continue.',
+      );
+      setStatus('locked');
+      return 'locked';
+    },
+    [refreshWallets],
+  );
 
   const registerActivity = useCallback(() => {
     if (status !== 'unlocked') return;
@@ -255,6 +306,8 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
     setBackupCompletedState(false);
     setWallets([]);
     setActiveWalletIdState(null);
+    setNetworkSwitchMessage(null);
+    setSuppressAutoBiometric(false);
     setStatus('missing');
   };
 
@@ -283,6 +336,8 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
         });
       }
       await refreshWallets();
+      setNetworkSwitchMessage(null);
+      setSuppressAutoBiometric(false);
       setStatus('unlocked');
       scheduleLock();
       return { mnemonic, address: record.id };
@@ -319,6 +374,8 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
       });
     }
     await refreshWallets();
+    setNetworkSwitchMessage(null);
+    setSuppressAutoBiometric(false);
     setStatus('unlocked');
     scheduleLock();
     return { mnemonic, address: walletInstance.address };
@@ -342,6 +399,8 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
         });
       }
       await refreshWallets();
+      setNetworkSwitchMessage(null);
+      setSuppressAutoBiometric(false);
       setStatus('unlocked');
       scheduleLock();
       return { address: record.id };
@@ -376,6 +435,8 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
       });
     }
     await refreshWallets();
+    setNetworkSwitchMessage(null);
+    setSuppressAutoBiometric(false);
     setStatus('unlocked');
     scheduleLock();
     return { address: walletInstance.address };
@@ -397,7 +458,7 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
     await removeWalletRecord(walletId);
     const { records, activeId } = await refreshWallets();
     const hasRemaining = records.length > 0 || (await hasAnyWallets());
-    if (!hasRemaining || !activeId) {
+    if (!hasRemaining) {
       clearLockTimer();
       await clearWalletStorage();
       await clearBiometricPassword();
@@ -409,7 +470,20 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
       setBackupCompletedState(false);
       setWallets([]);
       setActiveWalletIdState(null);
+      setNetworkSwitchMessage(null);
+      setSuppressAutoBiometric(false);
       setStatus('missing');
+      return;
+    }
+    if (!activeId) {
+      clearLockTimer();
+      lastPasswordRef.current = null;
+      setWallet(null);
+      setAddress(null);
+      setRecoveryPhrase(null);
+      setBackupCompletedState(false);
+      setActiveWalletIdState(null);
+      setStatus('locked');
       return;
     }
     if (walletId === activeWalletId && lastPasswordRef.current) {
@@ -478,8 +552,12 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
       backupCompleted: backupCompletedState,
       wallets,
       activeWalletId,
+      networkSwitchMessage,
+      suppressAutoBiometric,
       unlock,
       lock,
+      lockForNetworkSwitch,
+      clearNetworkSwitchPrompt,
       createWallet,
       importWallet,
       confirmBackup,
@@ -497,6 +575,10 @@ export function WalletSessionProvider({ children, isWalletActive }: { children: 
       backupCompletedState,
       wallets,
       activeWalletId,
+      networkSwitchMessage,
+      suppressAutoBiometric,
+      lockForNetworkSwitch,
+      clearNetworkSwitchPrompt,
       registerActivity,
     ],
   );
